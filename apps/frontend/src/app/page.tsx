@@ -8,42 +8,70 @@ import {
 } from '@/lib/store/services/api'
 import { formatToman, formatChange, getChangeColor } from '@/lib/utils/formatters'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
+import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
+import { SiTether } from 'react-icons/si'
+import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
+import { FiArrowUp, FiArrowDown, FiClock, FiInfo } from 'react-icons/fi'
+import { HiRefresh } from 'react-icons/hi'
 
 // Currency items to display
 const currencyItems = [
-  { key: 'usd_sell', name: 'دلار آمریکا' },
-  { key: 'eur', name: 'یورو' },
-  { key: 'gbp', name: 'پوند انگلیس' },
-  { key: 'cad', name: 'دلار کانادا' },
-  { key: 'aud', name: 'دلار استرالیا' },
+  { key: 'usd_sell', name: 'دلار آمریکا', icon: FaDollarSign, color: 'text-blue-600' },
+  { key: 'eur', name: 'یورو', icon: FaEuroSign, color: 'text-blue-600' },
+  { key: 'gbp', name: 'پوند انگلیس', icon: FaPoundSign, color: 'text-blue-600' },
+  { key: 'cad', name: 'دلار کانادا', icon: FaDollarSign, color: 'text-blue-600' },
+  { key: 'aud', name: 'دلار استرالیا', icon: FaDollarSign, color: 'text-blue-600' },
 ]
 
 const cryptoItems = [
-  { key: 'usdt', name: 'تتر' },
-  { key: 'btc', name: 'بیت کوین' },
-  { key: 'eth', name: 'اتریوم' },
+  { key: 'usdt', name: 'تتر', icon: SiTether, color: 'text-purple-600' },
+  { key: 'btc', name: 'بیت کوین', icon: FaBitcoin, color: 'text-purple-600' },
+  { key: 'eth', name: 'اتریوم', icon: FaEthereum, color: 'text-purple-600' },
 ]
 
 const goldItems = [
-  { key: 'sekkeh', name: 'سکه امامی' },
-  { key: 'bahar', name: 'بهار آزادی' },
-  { key: 'nim', name: 'نیم سکه' },
-  { key: 'rob', name: 'ربع سکه' },
-  { key: 'gerami', name: 'سکه گرمی' },
-  { key: '18ayar', name: 'طلای 18 عیار' },
+  { key: 'sekkeh', name: 'سکه امامی', icon: GiTwoCoins, color: 'text-amber-600' },
+  { key: 'bahar', name: 'بهار آزادی', icon: GiTwoCoins, color: 'text-amber-600' },
+  { key: 'nim', name: 'نیم سکه', icon: GiTwoCoins, color: 'text-amber-600' },
+  { key: 'rob', name: 'ربع سکه', icon: GiTwoCoins, color: 'text-amber-600' },
+  { key: 'gerami', name: 'سکه گرمی', icon: GiTwoCoins, color: 'text-amber-600' },
+  { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-amber-600' },
 ]
 
-// Loading skeleton component
+// Loading skeleton component with shimmer effect
 function LoadingSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-4">
       {Array.from({ length: count }).map((_, idx) => (
-        <div key={idx} className="flex justify-between items-center border-b pb-3 last:border-b-0 animate-pulse">
-          <div className="flex-1">
-            <div className="h-5 bg-gray-200 rounded w-1/3 mb-2"></div>
-            <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+        <div key={idx} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
+          {/* Left side - Icon, Name and Price */}
+          <div className="flex items-center gap-3 flex-1">
+            {/* Icon skeleton */}
+            <div
+              className="w-8 h-8 rounded-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer"
+              style={{ backgroundSize: '1000px 100%' }}
+            ></div>
+
+            {/* Text content */}
+            <div className="flex-1">
+              {/* Name skeleton */}
+              <div
+                className="h-5 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded w-1/3 mb-2 animate-shimmer"
+                style={{ backgroundSize: '1000px 100%' }}
+              ></div>
+              {/* Price skeleton - larger to match actual price */}
+              <div
+                className="h-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded w-2/3 animate-shimmer"
+                style={{ backgroundSize: '1000px 100%' }}
+              ></div>
+            </div>
           </div>
-          <div className="h-4 bg-gray-200 rounded w-16"></div>
+
+          {/* Right side - Change badge skeleton */}
+          <div
+            className="h-8 w-20 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-shimmer"
+            style={{ backgroundSize: '1000px 100%' }}
+          ></div>
         </div>
       ))}
     </div>
@@ -52,6 +80,13 @@ function LoadingSkeleton({ count = 5 }: { count?: number }) {
 
 export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  // Category colors for visual distinction
+  const categoryColors = {
+    currencies: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', accent: 'border-t-blue-500' },
+    crypto: { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-700', accent: 'border-t-purple-500' },
+    gold: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', accent: 'border-t-amber-500' }
+  }
 
   const {
     data: currencies,
@@ -103,47 +138,46 @@ export default function Home() {
   const hasStaleData = (currenciesError && currencies) || (cryptoError && crypto) || (goldError && gold)
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto">
-        {/* Main Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4" dir="rtl">
+        {/* Main Header with Gradient */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white text-center py-8 px-4 shadow-lg mb-6">
+          <h1 className="text-3xl md:text-4xl font-bold mb-6 drop-shadow-lg" dir="rtl">
             نرخ ارز، طلا و ارز دیجیتال
           </h1>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4" dir="rtl">
             <button
               onClick={handleRefresh}
               disabled={isRefreshing || isFetching}
-              className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold px-6 py-3 rounded-full shadow-md hover:shadow-lg active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-200 flex items-center gap-2 text-base md:text-lg"
             >
-              {isFetching && (
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
+              <HiRefresh className={`text-xl ${isFetching ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'در حال بروزرسانی...' : isFetching ? 'در حال دریافت...' : 'بروزرسانی'}
             </button>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span className="relative flex h-2 w-2">
+            <div className="flex items-center gap-2 text-sm text-white/90">
+              <span className="relative flex h-3 w-3">
                 {isFetching ? (
                   <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-300 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-400"></span>
                   </>
                 ) : (
                   <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-300 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400"></span>
                   </>
                 )}
               </span>
+              <FiClock className="text-base" />
               <span>
                 آخرین بروزرسانی: {lastUpdated ? lastUpdated.toLocaleTimeString('fa-IR') : '--:--:--'}
               </span>
             </div>
           </div>
         </div>
+
+        {/* Content Container */}
+        <div className="p-4 sm:p-6 lg:p-8">
 
         {/* Stale Data Warning Banner */}
         {hasStaleData && !hasAllErrors && (
@@ -193,10 +227,14 @@ export default function Home() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {/* SECTION 1: Currencies */}
-          <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6" dir="rtl">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">
-              ارزها
-            </h2>
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden" dir="rtl">
+            <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
+              <h2 className="text-2xl md:text-3xl font-bold text-blue-700 text-center flex items-center justify-center gap-2">
+                <FaDollarSign className="text-3xl" />
+                ارزها
+              </h2>
+            </div>
+            <div className="p-6">
 
             {currenciesLoading && !currencies && <LoadingSkeleton count={5} />}
 
@@ -213,14 +251,20 @@ export default function Home() {
                 {currencyItems.map(item => {
                   const data = currencies[item.key]
                   if (!data) return null
+                  const Icon = item.icon
+                  const isPositive = data.change >= 0
 
                   return (
-                    <div key={item.key} className="flex justify-between items-center border-b pb-3 last:border-b-0">
-                      <div>
-                        <p className="font-semibold text-gray-800">{item.name}</p>
-                        <p className="text-sm text-gray-600">{formatToman(data.value)} تومان</p>
+                    <div key={item.key} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <Icon className={`text-2xl ${item.color}`} />
+                        <div>
+                          <p className="text-base md:text-lg font-semibold text-gray-700">{item.name}</p>
+                          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">{formatToman(data.value)} <span className="text-sm font-normal text-gray-600">تومان</span></p>
+                        </div>
                       </div>
-                      <div className={`text-sm font-medium ${getChangeColor(data.change)}`}>
+                      <div className={`inline-flex items-center gap-1 ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full px-3 py-1 text-sm font-medium`}>
+                        {isPositive ? <FiArrowUp className="text-base" /> : <FiArrowDown className="text-base" />}
                         {formatChange(data.change)}
                       </div>
                     </div>
@@ -228,13 +272,18 @@ export default function Home() {
                 })}
               </div>
             )}
+            </div>
           </div>
 
           {/* SECTION 2: Cryptocurrencies */}
-          <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6" dir="rtl">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">
-              ارزهای دیجیتال
-            </h2>
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-t-4 border-t-purple-500 overflow-hidden" dir="rtl">
+            <div className="bg-purple-50 px-6 py-4 border-b border-purple-100">
+              <h2 className="text-2xl md:text-3xl font-bold text-purple-700 text-center flex items-center justify-center gap-2">
+                <FaBitcoin className="text-3xl" />
+                ارزهای دیجیتال
+              </h2>
+            </div>
+            <div className="p-6">
 
             {cryptoLoading && !crypto && <LoadingSkeleton count={3} />}
 
@@ -251,14 +300,20 @@ export default function Home() {
                 {cryptoItems.map(item => {
                   const data = crypto[item.key]
                   if (!data) return null
+                  const Icon = item.icon
+                  const isPositive = data.change >= 0
 
                   return (
-                    <div key={item.key} className="flex justify-between items-center border-b pb-3 last:border-b-0">
-                      <div>
-                        <p className="font-semibold text-gray-800">{item.name}</p>
-                        <p className="text-sm text-gray-600">{formatToman(data.value)} تومان</p>
+                    <div key={item.key} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <Icon className={`text-2xl ${item.color}`} />
+                        <div>
+                          <p className="text-base md:text-lg font-semibold text-gray-700">{item.name}</p>
+                          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">{formatToman(data.value)} <span className="text-sm font-normal text-gray-600">تومان</span></p>
+                        </div>
                       </div>
-                      <div className={`text-sm font-medium ${getChangeColor(data.change)}`}>
+                      <div className={`inline-flex items-center gap-1 ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full px-3 py-1 text-sm font-medium`}>
+                        {isPositive ? <FiArrowUp className="text-base" /> : <FiArrowDown className="text-base" />}
                         {formatChange(data.change)}
                       </div>
                     </div>
@@ -266,13 +321,18 @@ export default function Home() {
                 })}
               </div>
             )}
+            </div>
           </div>
 
           {/* SECTION 3: Gold & Coins */}
-          <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 md:col-span-2 xl:col-span-1" dir="rtl">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">
-              طلا و سکه
-            </h2>
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-t-4 border-t-amber-500 overflow-hidden md:col-span-2 xl:col-span-1" dir="rtl">
+            <div className="bg-amber-50 px-6 py-4 border-b border-amber-100">
+              <h2 className="text-2xl md:text-3xl font-bold text-amber-700 text-center flex items-center justify-center gap-2">
+                <GiGoldBar className="text-3xl" />
+                طلا و سکه
+              </h2>
+            </div>
+            <div className="p-6">
 
             {goldLoading && !gold && <LoadingSkeleton count={6} />}
 
@@ -289,14 +349,20 @@ export default function Home() {
                 {goldItems.map(item => {
                   const data = gold[item.key]
                   if (!data) return null
+                  const Icon = item.icon
+                  const isPositive = data.change >= 0
 
                   return (
-                    <div key={item.key} className="flex justify-between items-center border-b pb-3 last:border-b-0">
-                      <div>
-                        <p className="font-semibold text-gray-800">{item.name}</p>
-                        <p className="text-sm text-gray-600">{formatToman(data.value)} تومان</p>
+                    <div key={item.key} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <Icon className={`text-2xl ${item.color}`} />
+                        <div>
+                          <p className="text-base md:text-lg font-semibold text-gray-700">{item.name}</p>
+                          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">{formatToman(data.value)} <span className="text-sm font-normal text-gray-600">تومان</span></p>
+                        </div>
                       </div>
-                      <div className={`text-sm font-medium ${getChangeColor(data.change)}`}>
+                      <div className={`inline-flex items-center gap-1 ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full px-3 py-1 text-sm font-medium`}>
+                        {isPositive ? <FiArrowUp className="text-base" /> : <FiArrowDown className="text-base" />}
                         {formatChange(data.change)}
                       </div>
                     </div>
@@ -304,14 +370,17 @@ export default function Home() {
                 })}
               </div>
             )}
+            </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="text-center mt-8 py-4 border-t border-gray-200" dir="rtl">
-          <p className="text-sm text-gray-600">
-            داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند
+          <p className="text-sm text-gray-600 flex items-center justify-center gap-2">
+            <FiInfo className="text-base" />
+            <span>داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند</span>
           </p>
+        </div>
         </div>
       </div>
     </div>

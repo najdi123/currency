@@ -28,7 +28,10 @@
       "Bash(git rm:*)",
       "Bash(git reset:*)",
       "Bash(git add:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
