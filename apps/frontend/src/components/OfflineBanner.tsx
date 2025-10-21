@@ -1,0 +1,332 @@
+/**
+ * Offline Banner Component
+ *
+ * Shows a banner when the user is offline or has a poor connection.
+ * Automatically hides when connection is restored.
+ *
+ * Features:
+ * - Shows when offline
+ * - Shows warning for poor connection
+ * - Auto-hides when connection restored
+ * - Smooth animations
+ * - Triggers refetch when reconnected (optional)
+ * - Persian text with RTL support
+ */
+
+'use client'
+
+import { useState, useEffect } from 'react'
+import {
+  useNetworkStatus,
+  getQualityText,
+  getConnectionTypeText,
+  type ConnectionQuality,
+} from '@/lib/hooks/useNetworkStatus'
+
+/**
+ * Offline Banner Props
+ */
+export interface OfflineBannerProps {
+  /** Callback when connection is restored (can trigger refetch) */
+  onReconnect?: () => void
+  /** Show warning for poor connection (default: true) */
+  showPoorConnectionWarning?: boolean
+  /** Auto-hide after reconnect (default: true) */
+  autoHideOnReconnect?: boolean
+  /** Auto-hide delay in ms (default: 3000) */
+  autoHideDelay?: number
+  /** Custom className */
+  className?: string
+}
+
+/**
+ * Get banner style based on connection quality
+ */
+function getBannerStyle(quality: ConnectionQuality): {
+  bg: string
+  border: string
+  text: string
+  icon: string
+} {
+  switch (quality) {
+    case 'offline':
+      return {
+        bg: 'bg-red-500',
+        border: 'border-red-600',
+        text: 'text-white',
+        icon: '🔴',
+      }
+    case 'poor':
+      return {
+        bg: 'bg-orange-500',
+        border: 'border-orange-600',
+        text: 'text-white',
+        icon: '⚠️',
+      }
+    case 'fair':
+      return {
+        bg: 'bg-yellow-500',
+        border: 'border-yellow-600',
+        text: 'text-white',
+        icon: '📶',
+      }
+    default:
+      return {
+        bg: 'bg-green-500',
+        border: 'border-green-600',
+        text: 'text-white',
+        icon: '✅',
+      }
+  }
+}
+
+/**
+ * Get banner message based on connection quality
+ */
+function getBannerMessage(
+  quality: ConnectionQuality,
+  isOnline: boolean,
+  connectionType?: string,
+  wasOffline?: boolean
+): { title: string; subtitle?: string } {
+  if (!isOnline || quality === 'offline') {
+    return {
+      title: 'شما آفلاین هستید',
+      subtitle: 'لطفاً اتصال اینترنت خود را بررسی کنید',
+    }
+  }
+
+  if (wasOffline) {
+    return {
+      title: 'اتصال برقرار شد',
+      subtitle: connectionType ? `نوع اتصال: ${connectionType}` : 'به اینترنت متصل شدید',
+    }
+  }
+
+  if (quality === 'poor') {
+    return {
+      title: 'اتصال ضعیف',
+      subtitle: 'سرعت اینترنت شما کند است',
+    }
+  }
+
+  if (quality === 'fair') {
+    return {
+      title: 'کیفیت اتصال متوسط',
+      subtitle: 'ممکن است برخی از عملیات کند باشند',
+    }
+  }
+
+  return {
+    title: 'اتصال برقرار شد',
+    subtitle: `کیفیت اتصال: ${getQualityText(quality)}`,
+  }
+}
+
+/**
+ * Offline Banner Component
+ */
+export function OfflineBanner({
+  onReconnect,
+  showPoorConnectionWarning = true,
+  autoHideOnReconnect = true,
+  autoHideDelay = 3000,
+  className = '',
+}: OfflineBannerProps) {
+  const { isOnline, quality, connectionType } = useNetworkStatus()
+  const [isVisible, setIsVisible] = useState(false)
+  const [wasOffline, setWasOffline] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+
+  // Track when user goes offline/online
+  useEffect(() => {
+    // Just went offline
+    if (!isOnline && !wasOffline) {
+      setWasOffline(true)
+      setIsVisible(true)
+      setIsClosing(false)
+    }
+
+    // Just came back online
+    if (isOnline && wasOffline) {
+      // Trigger refetch callback
+      if (onReconnect) {
+        onReconnect()
+      }
+
+      // Auto-hide after delay
+      if (autoHideOnReconnect) {
+        setTimeout(() => {
+          handleClose()
+        }, autoHideDelay)
+      }
+
+      setWasOffline(false)
+    }
+  }, [isOnline, wasOffline, onReconnect, autoHideOnReconnect, autoHideDelay])
+
+  // Show/hide based on connection quality
+  useEffect(() => {
+    if (!isOnline) {
+      setIsVisible(true)
+      setIsClosing(false)
+      return
+    }
+
+    if (showPoorConnectionWarning && (quality === 'poor' || quality === 'fair')) {
+      setIsVisible(true)
+      setIsClosing(false)
+      return
+    }
+
+    // Hide if connection is good and was not offline
+    if (!wasOffline && quality !== 'poor' && quality !== 'fair') {
+      if (isVisible) {
+        handleClose()
+      }
+    }
+  }, [isOnline, quality, showPoorConnectionWarning, wasOffline, isVisible])
+
+  // Handle close with animation
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setIsVisible(false)
+      setIsClosing(false)
+    }, 300) // Match animation duration
+  }
+
+  // Don't render if not visible
+  if (!isVisible) return null
+
+  const style = getBannerStyle(quality)
+  const message = getBannerMessage(quality, isOnline, getConnectionTypeText(connectionType), wasOffline)
+
+  return (
+    <div
+      className={`fixed top-0 left-0 right-0 z-50 ${className}`}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div
+        className={`${style.bg} ${style.text} shadow-lg border-b ${style.border} transition-all duration-300 ${
+          isClosing ? 'transform -translate-y-full opacity-0' : 'transform translate-y-0 opacity-100'
+        }`}
+      >
+        <div className="container mx-auto px-4 py-3" dir="rtl">
+          <div className="flex items-center justify-between gap-4">
+            {/* Icon and Message */}
+            <div className="flex items-center gap-3 flex-1">
+              {/* Icon */}
+              <div className="text-2xl flex-shrink-0" aria-hidden="true">
+                {style.icon}
+              </div>
+
+              {/* Message */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm sm:text-base">
+                  {message.title}
+                </p>
+                {message.subtitle && (
+                  <p className="text-xs sm:text-sm opacity-90 mt-0.5">
+                    {message.subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Close Button */}
+            {(isOnline || quality !== 'offline') && (
+              <button
+                onClick={handleClose}
+                className="flex-shrink-0 p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                aria-label="بستن"
+                type="button"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Minimal Offline Indicator (for bottom-right corner)
+ */
+export function OfflineIndicator() {
+  const { isOnline, quality } = useNetworkStatus()
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    setIsVisible(!isOnline || quality === 'poor')
+  }, [isOnline, quality])
+
+  if (!isVisible) return null
+
+  const style = getBannerStyle(quality)
+
+  return (
+    <div
+      className="fixed bottom-4 right-4 z-40 animate-pulse"
+      role="status"
+      aria-label={isOnline ? 'اتصال ضعیف' : 'آفلاین'}
+    >
+      <div
+        className={`${style.bg} ${style.text} rounded-full shadow-lg px-4 py-2 flex items-center gap-2 text-sm font-medium`}
+      >
+        <span className="text-lg" aria-hidden="true">
+          {style.icon}
+        </span>
+        <span>{isOnline ? 'اتصال ضعیف' : 'آفلاین'}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Connection Quality Badge (for inline display)
+ */
+export function ConnectionQualityBadge({ showWhenGood = false }: { showWhenGood?: boolean }) {
+  const { quality, connectionType, effectiveBandwidth, rtt } = useNetworkStatus()
+
+  // Hide when connection is good and showWhenGood is false
+  if (!showWhenGood && (quality === 'excellent' || quality === 'good')) {
+    return null
+  }
+
+  const style = getBannerStyle(quality)
+
+  return (
+    <div
+      className={`inline-flex items-center gap-2 ${style.bg} ${style.text} rounded-full px-3 py-1 text-xs font-medium`}
+      title={`کیفیت: ${getQualityText(quality)}${
+        connectionType ? ` - نوع: ${getConnectionTypeText(connectionType)}` : ''
+      }${effectiveBandwidth ? ` - سرعت: ${effectiveBandwidth.toFixed(1)} Mbps` : ''}${
+        rtt ? ` - RTT: ${rtt}ms` : ''
+      }`}
+    >
+      <span aria-hidden="true">{style.icon}</span>
+      <span>{getQualityText(quality)}</span>
+      {connectionType && (
+        <span className="opacity-75">({getConnectionTypeText(connectionType)})</span>
+      )}
+    </div>
+  )
+}
+
+export default OfflineBanner
