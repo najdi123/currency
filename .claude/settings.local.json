@@ -25,7 +25,10 @@
       "Bash(timeout /t 5 /nobreak)",
       "Bash(curl:*)",
       "Bash(npm run dev:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git reset:*)",
+      "Bash(git add:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
