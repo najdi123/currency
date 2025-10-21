@@ -137,6 +137,7 @@ export function OfflineBanner({
   const [isVisible, setIsVisible] = useState(false)
   const [wasOffline, setWasOffline] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false) // Track manual dismissal
 
   // Track when user goes offline/online
   useEffect(() => {
@@ -145,6 +146,7 @@ export function OfflineBanner({
       setWasOffline(true)
       setIsVisible(true)
       setIsClosing(false)
+      setIsDismissed(false) // Reset dismissal when going offline
     }
 
     // Just came back online
@@ -162,11 +164,17 @@ export function OfflineBanner({
       }
 
       setWasOffline(false)
+      setIsDismissed(false) // Reset dismissal when coming back online
     }
   }, [isOnline, wasOffline, onReconnect, autoHideOnReconnect, autoHideDelay])
 
   // Show/hide based on connection quality
   useEffect(() => {
+    // Don't show if user manually dismissed it
+    if (isDismissed) {
+      return
+    }
+
     if (!isOnline) {
       setIsVisible(true)
       setIsClosing(false)
@@ -185,11 +193,12 @@ export function OfflineBanner({
         handleClose()
       }
     }
-  }, [isOnline, quality, showPoorConnectionWarning, wasOffline, isVisible])
+  }, [isOnline, quality, showPoorConnectionWarning, wasOffline, isVisible, isDismissed])
 
   // Handle close with animation
   const handleClose = () => {
     setIsClosing(true)
+    setIsDismissed(true) // Mark as dismissed by user
     setTimeout(() => {
       setIsVisible(false)
       setIsClosing(false)
