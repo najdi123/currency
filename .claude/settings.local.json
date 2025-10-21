@@ -24,7 +24,8 @@
       "Bash(npm run start:dev:*)",
       "Bash(timeout /t 5 /nobreak)",
       "Bash(curl:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
