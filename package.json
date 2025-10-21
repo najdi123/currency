@@ -1,0 +1,18 @@
+{
+  "name": "currency-tracker-monorepo",
+  "version": "1.0.0",
+  "description": "Currency tracking application with prices in Iranian Toman",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "backend:dev": "npm run start:dev --workspace=apps/backend",
+    "backend:build": "npm run build --workspace=apps/backend",
+    "backend:start": "npm run start:prod --workspace=apps/backend"
+  },
+  "keywords": ["currency", "toman", "cryptocurrency", "gold", "exchange-rate"],
+  "author": "",
+  "license": "ISC"
+}

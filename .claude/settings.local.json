@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run backend:dev)",
+      "Bash(timeout /t 10 /nobreak)",
+      "Bash(curl -s http://localhost:4000/api/health)",
+      "Bash(curl -s -X POST http://localhost:4000/api/currencies -H \"Content-Type: application/json\" -d \"{\"\"code\"\":\"\"USD\"\",\"\"name\"\":\"\"US Dollar\"\",\"\"symbol\"\":\"\"$\"\",\"\"priceInToman\"\":580000,\"\"changePercentage24h\"\":1.5}\")",
+      "Bash(curl -s -X POST http://localhost:4000/api/currencies -H \"Content-Type: application/json\" -d \"{\"\"code\"\":\"\"USD\"\",\"\"name\"\":\"\"US Dollar\"\",\"\"symbol\"\":\"\"$\"\",\"\"priceInToman\"\":580000}\" -w \"\\nHTTP Status: %{http_code}\")",
+      "Bash(curl -s http://localhost:4000/api/currencies/code/USD)",
+      "Bash(curl -s -X POST http://localhost:4000/api/digital-currencies -H \"Content-Type: application/json\" -d \"{\"\"symbol\"\":\"\"BTC\"\",\"\"name\"\":\"\"Bitcoin\"\",\"\"priceInToman\"\":2500000000,\"\"marketCapInToman\"\":50000000000000,\"\"changePercentage24h\"\":2.3}\")",
+      "Bash(curl -s -X POST http://localhost:4000/api/digital-currencies -H \"Content-Type: application/json\" -d \"{\"\"symbol\"\":\"\"ETH\"\",\"\"name\"\":\"\"Ethereum\"\",\"\"priceInToman\"\":150000000,\"\"marketCapInToman\"\":30000000000000,\"\"changePercentage24h\"\":1.8}\")",
+      "Bash(curl -s http://localhost:4000/api/digital-currencies/symbol/BTC)",
+      "Bash(curl -s \"http://localhost:4000/api/digital-currencies/top?limit=10\")",
+      "Bash(npx tsc --noEmit)",
+      "Bash(curl -s -X POST http://localhost:4000/api/currencies -H \"Content-Type: application/json\" -d \"{\"\"code\"\":\"\"\"\",\"\"name\"\":\"\"US Dollar\"\",\"\"symbol\"\":\"\"$\"\",\"\"priceInToman\"\":-100}\" -w \"\\nHTTP Status: %{http_code}\")",
+      "Bash(curl -s -X POST http://localhost:4000/api/currencies -H \"Content-Type: application/json\" -d \"{}\" -w \"\\nHTTP Status: %{http_code}\")",
+      "Bash(curl -s http://localhost:4000/api/currencies/invalid-id-format)",
+      "Bash(npm install axios)",
+      "Bash(curl -s http://localhost:4000/api/navasan/currencies)",
+      "Bash(curl -s http://localhost:4000/api/navasan/crypto)",
+      "Bash(curl -s http://localhost:4000/api/navasan/gold)",
+      "Bash(npm install @reduxjs/toolkit react-redux)",
+      "Bash(npm run start:dev:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
