@@ -1,17 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
 } from '@/lib/store/services/api'
-import { formatToman, formatChange, getChangeColor } from '@/lib/utils/formatters'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
+import { ItemCardGrid } from '@/components/ItemCardGrid'
+import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
 import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
 import { SiTether } from 'react-icons/si'
 import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
-import { FiArrowUp, FiArrowDown, FiClock, FiInfo } from 'react-icons/fi'
+import { FiClock, FiInfo } from 'react-icons/fi'
 import { HiRefresh } from 'react-icons/hi'
 
 // Currency items to display
@@ -38,55 +40,8 @@ const goldItems = [
   { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-amber-600' },
 ]
 
-// Loading skeleton component with shimmer effect
-function LoadingSkeleton({ count = 5 }: { count?: number }) {
-  return (
-    <div className="space-y-4">
-      {Array.from({ length: count }).map((_, idx) => (
-        <div key={idx} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
-          {/* Left side - Icon, Name and Price */}
-          <div className="flex items-center gap-3 flex-1">
-            {/* Icon skeleton */}
-            <div
-              className="w-8 h-8 rounded-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer"
-              style={{ backgroundSize: '1000px 100%' }}
-            ></div>
-
-            {/* Text content */}
-            <div className="flex-1">
-              {/* Name skeleton */}
-              <div
-                className="h-5 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded w-1/3 mb-2 animate-shimmer"
-                style={{ backgroundSize: '1000px 100%' }}
-              ></div>
-              {/* Price skeleton - larger to match actual price */}
-              <div
-                className="h-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded w-2/3 animate-shimmer"
-                style={{ backgroundSize: '1000px 100%' }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Right side - Change badge skeleton */}
-          <div
-            className="h-8 w-20 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full animate-shimmer"
-            style={{ backgroundSize: '1000px 100%' }}
-          ></div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-
-  // Category colors for visual distinction
-  const categoryColors = {
-    currencies: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', accent: 'border-t-blue-500' },
-    crypto: { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-700', accent: 'border-t-purple-500' },
-    gold: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', accent: 'border-t-amber-500' }
-  }
 
   const {
     data: currencies,
@@ -94,7 +49,6 @@ export default function Home() {
     isFetching: currenciesFetching,
     error: currenciesError,
     refetch: refetchCurrencies,
-    fulfilledTimeStamp: currenciesTimestamp,
   } = useGetCurrenciesQuery(undefined, {
     pollingInterval: 300000, // 5 minutes
   })
@@ -104,7 +58,6 @@ export default function Home() {
     isFetching: cryptoFetching,
     error: cryptoError,
     refetch: refetchCrypto,
-    fulfilledTimeStamp: cryptoTimestamp,
   } = useGetCryptoQuery(undefined, {
     pollingInterval: 300000, // 5 minutes
   })
@@ -114,7 +67,6 @@ export default function Home() {
     isFetching: goldFetching,
     error: goldError,
     refetch: refetchGold,
-    fulfilledTimeStamp: goldTimestamp,
   } = useGetGoldQuery(undefined, {
     pollingInterval: 300000, // 5 minutes
   })
@@ -130,12 +82,21 @@ export default function Home() {
     await Promise.all([refetchCurrencies(), refetchCrypto(), refetchGold()])
   }
 
-  const isRefreshing = currenciesLoading || cryptoLoading || goldLoading
-  const isFetching = currenciesFetching || cryptoFetching || goldFetching
-  const hasAllErrors = currenciesError && cryptoError && goldError
+  // Memoize computed state to prevent unnecessary re-renders
+  const computedState = useMemo(() => ({
+    isRefreshing: currenciesLoading || cryptoLoading || goldLoading,
+    isFetching: currenciesFetching || cryptoFetching || goldFetching,
+    hasAllErrors: currenciesError && cryptoError && goldError,
+    hasStaleData: (currenciesError && currencies) || (cryptoError && crypto) || (goldError && gold),
+    anyError: currenciesError || cryptoError || goldError
+  }), [
+    currenciesLoading, cryptoLoading, goldLoading,
+    currenciesFetching, cryptoFetching, goldFetching,
+    currenciesError, cryptoError, goldError,
+    currencies, crypto, gold
+  ])
 
-  // Check if showing stale data (has error but also has cached data)
-  const hasStaleData = (currenciesError && currencies) || (cryptoError && crypto) || (goldError && gold)
+  const { isRefreshing, isFetching, hasAllErrors, hasStaleData } = computedState
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -150,12 +111,14 @@ export default function Home() {
               onClick={handleRefresh}
               disabled={isRefreshing || isFetching}
               className="bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold px-6 py-3 rounded-full shadow-md hover:shadow-lg active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-200 flex items-center gap-2 text-base md:text-lg"
+              aria-label={isRefreshing ? 'در حال بروزرسانی قیمت‌ها' : 'بروزرسانی قیمت‌ها'}
+              aria-busy={isRefreshing || isFetching}
             >
-              <HiRefresh className={`text-xl ${isFetching ? 'animate-spin' : ''}`} />
+              <HiRefresh className={`text-xl ${isFetching ? 'animate-spin' : ''}`} aria-hidden="true" />
               {isRefreshing ? 'در حال بروزرسانی...' : isFetching ? 'در حال دریافت...' : 'بروزرسانی'}
             </button>
             <div className="flex items-center gap-2 text-sm text-white/90">
-              <span className="relative flex h-3 w-3">
+              <span className="relative flex h-3 w-3" aria-hidden="true">
                 {isFetching ? (
                   <>
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-300 opacity-75"></span>
@@ -168,12 +131,24 @@ export default function Home() {
                   </>
                 )}
               </span>
-              <FiClock className="text-base" />
-              <span>
-                آخرین بروزرسانی: {lastUpdated ? lastUpdated.toLocaleTimeString('fa-IR') : '--:--:--'}
-              </span>
+              <FiClock className="text-base" aria-hidden="true" />
+              <p className="text-sm text-white/90" aria-live="polite">
+                آخرین بروزرسانی: {lastUpdated ? (
+                  <time dateTime={lastUpdated.toISOString()}>
+                    {lastUpdated.toLocaleTimeString('fa-IR')}
+                  </time>
+                ) : '--:--:--'}
+              </p>
             </div>
           </div>
+        </div>
+
+        {/* ARIA Live Region for Screen Readers */}
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {(currenciesFetching || cryptoFetching || goldFetching) && 'در حال بروزرسانی قیمت‌ها...'}
+          {!currenciesFetching && !cryptoFetching && !goldFetching && lastUpdated &&
+            `قیمت‌ها به‌روز شدند. آخرین بروزرسانی: ${new Date(lastUpdated).toLocaleTimeString('fa-IR')}`
+          }
         </div>
 
         {/* Content Container */}
@@ -225,18 +200,26 @@ export default function Home() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="space-y-8">
           {/* SECTION 1: Currencies */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden" dir="rtl">
+          <section
+            className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-blue-500 overflow-hidden"
+            dir="rtl"
+            lang="fa"
+            aria-labelledby="currencies-heading"
+          >
             <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
-              <h2 className="text-2xl md:text-3xl font-bold text-blue-700 text-center flex items-center justify-center gap-2">
-                <FaDollarSign className="text-3xl" />
+              <h2
+                id="currencies-heading"
+                className="text-2xl md:text-3xl font-bold text-blue-700 text-center flex items-center justify-center gap-2"
+              >
+                <FaDollarSign className="text-3xl" aria-hidden="true" />
                 ارزها
               </h2>
             </div>
             <div className="p-6">
 
-            {currenciesLoading && !currencies && <LoadingSkeleton count={5} />}
+            {currenciesLoading && !currencies && <ItemCardSkeleton count={5} />}
 
             {currenciesError && !currencies && (
               <ErrorDisplay
@@ -247,45 +230,49 @@ export default function Home() {
             )}
 
             {currencies && (
-              <div className="space-y-4">
-                {currencyItems.map(item => {
-                  const data = currencies[item.key]
-                  if (!data) return null
-                  const Icon = item.icon
-                  const isPositive = data.change >= 0
-
-                  return (
-                    <div key={item.key} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Icon className={`text-2xl ${item.color}`} />
-                        <div>
-                          <p className="text-base md:text-lg font-semibold text-gray-700">{item.name}</p>
-                          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">{formatToman(data.value)} <span className="text-sm font-normal text-gray-600">تومان</span></p>
-                        </div>
-                      </div>
-                      <div className={`inline-flex items-center gap-1 ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full px-3 py-1 text-sm font-medium`}>
-                        {isPositive ? <FiArrowUp className="text-base" /> : <FiArrowDown className="text-base" />}
-                        {formatChange(data.change)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <ErrorBoundary
+                boundaryName="CurrenciesGrid"
+                fallback={(_error, reset) => (
+                  <div className="p-4 text-center text-gray-600" dir="rtl" role="alert" aria-live="assertive">
+                    <p className="mb-2">خطا در نمایش اطلاعات ارزها.</p>
+                    <button
+                      onClick={reset}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      تلاش مجدد
+                    </button>
+                  </div>
+                )}
+              >
+                <ItemCardGrid
+                  items={currencyItems}
+                  data={currencies}
+                  accentColor="blue"
+                />
+              </ErrorBoundary>
             )}
             </div>
-          </div>
+          </section>
 
           {/* SECTION 2: Cryptocurrencies */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-t-4 border-t-purple-500 overflow-hidden" dir="rtl">
+          <section
+            className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-purple-500 overflow-hidden"
+            dir="rtl"
+            lang="fa"
+            aria-labelledby="crypto-heading"
+          >
             <div className="bg-purple-50 px-6 py-4 border-b border-purple-100">
-              <h2 className="text-2xl md:text-3xl font-bold text-purple-700 text-center flex items-center justify-center gap-2">
-                <FaBitcoin className="text-3xl" />
+              <h2
+                id="crypto-heading"
+                className="text-2xl md:text-3xl font-bold text-purple-700 text-center flex items-center justify-center gap-2"
+              >
+                <FaBitcoin className="text-3xl" aria-hidden="true" />
                 ارزهای دیجیتال
               </h2>
             </div>
             <div className="p-6">
 
-            {cryptoLoading && !crypto && <LoadingSkeleton count={3} />}
+            {cryptoLoading && !crypto && <ItemCardSkeleton count={3} />}
 
             {cryptoError && !crypto && (
               <ErrorDisplay
@@ -296,45 +283,49 @@ export default function Home() {
             )}
 
             {crypto && (
-              <div className="space-y-4">
-                {cryptoItems.map(item => {
-                  const data = crypto[item.key]
-                  if (!data) return null
-                  const Icon = item.icon
-                  const isPositive = data.change >= 0
-
-                  return (
-                    <div key={item.key} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Icon className={`text-2xl ${item.color}`} />
-                        <div>
-                          <p className="text-base md:text-lg font-semibold text-gray-700">{item.name}</p>
-                          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">{formatToman(data.value)} <span className="text-sm font-normal text-gray-600">تومان</span></p>
-                        </div>
-                      </div>
-                      <div className={`inline-flex items-center gap-1 ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full px-3 py-1 text-sm font-medium`}>
-                        {isPositive ? <FiArrowUp className="text-base" /> : <FiArrowDown className="text-base" />}
-                        {formatChange(data.change)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <ErrorBoundary
+                boundaryName="CryptoGrid"
+                fallback={(_error, reset) => (
+                  <div className="p-4 text-center text-gray-600" dir="rtl" role="alert" aria-live="assertive">
+                    <p className="mb-2">خطا در نمایش اطلاعات ارزهای دیجیتال.</p>
+                    <button
+                      onClick={reset}
+                      className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors text-sm"
+                    >
+                      تلاش مجدد
+                    </button>
+                  </div>
+                )}
+              >
+                <ItemCardGrid
+                  items={cryptoItems}
+                  data={crypto}
+                  accentColor="purple"
+                />
+              </ErrorBoundary>
             )}
             </div>
-          </div>
+          </section>
 
           {/* SECTION 3: Gold & Coins */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-t-4 border-t-amber-500 overflow-hidden md:col-span-2 xl:col-span-1" dir="rtl">
+          <section
+            className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-amber-500 overflow-hidden"
+            dir="rtl"
+            lang="fa"
+            aria-labelledby="gold-heading"
+          >
             <div className="bg-amber-50 px-6 py-4 border-b border-amber-100">
-              <h2 className="text-2xl md:text-3xl font-bold text-amber-700 text-center flex items-center justify-center gap-2">
-                <GiGoldBar className="text-3xl" />
+              <h2
+                id="gold-heading"
+                className="text-2xl md:text-3xl font-bold text-amber-700 text-center flex items-center justify-center gap-2"
+              >
+                <GiGoldBar className="text-3xl" aria-hidden="true" />
                 طلا و سکه
               </h2>
             </div>
             <div className="p-6">
 
-            {goldLoading && !gold && <LoadingSkeleton count={6} />}
+            {goldLoading && !gold && <ItemCardSkeleton count={6} />}
 
             {goldError && !gold && (
               <ErrorDisplay
@@ -345,33 +336,29 @@ export default function Home() {
             )}
 
             {gold && (
-              <div className="space-y-4">
-                {goldItems.map(item => {
-                  const data = gold[item.key]
-                  if (!data) return null
-                  const Icon = item.icon
-                  const isPositive = data.change >= 0
-
-                  return (
-                    <div key={item.key} className="flex justify-between items-center border-b border-l-2 border-l-transparent pb-3 last:border-b-0 hover:bg-gray-50 hover:border-l-4 hover:border-l-blue-500 transition-all duration-150 px-2 -mx-2 rounded cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Icon className={`text-2xl ${item.color}`} />
-                        <div>
-                          <p className="text-base md:text-lg font-semibold text-gray-700">{item.name}</p>
-                          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">{formatToman(data.value)} <span className="text-sm font-normal text-gray-600">تومان</span></p>
-                        </div>
-                      </div>
-                      <div className={`inline-flex items-center gap-1 ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full px-3 py-1 text-sm font-medium`}>
-                        {isPositive ? <FiArrowUp className="text-base" /> : <FiArrowDown className="text-base" />}
-                        {formatChange(data.change)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <ErrorBoundary
+                boundaryName="GoldGrid"
+                fallback={(_error, reset) => (
+                  <div className="p-4 text-center text-gray-600" dir="rtl" role="alert" aria-live="assertive">
+                    <p className="mb-2">خطا در نمایش اطلاعات طلا و سکه.</p>
+                    <button
+                      onClick={reset}
+                      className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700 transition-colors text-sm"
+                    >
+                      تلاش مجدد
+                    </button>
+                  </div>
+                )}
+              >
+                <ItemCardGrid
+                  items={goldItems}
+                  data={gold}
+                  accentColor="amber"
+                />
+              </ErrorBoundary>
             )}
             </div>
-          </div>
+          </section>
         </div>
 
         {/* Footer */}

@@ -17,7 +17,7 @@ import { logApiError, addBreadcrumb, logPerformance } from '@/lib/errorLogger'
 
 // TypeScript interfaces for API responses
 export interface RateItem {
-  value: string
+  value: number
   change: number
   timestamp: number
   date: string
