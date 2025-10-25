@@ -3,6 +3,7 @@ import { Vazirmatn } from "next/font/google";
 import "./globals.css";
 import StoreProvider from "@/lib/StoreProvider";
 import { OfflineBannerWrapper } from "@/components/OfflineBannerWrapper";
+import { ThemeProvider } from "next-themes";
 
 // Professional Persian font - Vazirmatn Variable Font
 // Optimized for Persian/Farsi text with excellent readability
@@ -24,12 +25,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className={vazirmatn.variable}>
+    <html lang="fa" dir="rtl" className={vazirmatn.variable} suppressHydrationWarning>
       <body className={vazirmatn.className}>
-        <StoreProvider>
-          <OfflineBannerWrapper />
-          {children}
-        </StoreProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem={true}
+          disableTransitionOnChange={false}
+        >
+          <StoreProvider>
+            <OfflineBannerWrapper />
+            {children}
+          </StoreProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

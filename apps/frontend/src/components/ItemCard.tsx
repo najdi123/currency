@@ -7,16 +7,16 @@ import { logComponentError } from '@/lib/errorLogger'
 /**
  * Supported accent color variants for hover border effects
  */
-export type AccentColorVariant = 'blue' | 'purple' | 'amber'
+export type AccentColorVariant = 'blue' | 'purple' | 'gold'
 
 /**
  * Mapping of accent color variants to their Tailwind classes
  * This ensures Tailwind can statically analyze and include these classes in the build
  */
 const accentColorClasses: Record<AccentColorVariant, string> = {
-  blue: 'hover:border-l-blue-500',
-  purple: 'hover:border-l-purple-500',
-  amber: 'hover:border-l-amber-500',
+  blue: 'hover:border-l-blue-500 dark:hover:border-l-blue-400',
+  purple: 'hover:border-l-purple-500 dark:hover:border-l-purple-400',
+  gold: 'hover:border-l-gold-500 dark:hover:border-l-gold-400',
 }
 
 export interface ItemCardProps {
@@ -104,27 +104,27 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         role={role}
         className={`
           flex justify-between items-center
-          bg-white rounded-lg shadow-sm hover:shadow-md
-          border border-gray-200 border-l-2 border-l-transparent
-          hover:bg-gray-50 hover:border-l-4 ${accentColorClasses[accentColor]}
+          bg-surface rounded-lg shadow-sm hover:shadow-md
+          border border-border border-l-2 border-l-transparent
+          hover:bg-surface-secondary hover:border-l-4 ${accentColorClasses[accentColor]}
           transition-all duration-200
           p-4
           cursor-pointer
-          focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
+          focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-surface
           w-full text-left
         `}
         aria-label={`${name}: ${formatToman(value)} تومان، ${change >= 0 ? 'افزایش' : 'کاهش'} ${Math.abs(change)} درصد نسبت به قبل`}
       >
         {/* Left side - Placeholder Icon, Name and Price */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gray-200 rounded-full" aria-hidden="true" />
+          <div className="w-8 h-8 bg-surface-tertiary rounded-full" aria-hidden="true" />
           <div>
-            <p className="text-base md:text-lg font-semibold text-gray-700">
+            <p className="text-base md:text-lg font-semibold text-text-secondary">
               {name}
             </p>
-            <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">
+            <p className="text-2xl md:text-3xl font-bold font-mono text-text-primary">
               {formatToman(value)}{' '}
-              <span className="text-sm font-normal text-gray-600">تومان</span>
+              <span className="text-sm font-normal text-text-tertiary">تومان</span>
             </p>
           </div>
         </div>
@@ -133,7 +133,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div
           className={`
             inline-flex items-center gap-1
-            ${change >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
+            ${change >= 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'}
             rounded-full px-3 py-1 text-sm font-medium
           `}
           aria-label={change >= 0 ? 'افزایش قیمت' : 'کاهش قیمت'}
@@ -158,13 +158,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       role={role}
       className={`
         flex justify-between items-center
-        bg-white rounded-lg shadow-sm hover:shadow-md
-        border border-gray-200 border-l-2 border-l-transparent
-        hover:bg-gray-50 hover:border-l-4 ${accentColorClasses[accentColor]}
+        bg-surface rounded-lg shadow-sm hover:shadow-md
+        border border-border border-l-2 border-l-transparent
+        hover:bg-surface-secondary hover:border-l-4 ${accentColorClasses[accentColor]}
         transition-all duration-200
         p-4
         cursor-pointer
-        focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
+        focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-surface
         w-full text-left
       `}
       aria-label={`${name}: ${formatToman(value)} تومان، ${isPositive ? 'افزایش' : 'کاهش'} ${Math.abs(change)} درصد نسبت به قبل`}
@@ -176,12 +176,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           aria-hidden="true"
         />
         <div>
-          <p className="text-base md:text-lg font-semibold text-gray-700">
+          <p className="text-base md:text-lg font-semibold text-text-secondary">
             {name}
           </p>
-          <p className="text-2xl md:text-3xl font-bold font-mono text-gray-900">
+          <p className="text-2xl md:text-3xl font-bold font-mono text-text-primary">
             {formatToman(value)}{' '}
-            <span className="text-sm font-normal text-gray-600">تومان</span>
+            <span className="text-sm font-normal text-text-tertiary">تومان</span>
           </p>
         </div>
       </div>
@@ -190,7 +190,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       <div
         className={`
           inline-flex items-center gap-1
-          ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}
+          ${isPositive ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'}
           rounded-full px-3 py-1 text-sm font-medium
         `}
         aria-label={isPositive ? 'افزایش قیمت' : 'کاهش قیمت'}

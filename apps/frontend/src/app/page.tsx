@@ -10,6 +10,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { ItemCardGrid } from '@/components/ItemCardGrid'
 import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
 import { SiTether } from 'react-icons/si'
 import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
@@ -32,12 +33,12 @@ const cryptoItems = [
 ]
 
 const goldItems = [
-  { key: 'sekkeh', name: 'سکه امامی', icon: GiTwoCoins, color: 'text-amber-600' },
-  { key: 'bahar', name: 'بهار آزادی', icon: GiTwoCoins, color: 'text-amber-600' },
-  { key: 'nim', name: 'نیم سکه', icon: GiTwoCoins, color: 'text-amber-600' },
-  { key: 'rob', name: 'ربع سکه', icon: GiTwoCoins, color: 'text-amber-600' },
-  { key: 'gerami', name: 'سکه گرمی', icon: GiTwoCoins, color: 'text-amber-600' },
-  { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-amber-600' },
+  { key: 'sekkeh', name: 'سکه امامی', icon: GiTwoCoins, color: 'text-gold-600' },
+  { key: 'bahar', name: 'بهار آزادی', icon: GiTwoCoins, color: 'text-gold-600' },
+  { key: 'nim', name: 'نیم سکه', icon: GiTwoCoins, color: 'text-gold-600' },
+  { key: 'rob', name: 'ربع سکه', icon: GiTwoCoins, color: 'text-gold-600' },
+  { key: 'gerami', name: 'سکه گرمی', icon: GiTwoCoins, color: 'text-gold-600' },
+  { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-gold-600' },
 ]
 
 export default function Home() {
@@ -99,18 +100,21 @@ export default function Home() {
   const { isRefreshing, isFetching, hasAllErrors, hasStaleData } = computedState
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-secondary">
       <div className="max-w-7xl mx-auto">
         {/* Main Header with Gradient */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white text-center py-8 px-4 shadow-lg mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold mb-6 drop-shadow-lg" dir="rtl">
-            نرخ ارز، طلا و ارز دیجیتال
-          </h1>
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 text-white text-center py-8 px-4 shadow-lg mb-6">
+          <div className="flex items-center justify-center gap-4 mb-6" dir="rtl">
+            <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg">
+              نرخ ارز، طلا و ارز دیجیتال
+            </h1>
+            <ThemeToggle />
+          </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4" dir="rtl">
             <button
               onClick={handleRefresh}
               disabled={isRefreshing || isFetching}
-              className="bg-white text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold px-6 py-3 rounded-full shadow-md hover:shadow-lg active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-200 flex items-center gap-2 text-base md:text-lg"
+              className="bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold px-6 py-3 rounded-full shadow-md hover:shadow-lg active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-500 transition-all duration-200 flex items-center gap-2 text-base md:text-lg"
               aria-label={isRefreshing ? 'در حال بروزرسانی قیمت‌ها' : 'بروزرسانی قیمت‌ها'}
               aria-busy={isRefreshing || isFetching}
             >
@@ -156,18 +160,18 @@ export default function Home() {
 
         {/* Stale Data Warning Banner */}
         {hasStaleData && !hasAllErrors && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6" dir="rtl">
+          <div className="bg-warning-bg border border-warning-text/30 dark:border-warning-text/50 rounded-lg p-4 mb-6" dir="rtl">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
-                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-warning-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-yellow-800 mb-1">
+                <h3 className="text-sm font-semibold text-warning-text mb-1">
                   داده‌ها ممکن است قدیمی باشند
                 </h3>
-                <p className="text-sm text-yellow-700">
+                <p className="text-sm text-warning-text">
                   امکان دریافت آخرین اطلاعات وجود ندارد. داده‌های ذخیره‌شده قبلی نمایش داده می‌شوند.
                   {lastUpdated && (
                     <> آخرین بروزرسانی موفق: {lastUpdated.toLocaleTimeString('fa-IR')}</>
@@ -175,7 +179,7 @@ export default function Home() {
                 </p>
                 <button
                   onClick={handleRefresh}
-                  className="mt-2 text-sm text-yellow-800 hover:text-yellow-900 font-medium underline"
+                  className="mt-2 text-sm text-warning-text hover:opacity-80 font-medium underline"
                 >
                   تلاش مجدد برای بروزرسانی
                 </button>
@@ -186,13 +190,13 @@ export default function Home() {
 
         {/* Global Error Message - only show if no cached data at all */}
         {hasAllErrors && !currencies && !crypto && !gold && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6" dir="rtl">
+          <div className="bg-error-bg border border-error-text/30 dark:border-error-text/50 rounded-lg p-6 mb-6" dir="rtl">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-red-800 mb-2">خطا در دریافت اطلاعات</h3>
-              <p className="text-red-600 mb-4">امکان دریافت اطلاعات از سرور وجود ندارد. لطفاً دوباره تلاش کنید.</p>
+              <h3 className="text-lg font-semibold text-error-text mb-2">خطا در دریافت اطلاعات</h3>
+              <p className="text-error-text mb-4">امکان دریافت اطلاعات از سرور وجود ندارد. لطفاً دوباره تلاش کنید.</p>
               <button
                 onClick={handleRefresh}
-                className="bg-red-600 text-white rounded px-6 py-2 hover:bg-red-700 transition-colors"
+                className="bg-red-600 dark:bg-red-700 text-white rounded px-6 py-2 hover:bg-red-700 dark:hover:bg-red-800 transition-colors"
               >
                 تلاش مجدد
               </button>
@@ -203,15 +207,15 @@ export default function Home() {
         <div className="space-y-8">
           {/* SECTION 1: Currencies */}
           <section
-            className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-blue-500 overflow-hidden"
+            className="bg-surface/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-blue-500 dark:border-t-blue-600 overflow-hidden"
             dir="rtl"
             lang="fa"
             aria-labelledby="currencies-heading"
           >
-            <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
+            <div className="bg-accent-blue-50 px-6 py-4 border-b border-accent-blue-100">
               <h2
                 id="currencies-heading"
-                className="text-2xl md:text-3xl font-bold text-blue-700 text-center flex items-center justify-center gap-2"
+                className="text-2xl md:text-3xl font-bold text-blue-700 dark:text-blue-400 text-center flex items-center justify-center gap-2"
               >
                 <FaDollarSign className="text-3xl" aria-hidden="true" />
                 ارزها
@@ -233,11 +237,11 @@ export default function Home() {
               <ErrorBoundary
                 boundaryName="CurrenciesGrid"
                 fallback={(_error, reset) => (
-                  <div className="p-4 text-center text-gray-600" dir="rtl" role="alert" aria-live="assertive">
+                  <div className="p-4 text-center text-text-secondary" dir="rtl" role="alert" aria-live="assertive">
                     <p className="mb-2">خطا در نمایش اطلاعات ارزها.</p>
                     <button
                       onClick={reset}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
+                      className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors text-sm"
                     >
                       تلاش مجدد
                     </button>
@@ -256,15 +260,15 @@ export default function Home() {
 
           {/* SECTION 2: Cryptocurrencies */}
           <section
-            className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-purple-500 overflow-hidden"
+            className="bg-surface/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-purple-500 dark:border-t-purple-600 overflow-hidden"
             dir="rtl"
             lang="fa"
             aria-labelledby="crypto-heading"
           >
-            <div className="bg-purple-50 px-6 py-4 border-b border-purple-100">
+            <div className="bg-accent-purple-50 px-6 py-4 border-b border-accent-purple-100">
               <h2
                 id="crypto-heading"
-                className="text-2xl md:text-3xl font-bold text-purple-700 text-center flex items-center justify-center gap-2"
+                className="text-2xl md:text-3xl font-bold text-purple-700 dark:text-purple-400 text-center flex items-center justify-center gap-2"
               >
                 <FaBitcoin className="text-3xl" aria-hidden="true" />
                 ارزهای دیجیتال
@@ -286,11 +290,11 @@ export default function Home() {
               <ErrorBoundary
                 boundaryName="CryptoGrid"
                 fallback={(_error, reset) => (
-                  <div className="p-4 text-center text-gray-600" dir="rtl" role="alert" aria-live="assertive">
+                  <div className="p-4 text-center text-text-secondary" dir="rtl" role="alert" aria-live="assertive">
                     <p className="mb-2">خطا در نمایش اطلاعات ارزهای دیجیتال.</p>
                     <button
                       onClick={reset}
-                      className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors text-sm"
+                      className="bg-purple-600 dark:bg-purple-700 text-white px-4 py-2 rounded hover:bg-purple-700 dark:hover:bg-purple-800 transition-colors text-sm"
                     >
                       تلاش مجدد
                     </button>
@@ -309,15 +313,15 @@ export default function Home() {
 
           {/* SECTION 3: Gold & Coins */}
           <section
-            className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-amber-500 overflow-hidden"
+            className="bg-surface/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-gold-500 dark:border-t-gold-600 overflow-hidden"
             dir="rtl"
             lang="fa"
             aria-labelledby="gold-heading"
           >
-            <div className="bg-amber-50 px-6 py-4 border-b border-amber-100">
+            <div className="bg-accent-gold-50 px-6 py-4 border-b border-accent-gold-100">
               <h2
                 id="gold-heading"
-                className="text-2xl md:text-3xl font-bold text-amber-700 text-center flex items-center justify-center gap-2"
+                className="text-2xl md:text-3xl font-bold text-gold-700 dark:text-gold-400 text-center flex items-center justify-center gap-2"
               >
                 <GiGoldBar className="text-3xl" aria-hidden="true" />
                 طلا و سکه
@@ -339,11 +343,11 @@ export default function Home() {
               <ErrorBoundary
                 boundaryName="GoldGrid"
                 fallback={(_error, reset) => (
-                  <div className="p-4 text-center text-gray-600" dir="rtl" role="alert" aria-live="assertive">
+                  <div className="p-4 text-center text-text-secondary" dir="rtl" role="alert" aria-live="assertive">
                     <p className="mb-2">خطا در نمایش اطلاعات طلا و سکه.</p>
                     <button
                       onClick={reset}
-                      className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700 transition-colors text-sm"
+                      className="bg-gold-600 dark:bg-gold-700 text-white px-4 py-2 rounded hover:bg-gold-700 dark:hover:bg-gold-800 transition-colors text-sm"
                     >
                       تلاش مجدد
                     </button>
@@ -353,7 +357,7 @@ export default function Home() {
                 <ItemCardGrid
                   items={goldItems}
                   data={gold}
-                  accentColor="amber"
+                  accentColor="gold"
                 />
               </ErrorBoundary>
             )}
@@ -362,8 +366,8 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 py-4 border-t border-gray-200" dir="rtl">
-          <p className="text-sm text-gray-600 flex items-center justify-center gap-2">
+        <div className="text-center mt-8 py-4 border-t border-border" dir="rtl">
+          <p className="text-sm text-text-secondary flex items-center justify-center gap-2">
             <FiInfo className="text-base" />
             <span>داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند</span>
           </p>

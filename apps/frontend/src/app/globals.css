@@ -1,15 +1,163 @@
 @import "tailwindcss";
 
+/* Light theme variables */
 :root {
+  /* Base colors */
   --background: #fafafa;
   --foreground: #1a1a1a;
   --font-vazirmatn: "Vazirmatn", sans-serif;
+
+  /* Surface colors (backgrounds at different elevations) */
+  --surface: 255 255 255;
+  --surface-secondary: 249 250 251;
+  --surface-tertiary: 243 244 246;
+
+  /* Border colors */
+  --border: 229 231 235;
+  --border-secondary: 209 213 219;
+
+  /* Text colors */
+  --text-primary: 17 24 39;
+  --text-secondary: 75 85 99;
+  --text-tertiary: 107 114 128;
+
+  /* Accent colors - Blue (Currencies) */
+  --accent-blue-50: 239 246 255;
+  --accent-blue-100: 219 234 254;
+  --accent-blue-500: 59 130 246;
+  --accent-blue-600: 37 99 235;
+  --accent-blue-700: 29 78 216;
+
+  /* Accent colors - Purple (Crypto) */
+  --accent-purple-50: 250 245 255;
+  --accent-purple-100: 243 232 255;
+  --accent-purple-500: 168 85 247;
+  --accent-purple-600: 147 51 234;
+  --accent-purple-700: 126 34 206;
+
+  /* Accent colors - Gold (Gold section) */
+  --accent-gold-50: 255 251 235;
+  --accent-gold-100: 254 243 199;
+  --accent-gold-500: 245 158 11;
+  --accent-gold-600: 217 119 6;
+  --accent-gold-700: 180 83 9;
+
+  /* Status colors */
+  --success-bg: 240 253 244;
+  --success-text: 22 101 52;
+  --error-bg: 254 242 242;
+  --error-text: 153 27 27;
+  --warning-bg: 254 252 232;
+  --warning-text: 161 98 7;
+}
+
+/* Dark mode variables - class-based dark mode */
+.dark {
+  /* Base colors */
+  --background: #0f0f0f;
+  --foreground: #f0f0f0;
+
+  /* Surface colors (backgrounds at different elevations) */
+  --surface: 23 23 23;
+  --surface-secondary: 31 31 31;
+  --surface-tertiary: 39 39 39;
+
+  /* Border colors */
+  --border: 55 65 81;
+  --border-secondary: 75 85 99;
+
+  /* Text colors */
+  --text-primary: 243 244 246;
+  --text-secondary: 209 213 219;
+  --text-tertiary: 156 163 175;
+
+  /* Accent colors - Blue (Currencies) - BRIGHTER in dark mode for better visibility */
+  --accent-blue-50: 30 41 59;
+  --accent-blue-100: 51 65 85;
+  --accent-blue-500: 96 165 250;    /* blue-400 - brighter */
+  --accent-blue-600: 59 130 246;    /* blue-500 - brighter */
+  --accent-blue-700: 37 99 235;     /* blue-600 - brighter */
+
+  /* Accent colors - Purple (Crypto) - BRIGHTER in dark mode for better visibility */
+  --accent-purple-50: 46 16 101;
+  --accent-purple-100: 76 29 149;
+  --accent-purple-500: 192 132 252;  /* purple-400 - brighter */
+  --accent-purple-600: 168 85 247;   /* purple-500 - brighter */
+  --accent-purple-700: 147 51 234;   /* purple-600 - brighter */
+
+  /* Accent colors - Gold (Gold section) - BRIGHTER in dark mode for better visibility */
+  --accent-gold-50: 68 47 21;
+  --accent-gold-100: 120 53 15;
+  --accent-gold-500: 251 191 36;     /* gold-400 - brighter */
+  --accent-gold-600: 245 158 11;     /* gold-500 - brighter */
+  --accent-gold-700: 217 119 6;      /* gold-600 - brighter */
+
+  /* Status colors - dark mode variants with proper contrast */
+  --success-bg: 20 83 45;
+  --success-text: 134 239 172;
+  --error-bg: 127 29 29;
+  --error-text: 252 165 165;
+  --warning-bg: 113 63 18;
+  --warning-text: 253 224 71;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-vazirmatn);
+
+  /* Make theme variables accessible in Tailwind */
+  --color-surface: rgb(var(--surface));
+  --color-surface-secondary: rgb(var(--surface-secondary));
+  --color-surface-tertiary: rgb(var(--surface-tertiary));
+
+  --color-border: rgb(var(--border));
+  --color-border-secondary: rgb(var(--border-secondary));
+
+  --color-text-primary: rgb(var(--text-primary));
+  --color-text-secondary: rgb(var(--text-secondary));
+  --color-text-tertiary: rgb(var(--text-tertiary));
+
+  /* Blue accent colors */
+  --color-accent-blue-50: rgb(var(--accent-blue-50));
+  --color-accent-blue-100: rgb(var(--accent-blue-100));
+  --color-accent-blue-500: rgb(var(--accent-blue-500));
+  --color-accent-blue-600: rgb(var(--accent-blue-600));
+  --color-accent-blue-700: rgb(var(--accent-blue-700));
+
+  /* Purple accent colors */
+  --color-accent-purple-50: rgb(var(--accent-purple-50));
+  --color-accent-purple-100: rgb(var(--accent-purple-100));
+  --color-accent-purple-500: rgb(var(--accent-purple-500));
+  --color-accent-purple-600: rgb(var(--accent-purple-600));
+  --color-accent-purple-700: rgb(var(--accent-purple-700));
+
+  /* Gold accent colors */
+  --color-accent-gold-50: rgb(var(--accent-gold-50));
+  --color-accent-gold-100: rgb(var(--accent-gold-100));
+  --color-accent-gold-500: rgb(var(--accent-gold-500));
+  --color-accent-gold-600: rgb(var(--accent-gold-600));
+  --color-accent-gold-700: rgb(var(--accent-gold-700));
+
+  /* Status colors */
+  --color-success-bg: rgb(var(--success-bg));
+  --color-success-text: rgb(var(--success-text));
+  --color-error-bg: rgb(var(--error-bg));
+  --color-error-text: rgb(var(--error-text));
+  --color-warning-bg: rgb(var(--warning-bg));
+  --color-warning-text: rgb(var(--warning-text));
+
+  /* Custom Gold Color Palette (NOT amber) - Using custom gold shades */
+  --color-gold-50: rgb(255 251 235);
+  --color-gold-100: rgb(254 243 199);
+  --color-gold-200: rgb(253 230 138);
+  --color-gold-300: rgb(252 211 77);
+  --color-gold-400: rgb(251 191 36);
+  --color-gold-500: rgb(245 158 11);
+  --color-gold-600: rgb(217 119 6);
+  --color-gold-700: rgb(180 83 9);
+  --color-gold-800: rgb(146 64 14);
+  --color-gold-900: rgb(120 53 15);
 
   /* Shimmer animation for loading skeletons */
   --animate-shimmer: shimmer 2s infinite;
@@ -24,10 +172,47 @@
   }
 }
 
+/* Fallback for system preference dark mode */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0f0f0f;
     --foreground: #f0f0f0;
+
+    --surface: 23 23 23;
+    --surface-secondary: 31 31 31;
+    --surface-tertiary: 39 39 39;
+
+    --border: 55 65 81;
+    --border-secondary: 75 85 99;
+
+    --text-primary: 243 244 246;
+    --text-secondary: 209 213 219;
+    --text-tertiary: 156 163 175;
+
+    --accent-blue-50: 30 41 59;
+    --accent-blue-100: 51 65 85;
+    --accent-blue-500: 96 165 250;
+    --accent-blue-600: 59 130 246;
+    --accent-blue-700: 37 99 235;
+
+    --accent-purple-50: 46 16 101;
+    --accent-purple-100: 76 29 149;
+    --accent-purple-500: 192 132 252;
+    --accent-purple-600: 168 85 247;
+    --accent-purple-700: 147 51 234;
+
+    --accent-gold-50: 68 47 21;
+    --accent-gold-100: 120 53 15;
+    --accent-gold-500: 251 191 36;
+    --accent-gold-600: 245 158 11;
+    --accent-gold-700: 217 119 6;
+
+    --success-bg: 20 83 45;
+    --success-text: 134 239 172;
+    --error-bg: 127 29 29;
+    --error-text: 252 165 165;
+    --warning-bg: 113 63 18;
+    --warning-text: 253 224 71;
   }
 }
 
@@ -44,6 +229,9 @@ body {
   font-weight: 400;
   line-height: 1.7;
   letter-spacing: -0.01em;
+
+  /* Smooth transitions for theme changes */
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Enhanced readability for headings */
