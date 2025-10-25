@@ -31,7 +31,13 @@
       "Bash(dir:*)",
       "Bash(cat:*)",
       "Bash(npm install:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

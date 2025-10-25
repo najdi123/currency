@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(powershell -Command \"Remove-Item -Path ''.next'' -Recurse -Force\")",
+      "Bash(taskkill:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc --noEmit)",
+      "mcp__ide__getDiagnostics",
+      "Bash(dir:*)",
+      "Bash(npm install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
