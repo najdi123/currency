@@ -11,6 +11,10 @@ import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { ItemCardGrid } from '@/components/ItemCardGrid'
 import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { ChartBottomSheet } from '@/components/ChartBottomSheet'
+import { useChartBottomSheet } from '@/lib/hooks/useChartBottomSheet'
+import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
+import type { ItemType } from '@/types/chart'
 import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
 import { SiTether } from 'react-icons/si'
 import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
@@ -33,16 +37,17 @@ const cryptoItems = [
 ]
 
 const goldItems = [
-  { key: 'sekkeh', name: 'سکه امامی', icon: GiTwoCoins, color: 'text-gold-600' },
-  { key: 'bahar', name: 'بهار آزادی', icon: GiTwoCoins, color: 'text-gold-600' },
-  { key: 'nim', name: 'نیم سکه', icon: GiTwoCoins, color: 'text-gold-600' },
-  { key: 'rob', name: 'ربع سکه', icon: GiTwoCoins, color: 'text-gold-600' },
-  { key: 'gerami', name: 'سکه گرمی', icon: GiTwoCoins, color: 'text-gold-600' },
-  { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-gold-600' },
+  { key: 'sekkeh', name: 'سکه امامی', icon: GiTwoCoins, color: 'text-gold-400' },
+  { key: 'bahar', name: 'بهار آزادی', icon: GiTwoCoins, color: 'text-gold-400' },
+  { key: 'nim', name: 'نیم سکه', icon: GiTwoCoins, color: 'text-gold-400' },
+  { key: 'rob', name: 'ربع سکه', icon: GiTwoCoins, color: 'text-gold-400' },
+  { key: 'gerami', name: 'سکه گرمی', icon: GiTwoCoins, color: 'text-gold-400' },
+  { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-gold-400' },
 ]
 
 export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const chartSheet = useChartBottomSheet()
 
   const {
     data: currencies,
@@ -99,8 +104,40 @@ export default function Home() {
 
   const { isRefreshing, isFetching, hasAllErrors, hasStaleData } = computedState
 
+  // Helper functions for chart integration
+  const getItemData = (itemKey: string, itemType: ItemType) => {
+    switch (itemType) {
+      case 'currency':
+        return currencies?.[itemKey]
+      case 'crypto':
+        return crypto?.[itemKey]
+      case 'gold':
+        return gold?.[itemKey]
+      default:
+        return null
+    }
+  }
+
+  const getItemName = (itemKey: string, itemType: ItemType): string => {
+    const items = itemType === 'currency' ? currencyItems : itemType === 'crypto' ? cryptoItems : goldItems
+    return items.find(item => item.key === itemKey)?.name || itemKey
+  }
+
+  const handleItemClick = (itemKey: string, itemType: ItemType) => {
+    const itemData = getItemData(itemKey, itemType)
+    if (itemData) {
+      chartSheet.openChart({
+        code: mapItemCodeToApi(itemKey),
+        name: getItemName(itemKey, itemType),
+        type: itemType,
+        price: itemData.value,
+        change: itemData.change,
+      })
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-surface-secondary">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto">
         {/* Main Header with Gradient */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 text-white text-center py-8 px-4 shadow-lg mb-6">
@@ -156,7 +193,7 @@ export default function Home() {
         </div>
 
         {/* Content Container */}
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className="xl:p-4 sm:p-6 lg:p-8">
 
         {/* Stale Data Warning Banner */}
         {hasStaleData && !hasAllErrors && (
@@ -207,7 +244,7 @@ export default function Home() {
         <div className="space-y-8">
           {/* SECTION 1: Currencies */}
           <section
-            className="bg-surface/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-blue-500 dark:border-t-blue-600 overflow-hidden"
+            className="bg-section-background xl:rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-blue-500 dark:border-t-blue-600 overflow-hidden"
             dir="rtl"
             lang="fa"
             aria-labelledby="currencies-heading"
@@ -252,6 +289,7 @@ export default function Home() {
                   items={currencyItems}
                   data={currencies}
                   accentColor="blue"
+                  onItemClick={(key) => handleItemClick(key, 'currency')}
                 />
               </ErrorBoundary>
             )}
@@ -260,7 +298,7 @@ export default function Home() {
 
           {/* SECTION 2: Cryptocurrencies */}
           <section
-            className="bg-surface/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-purple-500 dark:border-t-purple-600 overflow-hidden"
+            className="bg-section-background xl:rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-purple-500 dark:border-t-purple-600 overflow-hidden"
             dir="rtl"
             lang="fa"
             aria-labelledby="crypto-heading"
@@ -305,6 +343,7 @@ export default function Home() {
                   items={cryptoItems}
                   data={crypto}
                   accentColor="purple"
+                  onItemClick={(key) => handleItemClick(key, 'crypto')}
                 />
               </ErrorBoundary>
             )}
@@ -313,7 +352,7 @@ export default function Home() {
 
           {/* SECTION 3: Gold & Coins */}
           <section
-            className="bg-surface/90 backdrop-blur-sm rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-gold-500 dark:border-t-gold-600 overflow-hidden"
+            className="bg-section-background xl:rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 border-t-4 border-t-gold-500 dark:border-t-gold-400 overflow-hidden"
             dir="rtl"
             lang="fa"
             aria-labelledby="gold-heading"
@@ -321,7 +360,7 @@ export default function Home() {
             <div className="bg-accent-gold-50 px-6 py-4 border-b border-accent-gold-100">
               <h2
                 id="gold-heading"
-                className="text-2xl md:text-3xl font-bold text-gold-700 dark:text-gold-400 text-center flex items-center justify-center gap-2"
+                className="text-2xl md:text-3xl font-bold text-gold-400 dark:text-gold-400 text-center flex items-center justify-center gap-2"
               >
                 <GiGoldBar className="text-3xl" aria-hidden="true" />
                 طلا و سکه
@@ -347,7 +386,7 @@ export default function Home() {
                     <p className="mb-2">خطا در نمایش اطلاعات طلا و سکه.</p>
                     <button
                       onClick={reset}
-                      className="bg-gold-600 dark:bg-gold-700 text-white px-4 py-2 rounded hover:bg-gold-700 dark:hover:bg-gold-800 transition-colors text-sm"
+                      className="bg-gold-400 dark:bg-gold-700 text-white px-4 py-2 rounded hover:bg-gold-700 dark:hover:bg-gold-800 transition-colors text-sm"
                     >
                       تلاش مجدد
                     </button>
@@ -358,6 +397,7 @@ export default function Home() {
                   items={goldItems}
                   data={gold}
                   accentColor="gold"
+                  onItemClick={(key) => handleItemClick(key, 'gold')}
                 />
               </ErrorBoundary>
             )}
@@ -372,6 +412,13 @@ export default function Home() {
             <span>داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند</span>
           </p>
         </div>
+
+        {/* Chart Bottom Sheet */}
+        <ChartBottomSheet
+          isOpen={chartSheet.isOpen}
+          onClose={chartSheet.closeChart}
+          item={chartSheet.selectedItem}
+        />
         </div>
       </div>
     </div>

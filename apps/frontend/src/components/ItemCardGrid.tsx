@@ -38,9 +38,12 @@ export interface ItemCardGridProps {
  * ItemCardGrid - A responsive grid layout for displaying currency/gold cards
  *
  * Responsive breakpoints:
- * - Mobile (default): 2 cards per row
- * - Tablet (md: 768px+): 2 cards per row
- * - Desktop (lg: 1024px+): 4 cards per row
+ * - Extra Small (< 640px): 1 card per row
+ * - Small (640px - 768px): 2 cards per row
+ * - Medium (768px - 1024px): 2 cards per row
+ * - Large (1024px - 1280px): 3 cards per row
+ * - Extra Large (1280px - 1536px): 4 cards per row
+ * - 2XL (1536px+): 5 cards per row
  *
  * Features:
  * - Automatic grid layout with consistent spacing
@@ -49,6 +52,8 @@ export interface ItemCardGridProps {
  * - Fully accessible with ARIA list/listitem relationships
  * - Optimized with useCallback to prevent unnecessary re-renders
  * - Memoized component to prevent re-renders when props haven't changed
+ * - Responsive gap spacing that scales with screen size
+ * - Mobile-first design with 1 column on mobile, expanding to more columns on larger screens
  *
  * Performance Optimizations:
  * - Wrapped with React.memo for shallow prop comparison
@@ -91,8 +96,9 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
 
   return (
     <div
-      className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5"
       role="list"
+      aria-label="لیست آیتم‌های قیمت"
     >
       {items.map((item) => {
         const itemData = data[item.key]

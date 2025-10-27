@@ -7,6 +7,7 @@ import { CurrenciesModule } from './currencies/currencies.module';
 import { DigitalCurrenciesModule } from './digital-currencies/digital-currencies.module';
 import { GoldModule } from './gold/gold.module';
 import { NavasanModule } from './navasan/navasan.module';
+import { ChartModule } from './chart/chart.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { NavasanModule } from './navasan/navasan.module';
     DigitalCurrenciesModule,
     GoldModule,
     NavasanModule,
+    ChartModule,
   ],
   controllers: [AppController],
   providers: [AppService],

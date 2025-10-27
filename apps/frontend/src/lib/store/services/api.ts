@@ -14,6 +14,7 @@ import {
   type RtkQueryError,
 } from '@/types/errors'
 import { logApiError, addBreadcrumb, logPerformance } from '@/lib/errorLogger'
+import type { ChartResponse, ChartQueryParams } from '@/types/chart'
 
 // TypeScript interfaces for API responses
 export interface RateItem {
@@ -181,7 +182,7 @@ const baseQueryWithRetry = retry(
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithRetry,
-  tagTypes: ['Rates'],
+  tagTypes: ['Rates', 'ChartData'],
   // Configure RTK Query behavior for stale data handling
   refetchOnFocus: true, // Refetch when window gains focus
   refetchOnReconnect: true, // Refetch when network reconnects
@@ -211,6 +212,16 @@ export const api = createApi({
       providesTags: ['Rates'],
       keepUnusedDataFor: 1200,
     }),
+    getChartData: builder.query<ChartResponse, ChartQueryParams>({
+      query: ({ itemCode, timeRange, itemType }) => ({
+        url: `/chart/${itemCode}`,
+        params: { timeRange, itemType },
+      }),
+      providesTags: (_result, _error, arg) => [
+        { type: 'ChartData' as const, id: `${arg.itemCode}-${arg.timeRange}-${arg.itemType}` }
+      ],
+      keepUnusedDataFor: 600,
+    }),
   }),
 })
 
@@ -220,6 +231,7 @@ export const {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
+  useGetChartDataQuery,
 } = api
 
 // Re-export typed error utilities for component use

@@ -14,17 +14,17 @@ export function formatToman(value: string | number | undefined | null): string {
 }
 
 /**
- * Format a change amount with sign and comma separators
- * @param change - The change amount
- * @returns Formatted string with +/- sign (e.g., "+1,500" or "-2,300")
+ * Format a change percentage with sign on the left
+ * @param change - The change percentage amount
+ * @returns Formatted string with +/- sign on the left (e.g., "+2.5%" or "-1.3%")
  */
 export function formatChange(change: number | undefined | null): string {
-  if (change === undefined || change === null || change === 0) return '0'
+  if (change === undefined || change === null || change === 0) return '0%'
 
-  const formatted = new Intl.NumberFormat('en-US').format(Math.abs(Math.round(change)))
   const sign = change > 0 ? '+' : '-'
+  const absValue = Math.abs(change).toFixed(2)
 
-  return `${sign}${formatted}`
+  return `${sign}${absValue}%`
 }
 
 /**

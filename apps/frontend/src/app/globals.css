@@ -8,6 +8,7 @@
   --font-vazirmatn: "Vazirmatn", sans-serif;
 
   /* Surface colors (backgrounds at different elevations) */
+  --section-background: 248 248 248; /* Slightly darker than background, lighter than surface */
   --surface: 255 255 255;
   --surface-secondary: 249 250 251;
   --surface-tertiary: 243 244 246;
@@ -35,12 +36,12 @@
   --accent-purple-600: 147 51 234;
   --accent-purple-700: 126 34 206;
 
-  /* Accent colors - Gold (Gold section) */
+  /* Accent colors - Gold (Gold section) - LIGHTENED for better visibility */
   --accent-gold-50: 255 251 235;
   --accent-gold-100: 254 243 199;
-  --accent-gold-500: 245 158 11;
-  --accent-gold-600: 217 119 6;
-  --accent-gold-700: 180 83 9;
+  --accent-gold-500: 251 191 36;  /* gold-400 - lighter, brighter */
+  --accent-gold-600: 245 158 11;  /* gold-500 - lighter */
+  --accent-gold-700: 217 119 6;   /* gold-600 - lighter */
 
   /* Status colors */
   --success-bg: 240 253 244;
@@ -54,17 +55,18 @@
 /* Dark mode variables - class-based dark mode */
 .dark {
   /* Base colors */
-  --background: #0f0f0f;
+  --background: #000000;  /* Pure black for deepest hierarchy level */
   --foreground: #f0f0f0;
 
-  /* Surface colors (backgrounds at different elevations) */
-  --surface: 23 23 23;
-  --surface-secondary: 31 31 31;
-  --surface-tertiary: 39 39 39;
+  /* Surface colors (backgrounds at different elevations) - LIGHTER for better visibility */
+  --section-background: 23 23 23; /* Slightly lighter than pure black - subtle elevation */
+  --surface: 55 65 81;           /* gray-700 - Much lighter for cards */
+  --surface-secondary: 75 85 99; /* gray-600 - Lighter hover state */
+  --surface-tertiary: 107 114 128; /* gray-500 - Even lighter tertiary */
 
   /* Border colors */
-  --border: 55 65 81;
-  --border-secondary: 75 85 99;
+  --border: 107 114 128;         /* gray-500 - Adjusted for contrast with lighter surfaces */
+  --border-secondary: 156 163 175; /* gray-400 - Lighter secondary border */
 
   /* Text colors */
   --text-primary: 243 244 246;
@@ -85,12 +87,12 @@
   --accent-purple-600: 168 85 247;   /* purple-500 - brighter */
   --accent-purple-700: 147 51 234;   /* purple-600 - brighter */
 
-  /* Accent colors - Gold (Gold section) - BRIGHTER in dark mode for better visibility */
+  /* Accent colors - Gold (Gold section) - EVEN BRIGHTER in dark mode for better visibility */
   --accent-gold-50: 68 47 21;
   --accent-gold-100: 120 53 15;
-  --accent-gold-500: 251 191 36;     /* gold-400 - brighter */
-  --accent-gold-600: 245 158 11;     /* gold-500 - brighter */
-  --accent-gold-700: 217 119 6;      /* gold-600 - brighter */
+  --accent-gold-500: 252 211 77;     /* gold-300 - much brighter */
+  --accent-gold-600: 251 191 36;     /* gold-400 - brighter */
+  --accent-gold-700: 245 158 11;     /* gold-500 - brighter */
 
   /* Status colors - dark mode variants with proper contrast */
   --success-bg: 20 83 45;
@@ -107,6 +109,7 @@
   --font-sans: var(--font-vazirmatn);
 
   /* Make theme variables accessible in Tailwind */
+  --color-section-background: rgb(var(--section-background));
   --color-surface: rgb(var(--surface));
   --color-surface-secondary: rgb(var(--surface-secondary));
   --color-surface-tertiary: rgb(var(--surface-tertiary));
@@ -175,15 +178,16 @@
 /* Fallback for system preference dark mode */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: #0f0f0f;
+    --background: #000000;  /* Pure black for deepest hierarchy level */
     --foreground: #f0f0f0;
 
-    --surface: 23 23 23;
-    --surface-secondary: 31 31 31;
-    --surface-tertiary: 39 39 39;
+    --section-background: 23 23 23; /* Slightly lighter than pure black - subtle elevation */
+    --surface: 55 65 81;           /* gray-700 - Much lighter for cards */
+    --surface-secondary: 75 85 99; /* gray-600 - Lighter hover state */
+    --surface-tertiary: 107 114 128; /* gray-500 - Even lighter tertiary */
 
-    --border: 55 65 81;
-    --border-secondary: 75 85 99;
+    --border: 107 114 128;         /* gray-500 - Adjusted for contrast with lighter surfaces */
+    --border-secondary: 156 163 175; /* gray-400 - Lighter secondary border */
 
     --text-primary: 243 244 246;
     --text-secondary: 209 213 219;
@@ -203,9 +207,9 @@
 
     --accent-gold-50: 68 47 21;
     --accent-gold-100: 120 53 15;
-    --accent-gold-500: 251 191 36;
-    --accent-gold-600: 245 158 11;
-    --accent-gold-700: 217 119 6;
+    --accent-gold-500: 252 211 77;     /* gold-300 - much brighter */
+    --accent-gold-600: 251 191 36;     /* gold-400 - brighter */
+    --accent-gold-700: 245 158 11;     /* gold-500 - brighter */
 
     --success-bg: 20 83 45;
     --success-text: 134 239 172;
@@ -258,4 +262,10 @@ h1, h2, h3, h4, h5, h6 {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Optimize touch interactions for mobile devices */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
