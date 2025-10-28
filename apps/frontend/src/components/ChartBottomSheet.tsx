@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
 import type { SelectedChartItem, TimeRange } from '@/types/chart'
-import { ChartHeader, TimeRangeSelector, PriceChart } from './Chart'
+import { ChartHeader } from './Chart/ChartHeader'
+import { TimeRangeSelector } from './Chart/TimeRangeSelector'
+import { PriceChart } from './Chart/PriceChart'
 import { HiX } from 'react-icons/hi'
 
 interface ChartBottomSheetProps {

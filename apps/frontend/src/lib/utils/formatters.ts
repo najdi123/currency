@@ -14,17 +14,17 @@ export function formatToman(value: string | number | undefined | null): string {
 }
 
 /**
- * Format a change percentage with sign on the left
- * @param change - The change percentage amount
- * @returns Formatted string with +/- sign on the left (e.g., "+2.5%" or "-1.3%")
+ * Format a change amount in Toman with sign on the left
+ * @param change - The change amount in Toman
+ * @returns Formatted string with +/- sign on the left (e.g., "+2.5T" or "-1.3T")
  */
 export function formatChange(change: number | undefined | null): string {
-  if (change === undefined || change === null || change === 0) return '0%'
+  if (change === undefined || change === null || change === 0) return '0T'
 
   const sign = change > 0 ? '+' : '-'
   const absValue = Math.abs(change).toFixed(2)
 
-  return `${sign}${absValue}%`
+  return `${sign}${absValue}T`
 }
 
 /**

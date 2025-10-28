@@ -134,7 +134,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           active:scale-[0.98] touch-manipulation [-webkit-tap-highlight-color:transparent]
           motion-reduce:transition-none motion-reduce:active:scale-100
         `}
-        aria-label={`${name}: ${formatToman(value)} تومان، ${isPositiveFallback ? 'افزایش' : 'کاهش'} ${Math.abs(change)} درصد نسبت به قبل`}
+        aria-label={`${name}: ${formatToman(value)} تومان، ${isPositiveFallback ? 'افزایش' : 'کاهش'} ${Math.abs(change)} تومان نسبت به قبل`}
       >
         {/* Top row: Placeholder Icon (left) and Name (right) */}
         <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
@@ -198,7 +198,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         active:scale-[0.98] touch-manipulation [-webkit-tap-highlight-color:transparent]
         motion-reduce:transition-none motion-reduce:active:scale-100
       `}
-      aria-label={`${name}: ${formatToman(value)} تومان، ${isPositive ? 'افزایش' : 'کاهش'} ${Math.abs(change)} درصد نسبت به قبل`}
+      aria-label={`${name}: ${formatToman(value)} تومان، ${isPositive ? 'افزایش' : 'کاهش'} ${Math.abs(change)} تومان نسبت به قبل`}
     >
       {/* Top row: Icon (left) and Name (right) */}
       <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">

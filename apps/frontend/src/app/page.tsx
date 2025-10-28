@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense, useRef } from 'react'
 import {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
@@ -11,15 +11,27 @@ import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { ItemCardGrid } from '@/components/ItemCardGrid'
 import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { ChartBottomSheet } from '@/components/ChartBottomSheet'
 import { useChartBottomSheet } from '@/lib/hooks/useChartBottomSheet'
 import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
-import type { ItemType } from '@/types/chart'
+import type { ItemType, SelectedChartItem } from '@/types/chart'
 import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
 import { SiTether } from 'react-icons/si'
 import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
 import { FiClock, FiInfo } from 'react-icons/fi'
 import { HiRefresh } from 'react-icons/hi'
+
+// Lazy load chart component to reduce initial bundle size
+const ChartBottomSheet = lazy<React.ComponentType<{
+  isOpen: boolean
+  onClose: () => void
+  item: SelectedChartItem | null
+}>>(() =>
+  import(
+    /* webpackChunkName: "chart-bottom-sheet" */
+    /* webpackPrefetch: true */
+    '@/components/ChartBottomSheet'
+  ).then(mod => ({ default: mod.ChartBottomSheet }))
+)
 
 // Currency items to display
 const currencyItems = [
@@ -76,6 +88,60 @@ export default function Home() {
   } = useGetGoldQuery(undefined, {
     pollingInterval: 300000, // 5 minutes
   })
+
+  // Preload chart component when user scrolls near item cards
+  const hasPreloadedChart = useRef(false)
+
+  useEffect(() => {
+    // Only preload once
+    if (hasPreloadedChart.current) return
+
+    // SSR guard - only run in browser
+    if (typeof window === 'undefined') return
+
+    // Use requestAnimationFrame to ensure DOM is painted
+    const rafId = requestAnimationFrame(() => {
+      // Query for item cards
+      const cards = document.querySelectorAll('[role="listitem"]')
+
+      // If no cards found, DOM might not be ready yet - skip preload
+      // Chart will load on demand when user clicks
+      if (cards.length === 0) {
+        console.debug('Chart preload: No item cards found, skipping preload')
+        return
+      }
+
+      // Create intersection observer to detect when cards enter viewport
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some(entry => entry.isIntersecting)) {
+            // Preload the chart component
+            import('@/components/ChartBottomSheet')
+              .then(() => {
+                hasPreloadedChart.current = true
+                console.debug('Chart preloaded successfully')
+              })
+              .catch((err) => {
+                // Don't set hasPreloadedChart on error, allow retry on click
+                console.warn('Chart preload failed (will load on demand):', err)
+              })
+            observer.disconnect()
+          }
+        },
+        {
+          rootMargin: '100px', // Start loading 100px before visible
+          threshold: 0.1
+        }
+      )
+
+      // Observe all item cards
+      cards.forEach(card => observer.observe(card))
+    })
+
+    return () => {
+      cancelAnimationFrame(rafId)
+    }
+  }, []) // Empty deps - run once after mount
 
   // Update timestamp when data is successfully fetched
   useEffect(() => {
@@ -413,12 +479,72 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Chart Bottom Sheet */}
-        <ChartBottomSheet
-          isOpen={chartSheet.isOpen}
-          onClose={chartSheet.closeChart}
-          item={chartSheet.selectedItem}
-        />
+        {/* Chart Bottom Sheet - Lazy loaded for performance */}
+        <ErrorBoundary
+          boundaryName="ChartLazyLoad"
+          fallback={(error, reset) => (
+            // Only show error UI if chart is open
+            chartSheet.isOpen ? (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                onClick={chartSheet.closeChart}
+              >
+                <div
+                  className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
+                  onClick={(e) => e.stopPropagation()}
+                  dir="rtl"
+                >
+                  <div className="text-center">
+                    <div className="mb-4 text-red-500 text-5xl">⚠️</div>
+                    <h3 className="text-lg font-semibold text-error-text mb-2">
+                      خطا در بارگذاری نمودار
+                    </h3>
+                    <p className="text-text-secondary mb-4 text-sm">
+                      امکان بارگذاری نمودار وجود ندارد. لطفاً اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.
+                    </p>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => {
+                          reset()
+                          window.location.reload()
+                        }}
+                        className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      >
+                        تلاش مجدد
+                      </button>
+                      <button
+                        onClick={chartSheet.closeChart}
+                        className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        بستن
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          )}
+        >
+          <Suspense fallback={
+            // Only show loading UI if chart is open
+            chartSheet.isOpen ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-surface rounded-lg p-6 shadow-xl">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-text-primary text-sm" dir="rtl">در حال بارگذاری نمودار...</p>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          }>
+            <ChartBottomSheet
+              isOpen={chartSheet.isOpen}
+              onClose={chartSheet.closeChart}
+              item={chartSheet.selectedItem}
+            />
+          </Suspense>
+        </ErrorBoundary>
         </div>
       </div>
     </div>

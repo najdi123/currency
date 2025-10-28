@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, lazy, Suspense } from 'react'
+import { useMemo, lazy } from 'react'
 import { useTheme } from 'next-themes'
 import { useGetChartDataQuery } from '@/lib/store/services/api'
 import type { TimeRange, ItemType } from '@/types/chart'
@@ -72,15 +72,18 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     return <ChartEmptyState />
   }
 
+  // Explicit guard for TypeScript - should never be null here due to above checks
+  if (!chartOption) {
+    return <ChartEmptyState />
+  }
+
   return (
     <div className="w-full h-[400px] min-h-[400px]" dir="ltr">
-      <Suspense fallback={<ChartLoadingState />}>
-        <ReactECharts
-          option={chartOption!}
-          style={{ height: '100%', width: '100%' }}
-          opts={{ renderer: 'canvas' }}
-        />
-      </Suspense>
+      <ReactECharts
+        option={chartOption}
+        style={{ height: '100%', width: '100%' }}
+        opts={{ renderer: 'canvas' }}
+      />
     </div>
   )
 }

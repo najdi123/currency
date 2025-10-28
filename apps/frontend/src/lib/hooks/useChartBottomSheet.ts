@@ -3,6 +3,13 @@
 import { useState, useCallback } from 'react'
 import type { SelectedChartItem } from '@/types/chart'
 
+/**
+ * Animation duration for the drawer close animation
+ * This should match the duration used by the Vaul drawer component
+ * Default Vaul animation is 300ms
+ */
+const DRAWER_CLOSE_ANIMATION_DURATION = 300
+
 interface UseChartBottomSheetReturn {
   isOpen: boolean
   selectedItem: SelectedChartItem | null
@@ -26,7 +33,8 @@ export const useChartBottomSheet = (): UseChartBottomSheetReturn => {
   const closeChart = useCallback(() => {
     setIsOpen(false)
     // Delay clearing item to avoid visual flash during close animation
-    setTimeout(() => setSelectedItem(null), 300)
+    // Duration matches the Vaul drawer's close animation
+    setTimeout(() => setSelectedItem(null), DRAWER_CLOSE_ANIMATION_DURATION)
   }, [])
 
   return {

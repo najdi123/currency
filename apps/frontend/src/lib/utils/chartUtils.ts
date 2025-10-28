@@ -3,26 +3,17 @@ import type { EChartsOption } from 'echarts'
 
 /**
  * Map internal item codes to API codes
+ * This is a simple mapping that uppercases codes for the backend
+ * The backend will then map them to the appropriate Navasan API codes
  */
-const ITEM_CODE_MAP: Record<string, string> = {
-  'usd_sell': 'USD',
-  'eur': 'EUR',
-  'gbp': 'GBP',
-  'cad': 'CAD',
-  'aud': 'AUD',
-  'btc': 'BTC',
-  'eth': 'ETH',
-  'usdt': 'USDT',
-  'sekkeh': 'COIN',
-  'bahar': 'BAHAR',
-  'nim': 'NIM',
-  'rob': 'ROB',
-  'gerami': 'GERAMI',
-  '18ayar': '18AYAR',
-}
-
 export const mapItemCodeToApi = (internalCode: string): string => {
-  return ITEM_CODE_MAP[internalCode] || internalCode.toUpperCase()
+  // Special case: usd_sell should stay as USD_SELL
+  if (internalCode === 'usd_sell') {
+    return 'USD_SELL'
+  }
+  // For all other codes, just uppercase them
+  // e.g., 'sekkeh' → 'SEKKEH', 'btc' → 'BTC', '18ayar' → '18AYAR'
+  return internalCode.toUpperCase()
 }
 
 /**
@@ -117,7 +108,7 @@ export const getEChartsOption = (
       left: '60px',
       right: '20px',
       top: '20px',
-      bottom: '40px',
+      bottom: '70px', // Increased to make room for zoom slider
     },
     xAxis: {
       type: 'category',
@@ -147,6 +138,51 @@ export const getEChartsOption = (
         }
       },
     },
+    // Enable zoom and pan with scroll wheel, touch gestures, and slider
+    dataZoom: [
+      {
+        type: 'inside', // Enable zoom with scroll wheel and touch gestures
+        start: 0,
+        end: 100,
+        zoomOnMouseWheel: true, // Zoom with mouse wheel
+        moveOnMouseMove: false, // Don't pan on mouse move (use drag instead)
+        moveOnMouseWheel: false, // Don't pan with mouse wheel
+        preventDefaultMouseMove: true,
+      },
+      {
+        type: 'slider', // Show slider at bottom for zooming
+        start: 0,
+        end: 100,
+        height: 20,
+        bottom: 10,
+        handleSize: '80%',
+        handleStyle: {
+          color: colors.line,
+        },
+        textStyle: {
+          color: colors.text,
+          fontSize: 10,
+        },
+        borderColor: colors.grid,
+        fillerColor: isDark ? 'rgba(96, 165, 250, 0.2)' : 'rgba(37, 99, 235, 0.2)',
+        dataBackground: {
+          lineStyle: {
+            color: colors.grid,
+          },
+          areaStyle: {
+            color: isDark ? 'rgba(96, 165, 250, 0.1)' : 'rgba(37, 99, 235, 0.1)',
+          },
+        },
+        selectedDataBackground: {
+          lineStyle: {
+            color: colors.line,
+          },
+          areaStyle: {
+            color: isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(37, 99, 235, 0.3)',
+          },
+        },
+      },
+    ],
     series: [
       {
         data: prices,
