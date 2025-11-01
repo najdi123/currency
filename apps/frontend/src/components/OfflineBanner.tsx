@@ -51,30 +51,30 @@ function getBannerStyle(quality: ConnectionQuality): {
   switch (quality) {
     case 'offline':
       return {
-        bg: 'bg-red-500',
-        border: 'border-red-600',
-        text: 'text-white',
+        bg: 'bg-red-100 dark:bg-red-900/30',
+        border: 'border-red-200 dark:border-red-800',
+        text: 'text-red-900 dark:text-red-100',
         icon: '🔴',
       }
     case 'poor':
       return {
-        bg: 'bg-orange-500',
-        border: 'border-orange-600',
-        text: 'text-white',
+        bg: 'bg-amber-100 dark:bg-amber-900/30',
+        border: 'border-amber-200 dark:border-amber-800',
+        text: 'text-amber-900 dark:text-amber-100',
         icon: '⚠️',
       }
     case 'fair':
       return {
-        bg: 'bg-yellow-500',
-        border: 'border-yellow-600',
-        text: 'text-white',
+        bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+        border: 'border-yellow-200 dark:border-yellow-800',
+        text: 'text-yellow-900 dark:text-yellow-100',
         icon: '📶',
       }
     default:
       return {
-        bg: 'bg-green-500',
-        border: 'border-green-600',
-        text: 'text-white',
+        bg: 'bg-green-100 dark:bg-green-900/30',
+        border: 'border-green-200 dark:border-green-800',
+        text: 'text-green-900 dark:text-green-100',
         icon: '✅',
       }
   }
@@ -218,16 +218,16 @@ export function OfflineBanner({
       aria-live="assertive"
     >
       <div
-        className={`${style.bg} ${style.text} shadow-lg border-b ${style.border} transition-all duration-300 ${
-          isClosing ? 'transform -translate-y-full opacity-0' : 'transform translate-y-0 opacity-100'
+        className={`${style.bg} ${style.text} shadow-md border-b ${style.border} transition-apple ${
+          isClosing ? 'transform -translate-y-full opacity-0' : 'transform translate-y-0 opacity-100 animate-slide-down'
         }`}
       >
-        <div className="container mx-auto px-4 py-3" dir="rtl">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3" dir="rtl">
           <div className="flex items-center justify-between gap-4">
             {/* Icon and Message */}
             <div className="flex items-center gap-3 flex-1">
               {/* Icon */}
-              <div className="text-2xl flex-shrink-0" aria-hidden="true">
+              <div className="text-xl flex-shrink-0" aria-hidden="true">
                 {style.icon}
               </div>
 
@@ -237,7 +237,7 @@ export function OfflineBanner({
                   {message.title}
                 </p>
                 {message.subtitle && (
-                  <p className="text-xs sm:text-sm opacity-90 mt-0.5">
+                  <p className="text-xs sm:text-sm opacity-75 mt-0.5">
                     {message.subtitle}
                   </p>
                 )}
@@ -248,12 +248,12 @@ export function OfflineBanner({
             {(isOnline || quality !== 'offline') && (
               <button
                 onClick={handleClose}
-                className="flex-shrink-0 p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                className="flex-shrink-0 p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-apple-fast active-scale-apple focus:outline-none focus:ring-2 focus:ring-current focus:ring-offset-2"
                 aria-label="بستن"
                 type="button"
               >
                 <svg
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

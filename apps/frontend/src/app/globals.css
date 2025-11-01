@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Import Apple-inspired design tokens */
+@import "../styles/tokens.css";
+
 /* Light theme variables */
 :root {
   /* Base colors */
@@ -22,26 +25,12 @@
   --text-secondary: 75 85 99;
   --text-tertiary: 107 114 128;
 
-  /* Accent colors - Blue (Currencies) */
+  /* Single Accent Color - Blue (Apple-style unified system) */
   --accent-blue-50: 239 246 255;
   --accent-blue-100: 219 234 254;
   --accent-blue-500: 59 130 246;
   --accent-blue-600: 37 99 235;
   --accent-blue-700: 29 78 216;
-
-  /* Accent colors - Purple (Crypto) */
-  --accent-purple-50: 250 245 255;
-  --accent-purple-100: 243 232 255;
-  --accent-purple-500: 168 85 247;
-  --accent-purple-600: 147 51 234;
-  --accent-purple-700: 126 34 206;
-
-  /* Accent colors - Gold (Gold section) - LIGHTENED for better visibility */
-  --accent-gold-50: 255 251 235;
-  --accent-gold-100: 254 243 199;
-  --accent-gold-500: 251 191 36;  /* gold-400 - lighter, brighter */
-  --accent-gold-600: 245 158 11;  /* gold-500 - lighter */
-  --accent-gold-700: 217 119 6;   /* gold-600 - lighter */
 
   /* Status colors */
   --success-bg: 240 253 244;
@@ -73,26 +62,12 @@
   --text-secondary: 209 213 219;
   --text-tertiary: 156 163 175;
 
-  /* Accent colors - Blue (Currencies) - BRIGHTER in dark mode for better visibility */
+  /* Single Accent Color - Blue (Apple-style unified system, brighter for dark mode) */
   --accent-blue-50: 30 41 59;
   --accent-blue-100: 51 65 85;
   --accent-blue-500: 96 165 250;    /* blue-400 - brighter */
   --accent-blue-600: 59 130 246;    /* blue-500 - brighter */
   --accent-blue-700: 37 99 235;     /* blue-600 - brighter */
-
-  /* Accent colors - Purple (Crypto) - BRIGHTER in dark mode for better visibility */
-  --accent-purple-50: 46 16 101;
-  --accent-purple-100: 76 29 149;
-  --accent-purple-500: 192 132 252;  /* purple-400 - brighter */
-  --accent-purple-600: 168 85 247;   /* purple-500 - brighter */
-  --accent-purple-700: 147 51 234;   /* purple-600 - brighter */
-
-  /* Accent colors - Gold (Gold section) - EVEN BRIGHTER in dark mode for better visibility */
-  --accent-gold-50: 68 47 21;
-  --accent-gold-100: 120 53 15;
-  --accent-gold-500: 252 211 77;     /* gold-300 - much brighter */
-  --accent-gold-600: 251 191 36;     /* gold-400 - brighter */
-  --accent-gold-700: 245 158 11;     /* gold-500 - brighter */
 
   /* Status colors - dark mode variants with proper contrast */
   --success-bg: 20 83 45;
@@ -108,59 +83,82 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-vazirmatn);
 
-  /* Make theme variables accessible in Tailwind */
+  /* ============================================================================
+     Apple Design Token Integration
+     Map design tokens to Tailwind-compatible custom properties
+     ============================================================================ */
+
+  /* Background System - Layered Hierarchy */
+  --color-background-base: var(--background-base);
+  --color-bg-base: var(--background-base);
+  --color-bg-elevated: var(--background-elevated);
+  --color-bg-secondary: var(--background-secondary);
+  --color-bg-tertiary: var(--background-tertiary);
+
+  --color-background-elevated: var(--background-elevated);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
+
+  /* Hover states for elevated surfaces */
+  --color-bg-elevated-hover: var(--background-secondary);
+
+  /* Legacy surface colors for gradual migration */
   --color-section-background: rgb(var(--section-background));
-  --color-surface: rgb(var(--surface));
-  --color-surface-secondary: rgb(var(--surface-secondary));
-  --color-surface-tertiary: rgb(var(--surface-tertiary));
+  --color-surface: var(--background-elevated);
+  --color-surface-secondary: var(--background-secondary);
+  --color-surface-tertiary: var(--background-tertiary);
 
-  --color-border: rgb(var(--border));
-  --color-border-secondary: rgb(var(--border-secondary));
-
+  /* Text Hierarchy - WCAG AAA Compliant */
   --color-text-primary: rgb(var(--text-primary));
   --color-text-secondary: rgb(var(--text-secondary));
   --color-text-tertiary: rgb(var(--text-tertiary));
+  --color-text-quaternary: rgb(var(--text-quaternary));
 
-  /* Blue accent colors */
-  --color-accent-blue-50: rgb(var(--accent-blue-50));
-  --color-accent-blue-100: rgb(var(--accent-blue-100));
-  --color-accent-blue-500: rgb(var(--accent-blue-500));
-  --color-accent-blue-600: rgb(var(--accent-blue-600));
-  --color-accent-blue-700: rgb(var(--accent-blue-700));
+  /* Primary Accent - SF Blue (Single accent system) */
+  --color-accent: rgb(var(--accent-primary));
+  --color-accent-hover: rgb(var(--accent-primary-hover));
+  --color-accent-primary: rgb(var(--accent-primary));
+  --color-accent-primary-hover: rgb(var(--accent-primary-hover));
+  --color-accent-primary-active: rgb(var(--accent-primary-active));
+  --color-accent-primary-subtle: var(--accent-primary-subtle);
 
-  /* Purple accent colors */
-  --color-accent-purple-50: rgb(var(--accent-purple-50));
-  --color-accent-purple-100: rgb(var(--accent-purple-100));
-  --color-accent-purple-500: rgb(var(--accent-purple-500));
-  --color-accent-purple-600: rgb(var(--accent-purple-600));
-  --color-accent-purple-700: rgb(var(--accent-purple-700));
+  /* Border System */
+  --color-border: rgb(var(--border-light));
+  --color-border-light: rgb(var(--border-light));
+  --color-border-secondary: rgb(var(--border-medium));
+  --color-border-heavy: rgb(var(--border-heavy));
+  --color-border-focus: rgb(var(--border-focus));
 
-  /* Gold accent colors */
-  --color-accent-gold-50: rgb(var(--accent-gold-50));
-  --color-accent-gold-100: rgb(var(--accent-gold-100));
-  --color-accent-gold-500: rgb(var(--accent-gold-500));
-  --color-accent-gold-600: rgb(var(--accent-gold-600));
-  --color-accent-gold-700: rgb(var(--accent-gold-700));
+  /* Semantic Status Colors */
+  --color-success: rgb(var(--success));
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
 
-  /* Status colors */
-  --color-success-bg: rgb(var(--success-bg));
-  --color-success-text: rgb(var(--success-text));
-  --color-error-bg: rgb(var(--error-bg));
-  --color-error-text: rgb(var(--error-text));
-  --color-warning-bg: rgb(var(--warning-bg));
-  --color-warning-text: rgb(var(--warning-text));
+  --color-error: rgb(var(--error));
+  --color-error-bg: var(--error-bg);
+  --color-error-text: var(--error-text);
 
-  /* Custom Gold Color Palette (NOT amber) - Using custom gold shades */
-  --color-gold-50: rgb(255 251 235);
-  --color-gold-100: rgb(254 243 199);
-  --color-gold-200: rgb(253 230 138);
-  --color-gold-300: rgb(252 211 77);
-  --color-gold-400: rgb(251 191 36);
-  --color-gold-500: rgb(245 158 11);
-  --color-gold-600: rgb(217 119 6);
-  --color-gold-700: rgb(180 83 9);
-  --color-gold-800: rgb(146 64 14);
-  --color-gold-900: rgb(120 53 15);
+  --color-warning: rgb(var(--warning));
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-text: var(--warning-text);
+
+  --color-info: rgb(var(--info));
+  --color-info-bg: var(--info-bg);
+  --color-info-text: var(--info-text);
+
+  /* Spacing tokens for Tailwind utilities */
+  --space-card-padding: var(--space-card);
+  --space-button-padding-x: var(--space-button-x);
+  --space-button-padding-y: var(--space-button-y);
+
+  /* Border radius tokens */
+  --radius-apple-card: var(--radius-card);
+  --radius-apple-button: var(--radius-button);
+  --radius-apple-input: var(--radius-input);
+
+  /* Shadow tokens */
+  --shadow-card: var(--shadow-sm);
+  --shadow-card-hover: var(--shadow-md);
 
   /* Shimmer animation for loading skeletons */
   --animate-shimmer: shimmer 2s infinite;
@@ -199,18 +197,6 @@
     --accent-blue-600: 59 130 246;
     --accent-blue-700: 37 99 235;
 
-    --accent-purple-50: 46 16 101;
-    --accent-purple-100: 76 29 149;
-    --accent-purple-500: 192 132 252;
-    --accent-purple-600: 168 85 247;
-    --accent-purple-700: 147 51 234;
-
-    --accent-gold-50: 68 47 21;
-    --accent-gold-100: 120 53 15;
-    --accent-gold-500: 252 211 77;     /* gold-300 - much brighter */
-    --accent-gold-600: 251 191 36;     /* gold-400 - brighter */
-    --accent-gold-700: 245 158 11;     /* gold-500 - brighter */
-
     --success-bg: 20 83 45;
     --success-text: 134 239 172;
     --error-bg: 127 29 29;
@@ -221,7 +207,7 @@
 }
 
 body {
-  background: var(--background);
+  background: var(--background-base, var(--background));
   color: var(--foreground);
   font-family: var(--font-vazirmatn), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
@@ -230,19 +216,20 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-weight: 400;
+  font-weight: var(--font-regular, 400);
   line-height: 1.7;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-normal, -0.01em);
 
   /* Smooth transitions for theme changes */
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color var(--duration-normal, 200ms) var(--ease-default, ease),
+              color var(--duration-normal, 200ms) var(--ease-default, ease);
 }
 
 /* Enhanced readability for headings */
 h1, h2, h3, h4, h5, h6 {
-  font-weight: 700;
+  font-weight: var(--font-semibold, 600);
   line-height: 1.3;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--tracking-tight, -0.02em);
 }
 
 /* Better number rendering for Persian numerals */
@@ -268,4 +255,247 @@ h1, h2, h3, h4, h5, h6 {
 button, a, [role="button"] {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================================
+   CUSTOM UTILITY CLASSES - Apple-Inspired Design System
+   ============================================================================
+   Reusable component patterns built on design tokens.
+   These utilities encapsulate common Apple-style patterns.
+============================================================================ */
+
+@layer utilities {
+  /* Typography Utilities - Apple-style text patterns */
+  .text-apple-title {
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+    font-weight: var(--font-semibold);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .text-apple-large-title {
+    font-size: var(--text-4xl);
+    line-height: var(--text-4xl-lh);
+    font-weight: var(--font-semibold);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .text-apple-body {
+    font-size: var(--text-lg);
+    line-height: var(--text-lg-lh);
+    font-weight: var(--font-regular);
+  }
+
+  .text-apple-caption {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-regular);
+  }
+
+  /* Card Utilities - Apple-style card components */
+  .card-apple {
+    background: var(--background-elevated);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-card);
+    border: 1px solid rgb(var(--border-light));
+    transition: var(--transition-default);
+  }
+
+  .card-apple:hover {
+    box-shadow: var(--shadow-md);
+    background: var(--background-secondary);
+  }
+
+  /* Button Utilities - Apple-style button variants */
+  .btn-apple-filled {
+    background: rgb(var(--accent-primary));
+    color: white;
+    border-radius: var(--radius-button);
+    padding: var(--space-button-y) var(--space-button-x);
+    font-weight: var(--font-medium);
+    transition: var(--transition-colors);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .btn-apple-filled:hover:not(:disabled) {
+    background: rgb(var(--accent-primary-hover));
+  }
+
+  .btn-apple-tinted {
+    background: var(--accent-primary-subtle);
+    color: rgb(var(--accent-primary));
+    border-radius: var(--radius-button);
+    padding: var(--space-button-y) var(--space-button-x);
+    font-weight: var(--font-medium);
+    transition: var(--transition-colors);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .btn-apple-tinted:hover:not(:disabled) {
+    opacity: 0.8;
+  }
+
+  .btn-apple-gray {
+    background: rgb(var(--gray-5));
+    color: rgb(var(--text-primary));
+    border-radius: var(--radius-button);
+    padding: var(--space-button-y) var(--space-button-x);
+    font-weight: var(--font-medium);
+    transition: var(--transition-colors);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .btn-apple-gray:hover:not(:disabled) {
+    background: rgb(var(--gray-4));
+  }
+
+  /* Badge Utilities - Subtle status indicators */
+  .badge-apple-success {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-medium);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .badge-apple-error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm-lh);
+    font-weight: var(--font-medium);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  /* Focus Ring - Consistent focus states */
+  .focus-apple {
+    outline: none;
+    box-shadow: 0 0 0 var(--focus-ring-width) rgba(var(--accent-primary), 0.4);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* Surface Elevation - Background layers */
+  .surface-elevated {
+    background: var(--background-elevated);
+  }
+
+  .surface-secondary {
+    background: var(--background-secondary);
+  }
+
+  .surface-tertiary {
+    background: var(--background-tertiary);
+  }
+
+  /* ============================================================================
+     Apple-style Animation Utilities
+     Smooth, refined animations using design token timing
+  ============================================================================ */
+
+  /* Smooth transitions - use design token timing */
+  .transition-apple {
+    transition: var(--transition-all);
+  }
+
+  .transition-apple-fast {
+    transition-property: all;
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .transition-apple-colors {
+    transition: var(--transition-colors);
+  }
+
+  /* Fade in animation - subtle entrance */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn var(--duration-normal) var(--ease-out);
+  }
+
+  /* Slide down animation - for dropdowns and modals */
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-down {
+    animation: slideDown var(--duration-normal) var(--ease-out);
+  }
+
+  /* Slide up animation - for bottom sheets */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slideUp var(--duration-normal) var(--ease-out);
+  }
+
+  /* Active scale for interactive elements */
+  .active-scale-apple {
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .active-scale-apple:active {
+    transform: scale(0.98);
+  }
+
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    .transition-apple,
+    .transition-apple-fast,
+    .transition-apple-colors,
+    .active-scale-apple {
+      transition: none;
+    }
+
+    .animate-fade-in,
+    .animate-slide-down,
+    .animate-slide-up {
+      animation: none;
+    }
+  }
 }

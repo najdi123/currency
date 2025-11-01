@@ -27,28 +27,28 @@ export const ThemeToggle: React.FC = () => {
   // Don't render until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
-      <div className="inline-flex rounded-lg border border-border bg-surface p-1 gap-1">
-        <div className="w-9 h-9 rounded-md bg-transparent" />
-        <div className="w-9 h-9 rounded-md bg-transparent" />
-        <div className="w-9 h-9 rounded-md bg-transparent" />
+      <div className="inline-flex rounded-lg border border-border-light bg-bg-elevated p-1 gap-1">
+        <div className="w-9 h-9 rounded-lg bg-transparent" />
+        <div className="w-9 h-9 rounded-lg bg-transparent" />
+        <div className="w-9 h-9 rounded-lg bg-transparent" />
       </div>
     )
   }
 
   const buttonBaseClasses = `
     w-9 h-9
-    rounded-md
+    rounded-lg
     flex items-center justify-center
-    transition-all duration-200
-    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+    transition-apple-fast active-scale-apple
+    focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900
   `
 
-  const activeClasses = 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
-  const inactiveClasses = 'bg-transparent text-text-secondary hover:bg-surface-tertiary'
+  const activeClasses = 'bg-accent text-white'
+  const inactiveClasses = 'bg-transparent text-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800'
 
   return (
     <div
-      className="inline-flex rounded-lg border border-border bg-surface p-1 gap-1 shadow-sm"
+      className="inline-flex rounded-lg border border-border-light bg-bg-elevated p-1 gap-1 shadow-sm"
       role="group"
       aria-label="انتخاب تم"
     >

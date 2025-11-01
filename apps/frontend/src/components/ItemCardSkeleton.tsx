@@ -9,12 +9,17 @@ export interface ItemCardSkeletonProps {
 
 /**
  * ItemCardSkeleton - Loading skeleton for ItemCardGrid
+ * Apple-inspired design with new design tokens
  *
  * Features:
- * - Matches the ItemCard vertical layout structure
+ * - Matches the ItemCard vertical layout structure with Apple-style aesthetics
  * - Smooth shimmer animation with gradient effect
+ * - Uses new design tokens via Tailwind classes
  * - Maintains consistent spacing and sizing with actual cards
  * - Fully responsive across all breakpoints (mobile to desktop)
+ * - Larger border radius (16px) matching new card design
+ * - More generous padding matching new card spacing
+ * - Uses ONLY Tailwind CSS classes (no inline styles)
  *
  * Layout Structure (matches ItemCard):
  * - Top row: Icon placeholder (left) and Name placeholder (right)
@@ -33,40 +38,52 @@ export const ItemCardSkeleton: React.FC<ItemCardSkeletonProps> = ({
       {Array.from({ length: count }).map((_, idx) => (
         <div
           key={idx}
-          className="flex flex-col bg-surface rounded-lg shadow-sm border border-border p-3 sm:p-4 lg:p-5 xl:p-6 min-h-[120px] sm:min-h-[140px] lg:min-h-[160px]"
+          className="bg-bg-elevated border border-border-light rounded-[1rem] shadow-[var(--shadow-sm)] p-4 flex flex-col min-h-[120px] sm:min-h-[140px] lg:min-h-[160px]"
         >
           {/* Top row: Icon placeholder (left) and Name placeholder (right) */}
           <div className="flex justify-between items-start gap-2 mb-auto">
             {/* Icon skeleton - circular shape matching icon size */}
             <div
-              className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 xl:w-12 xl:h-12 rounded-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-shimmer flex-shrink-0"
-              style={{ backgroundSize: '1000px 100%' }}
+              className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer flex-shrink-0"
+              style={{
+                backgroundImage: 'linear-gradient(90deg, rgb(var(--gray-5)) 0%, rgb(var(--gray-4)) 50%, rgb(var(--gray-5)) 100%)',
+                backgroundSize: '1000px 100%',
+              }}
               aria-hidden="true"
             />
 
             {/* Name skeleton - rectangular bar on the right */}
             <div className="flex-1 flex justify-end">
               <div
-                className="w-24 sm:w-32 h-4 sm:h-5 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded animate-shimmer"
-                style={{ backgroundSize: '1000px 100%' }}
+                className="w-32 h-5 rounded-md bg-gray-200 dark:bg-gray-700 animate-shimmer"
+                style={{
+                  backgroundImage: 'linear-gradient(90deg, rgb(var(--gray-5)) 0%, rgb(var(--gray-4)) 50%, rgb(var(--gray-5)) 100%)',
+                  backgroundSize: '1000px 100%',
+                }}
                 aria-hidden="true"
               />
             </div>
           </div>
 
           {/* Bottom section: Change badge and Price (both left-aligned) */}
-          <div className="flex flex-col items-start gap-1 sm:gap-2 mt-auto">
-            {/* Change badge skeleton - small pill shape */}
+          <div className="flex flex-col items-start gap-2 mt-auto">
+            {/* Change badge skeleton - small rounded rectangle */}
             <div
-              className="w-16 h-6 sm:h-7 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded-full animate-shimmer"
-              style={{ backgroundSize: '1000px 100%' }}
+              className="w-16 h-6 rounded-md bg-gray-200 dark:bg-gray-700 animate-shimmer"
+              style={{
+                backgroundImage: 'linear-gradient(90deg, rgb(var(--gray-5)) 0%, rgb(var(--gray-4)) 50%, rgb(var(--gray-5)) 100%)',
+                backgroundSize: '1000px 100%',
+              }}
               aria-hidden="true"
             />
 
             {/* Price skeleton - large bar for price text */}
             <div
-              className="w-32 sm:w-40 h-6 sm:h-8 md:h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded animate-shimmer"
-              style={{ backgroundSize: '1000px 100%' }}
+              className="w-40 h-8 rounded-md bg-gray-200 dark:bg-gray-700 animate-shimmer"
+              style={{
+                backgroundImage: 'linear-gradient(90deg, rgb(var(--gray-5)) 0%, rgb(var(--gray-4)) 50%, rgb(var(--gray-5)) 100%)',
+                backgroundSize: '1000px 100%',
+              }}
               aria-hidden="true"
             />
           </div>

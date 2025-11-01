@@ -52,15 +52,15 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
     >
       <Drawer.Portal>
         <Drawer.Overlay
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 animate-fade-in"
           onClick={onClose}
         />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[24px] bg-surface border-t-4 border-blue-500 dark:border-blue-400 shadow-xl z-50 max-h-[95vh]"
+          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[var(--radius-xl)] bg-bg-elevated border-t border-border-light shadow-xl z-50 max-h-[95vh] animate-slide-up"
           aria-label="نمودار قیمت"
         >
           {/* Drag Handle */}
-          <div className="mx-auto mt-3 mb-2 h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600" />
+          <div className="mx-auto mt-3 mb-2 h-1.5 w-12 rounded-full bg-text-tertiary/30" />
 
           {/* Accessible Title (required for screen readers) */}
           <Drawer.Title className="sr-only">
@@ -70,10 +70,10 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 left-4 p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 z-10"
+            className="absolute top-4 left-4 p-2 rounded-full bg-accent-primary-subtle text-accent transition-apple-fast active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-10"
             aria-label="بستن نمودار"
           >
-            <HiX className="text-xl text-text-primary" />
+            <HiX className="text-xl" />
           </button>
 
           {/* Header */}

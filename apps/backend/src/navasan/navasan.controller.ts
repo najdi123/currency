@@ -1,4 +1,5 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { NavasanService } from './navasan.service';
 
 @Controller('navasan')
@@ -8,13 +9,47 @@ export class NavasanController {
   constructor(private readonly navasanService: NavasanService) {}
 
   /**
+   * Sanitize header value to prevent HTTP header injection
+   * SECURITY FIX: Removes newlines, carriage returns, and control characters
+   */
+  private sanitizeHeaderValue(value: string): string {
+    if (!value) return '';
+    // Remove newlines, carriage returns, and other control characters
+    return value.replace(/[\r\n\x00-\x1f\x7f]/g, '');
+  }
+
+  /**
    * GET /api/navasan/latest
    * Returns all latest prices (currencies, crypto, and gold)
    */
   @Get('latest')
-  async getLatest() {
-    this.logger.log('GET /api/navasan/latest - Fetching all latest rates');
-    return this.navasanService.getLatestRates();
+  async getLatest(@Res() res: Response) {
+    try {
+      this.logger.log('GET /api/navasan/latest - Fetching all latest rates');
+
+      const response = await this.navasanService.getLatestRates();
+
+      // Add metadata headers to communicate data freshness
+      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
+      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
+      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
+      res.setHeader('X-Data-Source', response.metadata.source);
+      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+
+      // SECURITY FIX: Sanitize warning message to prevent header injection
+      if (response.metadata.warning) {
+        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+      }
+
+      // Return data with metadata
+      return res.json({
+        ...response.data,
+        _metadata: response.metadata,
+      });
+    } catch (error) {
+      // Re-throw to let NestJS exception filters handle it
+      throw error;
+    }
   }
 
   /**
@@ -22,9 +57,30 @@ export class NavasanController {
    * Returns only currency rates (USD, EUR, GBP, CAD, AUD)
    */
   @Get('currencies')
-  async getCurrencies() {
-    this.logger.log('GET /api/navasan/currencies - Fetching currency rates');
-    return this.navasanService.getCurrencies();
+  async getCurrencies(@Res() res: Response) {
+    try {
+      this.logger.log('GET /api/navasan/currencies - Fetching currency rates');
+
+      const response = await this.navasanService.getCurrencies();
+
+      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
+      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
+      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
+      res.setHeader('X-Data-Source', response.metadata.source);
+      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+
+      // SECURITY FIX: Sanitize warning message to prevent header injection
+      if (response.metadata.warning) {
+        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+      }
+
+      return res.json({
+        ...response.data,
+        _metadata: response.metadata,
+      });
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
@@ -32,9 +88,30 @@ export class NavasanController {
    * Returns only cryptocurrency rates (USDT, BTC, ETH)
    */
   @Get('crypto')
-  async getCrypto() {
-    this.logger.log('GET /api/navasan/crypto - Fetching crypto rates');
-    return this.navasanService.getCrypto();
+  async getCrypto(@Res() res: Response) {
+    try {
+      this.logger.log('GET /api/navasan/crypto - Fetching crypto rates');
+
+      const response = await this.navasanService.getCrypto();
+
+      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
+      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
+      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
+      res.setHeader('X-Data-Source', response.metadata.source);
+      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+
+      // SECURITY FIX: Sanitize warning message to prevent header injection
+      if (response.metadata.warning) {
+        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+      }
+
+      return res.json({
+        ...response.data,
+        _metadata: response.metadata,
+      });
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
@@ -42,8 +119,29 @@ export class NavasanController {
    * Returns gold coin and gold prices (Sekkeh, Bahar, Nim, Rob, Gerami, 18 Karat)
    */
   @Get('gold')
-  async getGold() {
-    this.logger.log('GET /api/navasan/gold - Fetching gold prices');
-    return this.navasanService.getGold();
+  async getGold(@Res() res: Response) {
+    try {
+      this.logger.log('GET /api/navasan/gold - Fetching gold prices');
+
+      const response = await this.navasanService.getGold();
+
+      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
+      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
+      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
+      res.setHeader('X-Data-Source', response.metadata.source);
+      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+
+      // SECURITY FIX: Sanitize warning message to prevent header injection
+      if (response.metadata.warning) {
+        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+      }
+
+      return res.json({
+        ...response.data,
+        _metadata: response.metadata,
+      });
+    } catch (error) {
+      throw error;
+    }
   }
 }

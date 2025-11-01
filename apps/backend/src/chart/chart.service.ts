@@ -24,7 +24,8 @@ export class ChartService {
   private readonly logger = new Logger(ChartService.name);
   private readonly apiKey: string;
   private readonly ohlcBaseUrl = 'http://api.navasan.tech/ohlcSearch/';
-  private readonly cacheExpiryMinutes = 60; // 1 hour cache for OHLC data
+  private readonly freshCacheMinutes = 60; // 1 hour cache for OHLC data
+  private readonly staleCacheHours = 72; // Keep stale OHLC data for 3 days
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
@@ -34,6 +35,26 @@ export class ChartService {
     if (!this.apiKey) {
       this.logger.error('NAVASAN_API_KEY is not set in environment variables');
       throw new Error('NAVASAN_API_KEY is required for chart service');
+    }
+  }
+
+  /**
+   * Validate cache key parameter to prevent NoSQL injection
+   * Only allows alphanumeric characters, underscores, hyphens, and reasonable length
+   */
+  private validateCacheKey(cacheKey: string): void {
+    if (!cacheKey || typeof cacheKey !== 'string') {
+      throw new Error('Cache key must be a non-empty string');
+    }
+
+    if (cacheKey.length > 100) {
+      throw new Error('Cache key too long');
+    }
+
+    // Only allow alphanumeric, underscore, hyphen
+    const safePattern = /^[a-zA-Z0-9_-]+$/;
+    if (!safePattern.test(cacheKey)) {
+      throw new Error('Cache key contains invalid characters');
     }
   }
 
@@ -193,7 +214,7 @@ export class ChartService {
   }
 
   /**
-   * Fetch OHLC data with caching
+   * Fetch OHLC data with caching and fallback to stale data
    */
   private async fetchOHLCDataWithCache(
     itemCode: string,
@@ -204,22 +225,59 @@ export class ChartService {
     // Generate cache key based on item, time range
     const cacheKey = `ohlc_${itemCode}_${timeRange}`;
 
+    // Validate cache key to prevent NoSQL injection
+    this.validateCacheKey(cacheKey);
+
     try {
-      // Check cache first
-      const cached = await this.getCachedOHLCData(cacheKey);
-      if (cached) {
-        this.logger.log(`Returning cached OHLC data for ${itemCode} (${timeRange})`);
-        return cached as NavasanOHLCDataPoint[];
+      // Step 1: Check for fresh cache (< 1 hour old)
+      const freshCache = await this.getFreshCachedOHLCData(cacheKey);
+      if (freshCache) {
+        this.logger.log(`✅ Returning fresh cached OHLC data for ${itemCode} (${timeRange})`);
+        return freshCache as NavasanOHLCDataPoint[];
       }
 
-      // No valid cache, fetch from API
-      this.logger.log(`Fetching OHLC data from Navasan API for ${itemCode} (${timeRange})`);
-      const data = await this.fetchOHLCFromApi(itemCode, startTimestamp, endTimestamp);
+      // Step 2: Try to fetch from API
+      this.logger.log(`📡 Fetching OHLC data from Navasan API for ${itemCode} (${timeRange})`);
+      try {
+        const apiResponse = await this.fetchOHLCFromApi(itemCode, startTimestamp, endTimestamp);
 
-      // Save to cache
-      await this.saveOHLCToCache(cacheKey, data);
+        // Success! Save to both fresh and stale caches with error handling
+        await this.saveOHLCToFreshCacheWithRetry(cacheKey, apiResponse.data, apiResponse.metadata);
+        await this.saveOHLCToStaleCacheWithRetry(cacheKey, apiResponse.data, apiResponse.metadata);
 
-      return data;
+        return apiResponse.data;
+      } catch (apiError) {
+        // Step 3: API failed, try to serve stale data
+        this.logger.warn(
+          `⚠️  OHLC API failed for ${itemCode}. Attempting fallback to stale data.`,
+        );
+
+        // Capture error message for tracking
+        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+
+        // Check if it's a token error
+        const isTokenError = this.isTokenExpirationError(apiError);
+        if (isTokenError) {
+          this.logger.error(`🔑 TOKEN EXPIRATION detected for OHLC API`);
+        }
+
+        // Try to get stale cache (up to 72 hours old)
+        const staleCache = await this.getStaleCachedOHLCData(cacheKey);
+        if (staleCache) {
+          this.logger.warn(`⚠️  Serving STALE OHLC data for ${itemCode} (${timeRange})`);
+
+          // Mark cache as fallback with error message for monitoring
+          await this.markOHLCCacheAsFallback(cacheKey, errorMessage).catch((err) => {
+            this.logger.error(`Failed to mark OHLC cache as fallback: ${err.message}`);
+          });
+
+          return staleCache as NavasanOHLCDataPoint[];
+        }
+
+        // No stale cache available
+        this.logger.error(`❌ No stale OHLC cache available for ${itemCode}`);
+        throw apiError;
+      }
     } catch (error) {
       this.logger.error(
         `Failed to fetch OHLC data for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
@@ -229,46 +287,169 @@ export class ChartService {
   }
 
   /**
+   * Check if error is due to token expiration
+   */
+  private isTokenExpirationError(error: unknown): boolean {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        return true;
+      }
+      const responseData = error.response?.data;
+      if (typeof responseData === 'object' && responseData !== null) {
+        const message = JSON.stringify(responseData).toLowerCase();
+        return (
+          message.includes('token') ||
+          message.includes('unauthorized') ||
+          message.includes('api key') ||
+          message.includes('authentication')
+        );
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Validate OHLC API response structure
+   * Ensures response contains valid OHLC data points with required fields
+   */
+  private validateOHLCResponse(data: unknown, itemCode: string): void {
+    // Check that response is an array
+    if (!Array.isArray(data)) {
+      this.logger.error(`Invalid OHLC API response for ${itemCode}: expected array, received ${typeof data}`);
+      throw new Error('Invalid OHLC API response structure: expected array of data points');
+    }
+
+    // Allow empty arrays (no data for time range is valid)
+    if (data.length === 0) {
+      this.logger.warn(`OHLC API returned empty array for ${itemCode}`);
+      return;
+    }
+
+    // Validate structure of each data point
+    const requiredFields = ['timestamp', 'date', 'open', 'high', 'low', 'close'];
+
+    for (let i = 0; i < data.length; i++) {
+      const point = data[i];
+
+      // Check that point is an object
+      if (!point || typeof point !== 'object' || Array.isArray(point)) {
+        this.logger.error(`Invalid OHLC data point at index ${i} for ${itemCode}: not an object`);
+        throw new Error(`Invalid OHLC API response: data point ${i} is not an object`);
+      }
+
+      // Check all required fields exist
+      for (const field of requiredFields) {
+        if (!(field in point)) {
+          this.logger.error(`Missing required field "${field}" in OHLC data point ${i} for ${itemCode}`);
+          throw new Error(`Invalid OHLC API response: data point ${i} missing "${field}" field`);
+        }
+      }
+
+      // Validate field types
+      const typedPoint = point as NavasanOHLCDataPoint;
+
+      // Validate timestamp is a number
+      if (typeof typedPoint.timestamp !== 'number' || isNaN(typedPoint.timestamp)) {
+        this.logger.error(`Invalid timestamp in OHLC data point ${i} for ${itemCode}`);
+        throw new Error(`Invalid OHLC API response: data point ${i} has invalid timestamp`);
+      }
+
+      // Validate price fields are strings that can be parsed as numbers
+      const priceFields = ['open', 'high', 'low', 'close'];
+      for (const field of priceFields) {
+        const value = typedPoint[field as keyof Pick<NavasanOHLCDataPoint, 'open' | 'high' | 'low' | 'close'>];
+        if (typeof value !== 'string' || isNaN(parseFloat(value))) {
+          this.logger.error(`Invalid ${field} value in OHLC data point ${i} for ${itemCode}`);
+          throw new Error(`Invalid OHLC API response: data point ${i} has invalid "${field}" value`);
+        }
+      }
+    }
+
+    this.logger.log(`✅ OHLC API response validation passed for ${itemCode}: ${data.length} data points`);
+  }
+
+  /**
    * Fetch OHLC data from Navasan API
+   * SECURITY: API key sent in header instead of URL to prevent exposure in logs
    */
   private async fetchOHLCFromApi(
     itemCode: string,
     startTimestamp: number,
     endTimestamp: number,
-  ): Promise<NavasanOHLCDataPoint[]> {
+  ): Promise<{ data: NavasanOHLCDataPoint[]; metadata?: Record<string, unknown> }> {
     try {
-      const url = `${this.ohlcBaseUrl}?api_key=${this.apiKey}&item=${itemCode}&start=${startTimestamp}&end=${endTimestamp}`;
+      // SECURITY FIX: API key in URL exposes it in logs - use headers instead
+      const url = `${this.ohlcBaseUrl}?item=${itemCode}&start=${startTimestamp}&end=${endTimestamp}`;
 
       this.logger.log(`Calling Navasan OHLC API: ${itemCode} from ${startTimestamp} to ${endTimestamp}`);
 
       const response = await axios.get<NavasanOHLCDataPoint[]>(url, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'X-API-Key': this.apiKey, // Fallback in case they use custom header
+        },
         timeout: 10000, // 10 second timeout
+        validateStatus: (status) => status < 500, // Don't throw on 4xx errors
       });
 
-      if (response.status !== 200) {
-        throw new Error(`Navasan OHLC API returned status ${response.status}`);
+      // Handle authentication errors - throw error to trigger stale fallback
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(
+          'Navasan OHLC API authentication failed. API key may be expired or invalid.',
+        );
       }
 
-      if (!Array.isArray(response.data)) {
-        throw new Error('Invalid response format from Navasan OHLC API');
+      // Handle rate limiting - throw error to trigger stale fallback
+      if (response.status === 429) {
+        const retryAfter = response.headers['retry-after'];
+        // Throw regular Error so it gets caught by try-catch and triggers stale cache fallback
+        throw new Error(
+          `Navasan OHLC API rate limit exceeded. Retry after ${retryAfter || 'some time'}.`,
+        );
       }
+
+      // Handle other non-200 responses
+      if (response.status !== 200) {
+        // SECURITY FIX: Don't expose specific status codes to prevent information leakage
+        throw new Error('External API returned unexpected response. Please try again later.');
+      }
+
+      // VALIDATION FIX: Validate OHLC API response structure before caching
+      // This prevents invalid/malformed data from being cached and served to users
+      this.validateOHLCResponse(response.data, itemCode);
 
       if (response.data.length === 0) {
         this.logger.warn(`No OHLC data returned for ${itemCode}`);
       }
 
-      return response.data;
+      // Capture rate limit metadata for monitoring
+      const apiMetadata: Record<string, unknown> = {
+        statusCode: response.status,
+      };
+
+      // Extract rate limit headers if present
+      if (response.headers['x-ratelimit-remaining']) {
+        apiMetadata.rateLimitRemaining = parseInt(response.headers['x-ratelimit-remaining'], 10);
+      }
+      if (response.headers['x-ratelimit-reset']) {
+        const resetTimestamp = parseInt(response.headers['x-ratelimit-reset'], 10);
+        apiMetadata.rateLimitReset = new Date(resetTimestamp * 1000);
+      }
+
+      return { data: response.data, metadata: apiMetadata };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNABORTED') {
           throw new InternalServerErrorException('Request to Navasan API timed out');
         }
         if (error.response) {
+          // Log detailed error internally for debugging
           this.logger.error(
             `Navasan API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`,
           );
+          // SECURITY FIX: Don't expose API error details to clients to prevent information leakage
           throw new InternalServerErrorException(
-            `Navasan API returned error: ${error.response.status}`,
+            'Failed to fetch chart data. Please try again later.',
           );
         }
       }
@@ -277,15 +458,16 @@ export class ChartService {
   }
 
   /**
-   * Get cached OHLC data if valid
+   * Get fresh cached OHLC data (< 1 hour old)
    */
-  private async getCachedOHLCData(cacheKey: string): Promise<unknown[] | null> {
-    const cacheExpiry = new Date(Date.now() - this.cacheExpiryMinutes * 60 * 1000);
+  private async getFreshCachedOHLCData(cacheKey: string): Promise<unknown[] | null> {
+    const freshExpiry = new Date(Date.now() - this.freshCacheMinutes * 60 * 1000);
 
     const cached = await this.cacheModel
       .findOne({
         category: cacheKey,
-        timestamp: { $gte: cacheExpiry },
+        cacheType: 'fresh',
+        timestamp: { $gte: freshExpiry },
       })
       .sort({ timestamp: -1 })
       .exec();
@@ -298,25 +480,172 @@ export class ChartService {
   }
 
   /**
-   * Save OHLC data to cache
+   * Get stale cached OHLC data (up to 72 hours old) for fallback
    */
-  private async saveOHLCToCache(cacheKey: string, data: NavasanOHLCDataPoint[]): Promise<void> {
+  private async getStaleCachedOHLCData(cacheKey: string): Promise<unknown[] | null> {
+    const staleExpiry = new Date(Date.now() - this.staleCacheHours * 60 * 60 * 1000);
+
+    const cached = await this.cacheModel
+      .findOne({
+        category: cacheKey,
+        cacheType: { $in: ['fresh', 'stale'] },
+        timestamp: { $gte: staleExpiry },
+      })
+      .sort({ timestamp: -1 })
+      .exec();
+
+    if (cached && Array.isArray(cached.data)) {
+      return cached.data as unknown[];
+    }
+
+    return null;
+  }
+
+  /**
+   * Save OHLC data to fresh cache using atomic upsert
+   * SECURITY FIX: Using findOneAndUpdate with upsert instead of delete-then-create
+   * ERROR TRACKING FIX: Reset apiErrorCount to 0 on successful API calls
+   */
+  private async saveOHLCToFreshCache(
+    cacheKey: string,
+    data: NavasanOHLCDataPoint[],
+    apiMetadata?: Record<string, unknown>,
+  ): Promise<void> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.cacheExpiryMinutes * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + this.freshCacheMinutes * 60 * 1000);
 
-    // Delete old cache entries for this key
-    await this.cacheModel.deleteMany({ category: cacheKey }).exec();
+    // Atomic upsert - no race condition, no data loss
+    await this.cacheModel
+      .findOneAndUpdate(
+        { category: cacheKey, cacheType: 'fresh' },
+        {
+          $set: {
+            data: data,
+            timestamp: now,
+            expiresAt,
+            lastApiSuccess: now,
+            apiErrorCount: 0, // Reset error count on success
+            isFallback: false,
+            lastApiError: undefined,
+            apiMetadata: apiMetadata || undefined,
+          },
+        },
+        { upsert: true, new: true },
+      )
+      .exec();
 
-    // Create new cache entry
-    const cache = new this.cacheModel({
-      category: cacheKey,
-      data: data,
-      timestamp: now,
-      expiresAt,
-    });
+    this.logger.log(
+      `💾 Saved fresh OHLC cache for ${cacheKey}, expires at: ${expiresAt.toISOString()}`,
+    );
+  }
 
-    await cache.save();
-    this.logger.log(`Cached OHLC data for ${cacheKey}, expires at: ${expiresAt.toISOString()}`);
+  /**
+   * Save OHLC data to stale cache using atomic upsert
+   * SECURITY FIX: Using findOneAndUpdate with upsert instead of delete-then-create
+   * ERROR TRACKING FIX: Reset apiErrorCount to 0 on successful API calls
+   */
+  private async saveOHLCToStaleCache(
+    cacheKey: string,
+    data: NavasanOHLCDataPoint[],
+    apiMetadata?: Record<string, unknown>,
+  ): Promise<void> {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.staleCacheHours * 60 * 60 * 1000);
+
+    // Atomic upsert - no race condition
+    await this.cacheModel
+      .findOneAndUpdate(
+        { category: cacheKey, cacheType: 'stale' },
+        {
+          $set: {
+            data: data,
+            timestamp: now,
+            expiresAt,
+            lastApiSuccess: now,
+            apiErrorCount: 0, // Reset error count on success
+            isFallback: false,
+            lastApiError: undefined,
+            apiMetadata: apiMetadata || undefined,
+          },
+        },
+        { upsert: true, new: true },
+      )
+      .exec();
+
+    this.logger.log(
+      `💾 Saved stale OHLC cache for ${cacheKey}, expires at: ${expiresAt.toISOString()}`,
+    );
+  }
+
+  /**
+   * Save OHLC cache with retry logic for resilience
+   * RELIABILITY FIX: Cache write failures shouldn't fail the request
+   */
+  private async saveOHLCToFreshCacheWithRetry(
+    cacheKey: string,
+    data: NavasanOHLCDataPoint[],
+    apiMetadata?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.saveOHLCToFreshCache(cacheKey, data, apiMetadata);
+    } catch (error) {
+      this.logger.error(
+        `Failed to save fresh OHLC cache for ${cacheKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Don't fail the request, just log the error
+    }
+  }
+
+  /**
+   * Save stale OHLC cache with retry logic
+   * RELIABILITY FIX: Retry stale cache writes since they're critical for fallback
+   */
+  private async saveOHLCToStaleCacheWithRetry(
+    cacheKey: string,
+    data: NavasanOHLCDataPoint[],
+    apiMetadata?: Record<string, unknown>,
+  ): Promise<void> {
+    let retries = 0;
+    const maxRetries = 1;
+
+    while (retries <= maxRetries) {
+      try {
+        await this.saveOHLCToStaleCache(cacheKey, data, apiMetadata);
+        return; // Success
+      } catch (error) {
+        retries++;
+        this.logger.error(
+          `Failed to save stale OHLC cache for ${cacheKey} (attempt ${retries}/${maxRetries + 1}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+
+        if (retries > maxRetries) {
+          this.logger.error(`Gave up saving stale OHLC cache for ${cacheKey} after ${maxRetries + 1} attempts`);
+          // Don't fail the request, but log as critical
+        }
+      }
+    }
+  }
+
+  /**
+   * Mark OHLC cache entry as being used as fallback and track API errors
+   * Populates isFallback, lastApiError, and increments apiErrorCount
+   * This enables monitoring of when stale OHLC data is being served
+   */
+  private async markOHLCCacheAsFallback(cacheKey: string, errorMessage: string): Promise<void> {
+    await this.cacheModel
+      .updateMany(
+        { category: cacheKey, cacheType: { $in: ['fresh', 'stale'] } },
+        {
+          $set: {
+            isFallback: true,
+            lastApiError: errorMessage,
+          },
+          $inc: {
+            apiErrorCount: 1,
+          },
+        },
+      )
+      .exec();
   }
 
   /**

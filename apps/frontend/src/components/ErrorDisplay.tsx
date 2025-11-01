@@ -84,14 +84,14 @@ export function ErrorDisplay({
 
   return (
     <div
-      className={`${colors.bg} border ${colors.border} rounded-lg ${compact ? 'p-4' : 'p-6'} ${className}`}
+      className={`bg-bg-elevated border border-border-light rounded-[var(--radius-lg)] ${compact ? 'p-4' : 'p-6'} ${className} animate-fade-in`}
       dir="rtl"
       role="alert"
     >
       <div className="flex items-start gap-3">
         {/* Icon */}
         <div className="flex-shrink-0">
-          <div className={`text-3xl ${compact ? 'text-2xl' : ''}`} aria-hidden="true">
+          <div className={`${compact ? 'text-2xl' : 'text-3xl'} text-accent opacity-60`} aria-hidden="true">
             {errorMessage.icon}
           </div>
         </div>
@@ -99,20 +99,20 @@ export function ErrorDisplay({
         {/* Content */}
         <div className="flex-1 min-w-0">
           {/* Title */}
-          <h3 className={`font-bold ${colors.text} ${compact ? 'text-base mb-1' : 'text-lg mb-2'}`}>
+          <h3 className={`font-semibold text-text-primary ${compact ? 'text-apple-body mb-1' : 'text-apple-title mb-2'}`}>
             {title}
           </h3>
 
           {/* Description */}
-          <p className={`${colors.text} opacity-90 ${compact ? 'text-sm mb-2' : 'text-base mb-3'}`}>
+          <p className={`text-text-secondary ${compact ? 'text-apple-caption mb-2' : 'text-apple-body mb-3'} leading-relaxed`}>
             {errorMessage.description}
           </p>
 
           {/* Suggested Actions */}
           {!compact && errorMessage.suggestedActions.length > 0 && (
             <div className="mb-4">
-              <p className={`${colors.text} font-semibold text-sm mb-2`}>پیشنهادات:</p>
-              <ul className={`${colors.text} opacity-80 text-sm space-y-1 pr-5`}>
+              <p className="text-text-primary font-semibold text-apple-caption mb-2">پیشنهادات:</p>
+              <ul className="text-text-secondary text-apple-caption space-y-1 pr-5">
                 {errorMessage.suggestedActions.map((action, index) => (
                   <li key={index} className="list-disc">
                     {action}
@@ -126,12 +126,12 @@ export function ErrorDisplay({
           {errorCode && errorMessage.showTechnicalDetails && config.isDevelopment && (
             <div className="mb-3">
               <details className="group">
-                <summary className={`cursor-pointer text-xs ${colors.text} opacity-75 hover:opacity-100 select-none`}>
+                <summary className="cursor-pointer text-xs text-text-secondary hover:text-text-primary transition-apple-fast select-none">
                   <span className="inline-block transition-transform group-open:rotate-90">▶</span>
                   {' '}جزئیات فنی (فقط در حالت توسعه)
                 </summary>
-                <div className="mt-2 bg-white bg-opacity-50 border border-current border-opacity-20 rounded p-2">
-                  <p className={`text-xs font-mono ${colors.text} break-all`}>
+                <div className="mt-2 bg-bg-secondary border border-border-light rounded-lg p-2">
+                  <p className="text-xs font-mono text-text-secondary break-all">
                     کد خطا: {errorCode}
                   </p>
                 </div>
@@ -145,7 +145,7 @@ export function ErrorDisplay({
             {errorMessage.canRetry && onRetry && (
               <button
                 onClick={onRetry}
-                className={`${colors.button} ${colors.buttonHover} text-white px-4 py-2 rounded transition-colors font-medium text-sm flex items-center gap-2`}
+                className="btn-apple-tinted active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 text-sm"
               >
                 <svg
                   className="w-4 h-4"
@@ -168,7 +168,7 @@ export function ErrorDisplay({
             {showReportButton && (
               <button
                 onClick={handleReport}
-                className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition-colors font-medium text-sm flex items-center gap-2"
+                className="btn-apple-gray active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 text-sm"
               >
                 <svg
                   className="w-4 h-4"
@@ -191,7 +191,7 @@ export function ErrorDisplay({
             {showCopyButton && (
               <button
                 onClick={handleCopy}
-                className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition-colors font-medium text-sm flex items-center gap-2"
+                className="btn-apple-gray active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 text-sm"
                 disabled={copied}
               >
                 {copied ? (
@@ -265,7 +265,7 @@ export function SimpleErrorMessage({ error }: { error: unknown }) {
   const errorMessage = getUserErrorMessage(error)
 
   return (
-    <div className="text-red-600 text-sm" dir="rtl">
+    <div className="text-error text-apple-caption" dir="rtl">
       {errorMessage.title}
     </div>
   )

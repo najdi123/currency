@@ -95,11 +95,12 @@ export const getEChartsOption = (
   itemName: string,
   isDark: boolean
 ): EChartsOption => {
+  // Use Apple design token colors - SF Blue with subtle variations
   const colors = {
-    line: isDark ? '#60a5fa' : '#2563eb',
-    grid: isDark ? '#374151' : '#e5e7eb',
-    text: isDark ? '#e5e7eb' : '#374151',
-    bg: isDark ? 'transparent' : 'transparent',
+    line: isDark ? 'rgb(10, 132, 255)' : 'rgb(0, 122, 255)',      // --accent-primary
+    grid: isDark ? 'rgb(58, 58, 60)' : 'rgb(229, 229, 234)',      // --border-light
+    text: isDark ? 'rgb(235, 235, 245)' : 'rgb(60, 60, 67)',      // --text-secondary
+    bg: 'transparent',
   }
 
   return {
@@ -108,49 +109,58 @@ export const getEChartsOption = (
       left: '60px',
       right: '20px',
       top: '20px',
-      bottom: '70px', // Increased to make room for zoom slider
+      bottom: '70px',
     },
     xAxis: {
       type: 'category',
       data: dates.map(d => formatChartDate(d, timeRange)),
       axisLine: {
-        lineStyle: { color: colors.grid }
+        show: false, // Clean Apple style - no axis lines
+      },
+      axisTick: {
+        show: false,
       },
       axisLabel: {
         color: colors.text,
         fontSize: 11,
+        fontFamily: 'Vazirmatn, -apple-system, sans-serif',
       },
     },
     yAxis: {
       type: 'value',
       axisLine: {
-        lineStyle: { color: colors.grid }
+        show: false, // Clean Apple style - no axis lines
+      },
+      axisTick: {
+        show: false,
       },
       axisLabel: {
         color: colors.text,
         fontSize: 11,
+        fontFamily: 'Vazirmatn, -apple-system, sans-serif',
         formatter: (value: number) => formatYAxisLabel(value),
       },
       splitLine: {
         lineStyle: {
           color: colors.grid,
-          opacity: 0.5,
+          opacity: 0.3, // Very subtle grid lines
+          type: 'solid',
         }
       },
     },
     // Enable zoom and pan with scroll wheel, touch gestures, and slider
     dataZoom: [
       {
-        type: 'inside', // Enable zoom with scroll wheel and touch gestures
+        type: 'inside',
         start: 0,
         end: 100,
-        zoomOnMouseWheel: true, // Zoom with mouse wheel
-        moveOnMouseMove: false, // Don't pan on mouse move (use drag instead)
-        moveOnMouseWheel: false, // Don't pan with mouse wheel
+        zoomOnMouseWheel: true,
+        moveOnMouseMove: false,
+        moveOnMouseWheel: false,
         preventDefaultMouseMove: true,
       },
       {
-        type: 'slider', // Show slider at bottom for zooming
+        type: 'slider',
         start: 0,
         end: 100,
         height: 20,
@@ -158,27 +168,31 @@ export const getEChartsOption = (
         handleSize: '80%',
         handleStyle: {
           color: colors.line,
+          borderWidth: 0,
         },
         textStyle: {
           color: colors.text,
           fontSize: 10,
+          fontFamily: 'Vazirmatn, -apple-system, sans-serif',
         },
-        borderColor: colors.grid,
-        fillerColor: isDark ? 'rgba(96, 165, 250, 0.2)' : 'rgba(37, 99, 235, 0.2)',
+        borderColor: 'transparent',
+        fillerColor: isDark ? 'rgba(10, 132, 255, 0.15)' : 'rgba(0, 122, 255, 0.15)',
         dataBackground: {
           lineStyle: {
             color: colors.grid,
+            width: 1,
           },
           areaStyle: {
-            color: isDark ? 'rgba(96, 165, 250, 0.1)' : 'rgba(37, 99, 235, 0.1)',
+            color: isDark ? 'rgba(10, 132, 255, 0.05)' : 'rgba(0, 122, 255, 0.05)',
           },
         },
         selectedDataBackground: {
           lineStyle: {
             color: colors.line,
+            width: 1,
           },
           areaStyle: {
-            color: isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(37, 99, 235, 0.3)',
+            color: isDark ? 'rgba(10, 132, 255, 0.2)' : 'rgba(0, 122, 255, 0.2)',
           },
         },
       },
@@ -188,9 +202,10 @@ export const getEChartsOption = (
         data: prices,
         type: 'line',
         smooth: true,
+        symbol: 'none', // Clean line without dots
         lineStyle: {
           color: colors.line,
-          width: 2,
+          width: 2.5,
         },
         itemStyle: {
           color: colors.line,
@@ -203,8 +218,8 @@ export const getEChartsOption = (
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(37, 99, 235, 0.3)' },
-              { offset: 1, color: isDark ? 'rgba(96, 165, 250, 0)' : 'rgba(37, 99, 235, 0)' }
+              { offset: 0, color: isDark ? 'rgba(10, 132, 255, 0.25)' : 'rgba(0, 122, 255, 0.25)' },
+              { offset: 1, color: isDark ? 'rgba(10, 132, 255, 0)' : 'rgba(0, 122, 255, 0)' }
             ],
           }
         },
@@ -212,30 +227,33 @@ export const getEChartsOption = (
     ],
     tooltip: {
       trigger: 'axis',
-      backgroundColor: isDark ? '#1f2937' : '#ffffff',
+      backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
       borderColor: colors.grid,
+      borderWidth: 1,
       textStyle: {
         color: colors.text,
+        fontFamily: 'Vazirmatn, -apple-system, sans-serif',
       },
+      padding: [12, 16],
       formatter: (params: any) => {
         const index = params[0].dataIndex
         const point = dataPoints[index]
         if (!point) return ''
 
         return `
-          <div style="font-size: 12px;">
-            <div style="margin-bottom: 4px; font-weight: bold;">${formatChartDate(point.timestamp, timeRange)}</div>
+          <div style="font-size: 12px; line-height: 1.6;">
+            <div style="margin-bottom: 6px; font-weight: 600; color: ${isDark ? '#FFFFFF' : '#000000'};">${formatChartDate(point.timestamp, timeRange)}</div>
             <div>Open: ${formatYAxisLabel(point.open)} T</div>
             <div>High: ${formatYAxisLabel(point.high)} T</div>
             <div>Low: ${formatYAxisLabel(point.low)} T</div>
-            <div>Close: ${formatYAxisLabel(point.close)} T</div>
-            ${point.volume ? `<div>Volume: ${formatYAxisLabel(point.volume)}</div>` : ''}
+            <div style="font-weight: 600;">Close: ${formatYAxisLabel(point.close)} T</div>
+            ${point.volume ? `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid ${colors.grid};">Volume: ${formatYAxisLabel(point.volume)}</div>` : ''}
           </div>
         `
       },
     },
     animation: true,
-    animationDuration: 300,
+    animationDuration: 200, // Faster, Apple-style
     animationEasing: 'cubicOut',
   }
 }

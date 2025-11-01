@@ -5,19 +5,10 @@ import { formatToman, formatChange } from '@/lib/utils/formatters'
 import { logComponentError } from '@/lib/errorLogger'
 
 /**
- * Supported accent color variants for hover border effects
+ * Supported accent color variants - DEPRECATED
+ * All variants now use unified blue accent (Apple-style)
  */
 export type AccentColorVariant = 'blue' | 'purple' | 'gold'
-
-/**
- * Mapping of accent color variants to their Tailwind classes
- * This ensures Tailwind can statically analyze and include these classes in the build
- */
-const accentColorClasses: Record<AccentColorVariant, string> = {
-  blue: 'hover:border-l-blue-500 dark:hover:border-l-blue-400',
-  purple: 'hover:border-l-purple-500 dark:hover:border-l-purple-400',
-  gold: 'hover:border-l-gold-500 dark:hover:border-l-gold-400',
-}
 
 export interface ItemCardProps {
   /**
@@ -51,7 +42,8 @@ export interface ItemCardProps {
   change: number
 
   /**
-   * Optional accent color variant for hover border
+   * Optional accent color variant - DEPRECATED
+   * All cards now use unified blue accent system (Apple-style)
    */
   accentColor?: AccentColorVariant
 
@@ -68,29 +60,36 @@ export interface ItemCardProps {
 
 /**
  * ItemCard - A reusable card component for displaying currency, crypto, and gold items
+ * Apple-inspired minimalist design with unified blue accent system
  *
  * Layout Structure:
  * - Top row: Icon (left) and Name (right)
  * - Bottom section: Change badge (above) and Price value (below), both left-aligned
  * - Vertical flex layout for consistent card structure
  *
- * Features:
+ * Design Features (Apple-inspired):
+ * - Single blue accent color for all categories (no purple/gold)
+ * - Subtle hover effect: soft background change + gentle shadow elevation
+ * - Generous whitespace with increased padding
+ * - Larger border radius (16px) for modern look
+ * - Soft shadows for depth without visual noise
+ * - No colored borders - clean, minimal aesthetic
+ * - Subtle scale on active state (0.98)
+ * - Uses ONLY Tailwind CSS classes (no inline styles)
+ *
+ * Accessibility Features:
  * - Displays item icon, name, price, and change percentage
  * - Visual indicators for positive (green) and negative (red) changes
- * - Hover effects with left border accent
- * - Fully accessible with keyboard navigation
- * - Comprehensive responsive design with 5 breakpoints
- * - Mobile-first approach with vertical layout
+ * - Fully accessible with keyboard navigation and focus rings
+ * - Comprehensive ARIA labels for screen readers
  * - Touch-optimized with proper target sizes (120px+ min-height)
  * - Performance optimized with motion-reduce support
- * - Text truncation to handle long names
- * - Optimized with React.memo to prevent unnecessary re-renders
  *
  * Responsive Behavior:
  * - All breakpoints: Consistent vertical layout
  * - Icon size scales from 20px to 48px across breakpoints
  * - Text size scales from 14px to 18px (name) and 20px to 48px (price)
- * - Padding scales from 12px to 24px across breakpoints
+ * - Padding scales from 16px to 24px (more generous than before)
  * - Min-height scales from 120px to 160px for proper spacing
  * - Touch targets meet WCAG AAA standards (120px+ on mobile)
  */
@@ -120,42 +119,26 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         type="button"
         onClick={onClick}
         role={role}
-        className={`
-          flex flex-col
-          bg-surface rounded-lg shadow-sm hover:shadow-md
-          border border-border border-l-2 border-l-transparent
-          hover:bg-surface-secondary hover:border-l-4 ${accentColorClasses[accentColor]}
-          transition-all duration-200
-          p-3 sm:p-4 lg:p-5 xl:p-6
-          min-h-[120px] sm:min-h-[140px] lg:min-h-[160px]
-          cursor-pointer
-          focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-surface
-          w-full text-left
-          active:scale-[0.98] touch-manipulation [-webkit-tap-highlight-color:transparent]
-          motion-reduce:transition-none motion-reduce:active:scale-100
-        `}
+        className="card-apple cursor-pointer active:scale-[0.98] group flex flex-col min-h-[120px] sm:min-h-[140px] lg:min-h-[160px] w-full text-left focus:outline-none focus:ring-[3px] focus:ring-[rgba(var(--accent-primary),0.4)] focus:ring-offset-2 touch-manipulation [-webkit-tap-highlight-color:transparent] motion-reduce:transition-none motion-reduce:active:scale-100"
         aria-label={`${name}: ${formatToman(value)} تومان، ${isPositiveFallback ? 'افزایش' : 'کاهش'} ${Math.abs(change)} تومان نسبت به قبل`}
       >
         {/* Top row: Placeholder Icon (left) and Name (right) */}
         <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 bg-surface-tertiary rounded-full flex-shrink-0" aria-hidden="true" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 bg-bg-tertiary rounded-full flex-shrink-0" aria-hidden="true" />
           <p className="text-sm sm:text-base md:text-lg font-semibold text-text-secondary truncate text-right flex-1">
             {name}
           </p>
         </div>
 
         {/* Bottom section: Change badge and Price (both on left) */}
-        <div className="flex flex-col items-start gap-1 sm:gap-2 mt-auto">
-          {/* Change badge */}
+        <div className="flex flex-col items-start gap-2 mt-auto">
+          {/* Change badge - Apple-style subtle design */}
           <div
-            className={`
-              inline-flex items-center gap-1
-              ${isPositiveFallback ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'}
-              rounded-full px-2 py-0.5 sm:px-3 sm:py-1
-              text-xs sm:text-sm
-              font-medium
-              whitespace-nowrap
-            `}
+            className={`inline-flex items-center gap-1 whitespace-nowrap px-2 py-1 rounded-md text-xs sm:text-sm font-medium ${
+              isPositiveFallback
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+            }`}
             dir="ltr"
             aria-label={isPositiveFallback ? 'افزایش قیمت' : 'کاهش قیمت'}
           >
@@ -184,26 +167,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       type="button"
       onClick={onClick}
       role={role}
-      className={`
-        flex flex-col
-        bg-surface rounded-lg shadow-sm hover:shadow-md
-        border border-border border-l-2 border-l-transparent
-        hover:bg-surface-secondary hover:border-l-4 ${accentColorClasses[accentColor]}
-        transition-all duration-200
-        p-3 sm:p-4 lg:p-5 xl:p-6
-        min-h-[120px] sm:min-h-[140px] lg:min-h-[160px]
-        cursor-pointer
-        focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-surface
-        w-full text-left
-        active:scale-[0.98] touch-manipulation [-webkit-tap-highlight-color:transparent]
-        motion-reduce:transition-none motion-reduce:active:scale-100
-      `}
+      className="card-apple cursor-pointer active:scale-[0.98] group flex flex-col min-h-[120px] sm:min-h-[140px] lg:min-h-[160px] w-full text-left focus:outline-none focus:ring-[3px] focus:ring-[rgba(var(--accent-primary),0.4)] focus:ring-offset-2 touch-manipulation [-webkit-tap-highlight-color:transparent] motion-reduce:transition-none motion-reduce:active:scale-100"
       aria-label={`${name}: ${formatToman(value)} تومان، ${isPositive ? 'افزایش' : 'کاهش'} ${Math.abs(change)} تومان نسبت به قبل`}
     >
       {/* Top row: Icon (left) and Name (right) */}
       <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
         <Icon
-          className={`text-2xl sm:text-3xl lg:text-4xl xl:text-5xl flex-shrink-0 ${iconColor}`}
+          className={`text-2xl sm:text-3xl lg:text-4xl xl:text-5xl flex-shrink-0 text-accent`}
           aria-hidden="true"
         />
         <p className="text-sm sm:text-base md:text-lg font-semibold text-text-secondary truncate text-right flex-1">
@@ -212,17 +182,14 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       </div>
 
       {/* Bottom section: Change badge and Price (both on left) */}
-      <div className="flex flex-col items-start gap-1 sm:gap-2 mt-auto">
-        {/* Change badge */}
+      <div className="flex flex-col items-start gap-2 mt-auto">
+        {/* Change badge - Apple-style subtle design */}
         <div
-          className={`
-            inline-flex items-center gap-1
-            ${isPositive ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'}
-            rounded-full px-2 py-0.5 sm:px-3 sm:py-1
-            text-xs sm:text-sm
-            font-medium
-            whitespace-nowrap
-          `}
+          className={`inline-flex items-center gap-1 whitespace-nowrap px-2 py-1 rounded-md text-xs sm:text-sm font-medium ${
+            isPositive
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+          }`}
           dir="ltr"
           aria-label={isPositive ? 'افزایش قیمت' : 'کاهش قیمت'}
         >
