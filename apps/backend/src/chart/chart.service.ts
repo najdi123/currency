@@ -9,14 +9,15 @@ import { Cache, CacheDocument } from '../navasan/schemas/cache.schema';
 
 /**
  * Interface for Navasan OHLC API response
+ * NOTE: Navasan API returns price fields as numbers, not strings
  */
 interface NavasanOHLCDataPoint {
   timestamp: number; // Unix timestamp
   date: string; // Persian date YYYY-MM-DD
-  open: string; // Price as string
-  high: string; // Price as string
-  low: string; // Price as string
-  close: string; // Price as string
+  open: number | string; // Price as number or string
+  high: number | string; // Price as number or string
+  low: number | string; // Price as number or string
+  close: number | string; // Price as number or string
 }
 
 @Injectable()
@@ -354,12 +355,15 @@ export class ChartService {
         throw new Error(`Invalid OHLC API response: data point ${i} has invalid timestamp`);
       }
 
-      // Validate price fields are strings that can be parsed as numbers
+      // Validate price fields are numbers or strings that can be parsed as numbers
       const priceFields = ['open', 'high', 'low', 'close'];
       for (const field of priceFields) {
         const value = typedPoint[field as keyof Pick<NavasanOHLCDataPoint, 'open' | 'high' | 'low' | 'close'>];
-        if (typeof value !== 'string' || isNaN(parseFloat(value))) {
-          this.logger.error(`Invalid ${field} value in OHLC data point ${i} for ${itemCode}`);
+        // Accept both numbers and numeric strings (API can return either)
+        const isValidNumber = typeof value === 'number' && !isNaN(value);
+        const isValidString = typeof value === 'string' && !isNaN(parseFloat(value));
+        if (!isValidNumber && !isValidString) {
+          this.logger.error(`Invalid ${field} value in OHLC data point ${i} for ${itemCode}: ${typeof value} = ${value}`);
           throw new Error(`Invalid OHLC API response: data point ${i} has invalid "${field}" value`);
         }
       }
@@ -370,7 +374,8 @@ export class ChartService {
 
   /**
    * Fetch OHLC data from Navasan API
-   * SECURITY: API key sent in header instead of URL to prevent exposure in logs
+   * NOTE: Navasan API requires the API key as a query parameter (not in headers)
+   * This is not ideal from a security perspective, but it's how their API works
    */
   private async fetchOHLCFromApi(
     itemCode: string,
@@ -378,16 +383,12 @@ export class ChartService {
     endTimestamp: number,
   ): Promise<{ data: NavasanOHLCDataPoint[]; metadata?: Record<string, unknown> }> {
     try {
-      // SECURITY FIX: API key in URL exposes it in logs - use headers instead
-      const url = `${this.ohlcBaseUrl}?item=${itemCode}&start=${startTimestamp}&end=${endTimestamp}`;
+      // NOTE: Navasan API requires the API key as a query parameter (not in headers)
+      const url = `${this.ohlcBaseUrl}?api_key=${this.apiKey}&item=${itemCode}&start=${startTimestamp}&end=${endTimestamp}`;
 
       this.logger.log(`Calling Navasan OHLC API: ${itemCode} from ${startTimestamp} to ${endTimestamp}`);
 
       const response = await axios.get<NavasanOHLCDataPoint[]>(url, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'X-API-Key': this.apiKey, // Fallback in case they use custom header
-        },
         timeout: 10000, // 10 second timeout
         validateStatus: (status) => status < 500, // Don't throw on 4xx errors
       });
@@ -653,11 +654,11 @@ export class ChartService {
    */
   private transformOHLCData(data: NavasanOHLCDataPoint[]): ChartDataPoint[] {
     return data.map((point) => {
-      // Parse string prices to numbers
-      const open = parseFloat(point.open);
-      const high = parseFloat(point.high);
-      const low = parseFloat(point.low);
-      const close = parseFloat(point.close);
+      // Convert prices to numbers (handle both number and string types)
+      const open = typeof point.open === 'number' ? point.open : parseFloat(point.open);
+      const high = typeof point.high === 'number' ? point.high : parseFloat(point.high);
+      const low = typeof point.low === 'number' ? point.low : parseFloat(point.low);
+      const close = typeof point.close === 'number' ? point.close : parseFloat(point.close);
 
       // Convert Unix timestamp to ISO 8601 string
       const timestamp = new Date(point.timestamp * 1000).toISOString();

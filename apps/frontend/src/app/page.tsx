@@ -18,7 +18,7 @@ import type { ItemType, SelectedChartItem } from '@/types/chart'
 import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
 import { SiTether } from 'react-icons/si'
 import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
-import { FiClock, FiInfo } from 'react-icons/fi'
+import { FiClock, FiInfo, FiCheckCircle } from 'react-icons/fi'
 import { HiRefresh } from 'react-icons/hi'
 
 // Lazy load chart component to reduce initial bundle size
@@ -60,7 +60,11 @@ const goldItems = [
 
 export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
   const chartSheet = useChartBottomSheet()
+
+  // Track manual refresh to show success notification (not for initial load or polling)
+  const isManualRefresh = useRef(false)
 
   const {
     data: currencies,
@@ -151,7 +155,47 @@ export default function Home() {
     }
   }, [currencies, crypto, gold, currenciesError, cryptoError, goldError])
 
+  // Show success notification after manual refresh completes
+  useEffect(() => {
+    // Only show success if:
+    // 1. Manual refresh was triggered
+    // 2. Not currently fetching
+    // 3. Data successfully loaded (at least one dataset available)
+    // 4. No errors
+    const wasManualRefresh = isManualRefresh.current
+    const notFetching = !currenciesFetching && !cryptoFetching && !goldFetching
+    const hasData = currencies || crypto || gold
+    const noErrors = !currenciesError && !cryptoError && !goldError
+
+    if (wasManualRefresh && notFetching && hasData && noErrors) {
+      // Reset manual refresh flag
+      isManualRefresh.current = false
+
+      // Show success notification
+      setShowSuccess(true)
+
+      // Auto-hide after 1.5 seconds
+      const timer = setTimeout(() => {
+        setShowSuccess(false)
+      }, 1500)
+
+      // Cleanup timeout on unmount
+      return () => clearTimeout(timer)
+    }
+  }, [
+    currenciesFetching,
+    cryptoFetching,
+    goldFetching,
+    currencies,
+    crypto,
+    gold,
+    currenciesError,
+    cryptoError,
+    goldError,
+  ])
+
   const handleRefresh = async () => {
+    isManualRefresh.current = true
     await Promise.all([refetchCurrencies(), refetchCrypto(), refetchGold()])
   }
 
@@ -251,6 +295,25 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Success Notification - Shows after successful manual refresh */}
+        {showSuccess && (
+          <div
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50
+              bg-green-100 dark:bg-green-900/30
+              border border-green-300 dark:border-green-700
+              text-green-800 dark:text-green-200
+              px-4 py-3 rounded-lg shadow-lg
+              flex items-center gap-2
+              animate-success-in"
+            role="status"
+            aria-live="polite"
+            dir="rtl"
+          >
+            <FiCheckCircle className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+            <span className="text-sm font-medium">داده‌ها با موفقیت به‌روز شد</span>
+          </div>
+        )}
 
         {/* ARIA Live Region for Screen Readers */}
         <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">

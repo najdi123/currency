@@ -644,4 +644,51 @@ button, a, [role="button"] {
       animation: none;
     }
   }
+
+  /* ============================================================================
+     Success State Animations
+     Smooth fade in/out animations for success notifications
+  ============================================================================ */
+
+  /* Success fade-in keyframes - enter from top with fade */
+  @keyframes success-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Success fade-out keyframes - exit to top with fade */
+  @keyframes success-fade-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Success fade-in animation utility */
+  .animate-success-in {
+    animation: success-fade-in 300ms ease-out;
+  }
+
+  /* Success fade-out animation utility */
+  .animate-success-out {
+    animation: success-fade-out 300ms ease-in;
+  }
+
+  /* Respect motion preferences - disable success animations for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-success-in,
+    .animate-success-out {
+      animation: none;
+    }
+  }
 }

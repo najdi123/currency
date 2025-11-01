@@ -37,6 +37,7 @@ export const ItemCardSkeleton: React.FC<ItemCardSkeletonProps> = ({
     >
       {Array.from({ length: count }).map((_, idx) => (
         <div
+        
           key={idx}
           className="bg-bg-elevated border border-border-light rounded-[1rem] shadow-[var(--shadow-sm)] p-4 flex flex-col min-h-[120px] sm:min-h-[140px] lg:min-h-[160px]"
         >
@@ -44,7 +45,7 @@ export const ItemCardSkeleton: React.FC<ItemCardSkeletonProps> = ({
           <div className="flex justify-between items-start gap-2 mb-auto">
             {/* Icon skeleton - circular shape matching icon size */}
             <div
-              className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full shimmer-bg flex-shrink-0"
+              className="w-9 h-9 mb-1 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full shimmer-bg flex-shrink-0"
               aria-hidden="true"
             />
 

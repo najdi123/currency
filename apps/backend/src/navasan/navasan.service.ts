@@ -313,22 +313,35 @@ export class NavasanService {
   private async fetchFromApiWithTimeout(
     items: string,
   ): Promise<{ data: Record<string, unknown>; metadata?: Record<string, unknown> }> {
-    // SECURITY FIX: API key in URL query params exposes it in logs, error messages, and monitoring
-    // Try Authorization header first (standard practice), fallback to custom header if needed
-    const url = `${this.baseUrl}?item=${items}`;
+    // NOTE: Navasan API requires the API key as a query parameter (not in headers)
+    // This is not ideal from a security perspective, but it's how their API works
+    const url = `${this.baseUrl}?api_key=${this.apiKey}&item=${items}`;
+
+    // DEBUG LOGGING: Log request details for troubleshooting (with sanitized API key)
+    const sanitizedUrl = `${this.baseUrl}?api_key=[REDACTED]&item=${items}`;
+    this.logger.debug(`📤 Making API request to: ${sanitizedUrl}`);
+    this.logger.debug(`📤 Timeout: ${this.apiTimeoutMs}ms`);
 
     try {
       const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'X-API-Key': this.apiKey, // Fallback in case they use custom header
-        },
         timeout: this.apiTimeoutMs,
         validateStatus: (status) => status < 500, // Don't throw on 4xx errors
       });
 
+      // DEBUG LOGGING: Log API response details for troubleshooting
+      this.logger.debug(`📥 Navasan API Response - Status: ${response.status}, Items: ${items}`);
+      this.logger.debug(`📥 Response Headers: ${JSON.stringify({
+        'content-type': response.headers['content-type'],
+        'x-ratelimit-remaining': response.headers['x-ratelimit-remaining'],
+        'retry-after': response.headers['retry-after'],
+      })}`);
+
       // Handle authentication errors - throw error to trigger stale fallback
       if (response.status === 401 || response.status === 403) {
+        // Log detailed error for debugging
+        this.logger.error(`🔐 Authentication failed - Status: ${response.status}`);
+        this.logger.error(`🔐 Response body: ${JSON.stringify(response.data)}`);
+
         // Throw regular Error (not UnauthorizedException) so it gets caught by try-catch
         // This triggers the stale cache fallback instead of failing the request
         throw new Error(
@@ -339,6 +352,8 @@ export class NavasanService {
       // Handle rate limiting - throw error to trigger stale fallback
       if (response.status === 429) {
         const retryAfter = response.headers['retry-after'];
+        this.logger.warn(`⏱️  Rate limit exceeded - Retry after: ${retryAfter || 'unknown'}`);
+
         // Throw regular Error (not HttpException) so it gets caught by try-catch
         // This triggers the stale cache fallback instead of failing the request
         throw new Error(
@@ -348,8 +363,12 @@ export class NavasanService {
 
       // Handle other client errors
       if (response.status >= 400 && response.status < 500) {
+        // Log detailed error for internal debugging
+        this.logger.error(`❌ Client error - Status: ${response.status}`);
+        this.logger.error(`❌ Response body: ${JSON.stringify(response.data)}`);
+        this.logger.error(`❌ Request URL (sanitized): ${this.baseUrl}?item=${items}`);
+
         // SECURITY FIX: Don't expose API error details to clients to prevent information leakage
-        // The detailed error is already logged above for internal debugging
         throw new BadRequestException(
           'External API request failed. Please check your request parameters.',
         );
@@ -357,12 +376,20 @@ export class NavasanService {
 
       // Handle server errors
       if (response.status >= 500) {
+        // Log detailed error for internal debugging
+        this.logger.error(`🔥 Server error - Status: ${response.status}`);
+        this.logger.error(`🔥 Response body: ${JSON.stringify(response.data)}`);
+
         // SECURITY FIX: Don't expose specific status codes to prevent information leakage
         throw new InternalServerErrorException('External API service temporarily unavailable. Please try again later.');
       }
 
       // Success
       if (response.status !== 200) {
+        // Log unexpected status code
+        this.logger.warn(`⚠️  Unexpected status code: ${response.status}`);
+        this.logger.warn(`⚠️  Response body: ${JSON.stringify(response.data)}`);
+
         // SECURITY FIX: Don't expose specific status codes to prevent information leakage
         throw new Error('External API returned unexpected response. Please try again later.');
       }
@@ -387,11 +414,48 @@ export class NavasanService {
 
       return { data: response.data, metadata: apiMetadata };
     } catch (error) {
-      // Handle timeout
-      if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
-        throw new RequestTimeoutException(
-          `Navasan API request timed out after ${this.apiTimeoutMs}ms`,
-        );
+      // Log all errors with detailed information for debugging
+      if (axios.isAxiosError(error)) {
+        this.logger.error(`🌐 Axios Error - Code: ${error.code}, Message: ${error.message}`);
+
+        if (error.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          this.logger.error(`🌐 Error Response - Status: ${error.response.status}`);
+          this.logger.error(`🌐 Error Response Body: ${JSON.stringify(error.response.data)}`);
+          this.logger.error(`🌐 Error Response Headers: ${JSON.stringify(error.response.headers)}`);
+        } else if (error.request) {
+          // The request was made but no response was received
+          this.logger.error(`🌐 No response received from API`);
+          this.logger.error(`🌐 Request details: ${JSON.stringify({
+            method: error.request.method,
+            path: error.request.path,
+            host: error.request.host,
+          })}`);
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          this.logger.error(`🌐 Request setup error: ${error.message}`);
+        }
+
+        // Handle timeout
+        if (error.code === 'ECONNABORTED') {
+          this.logger.error(`⏱️  Request timed out after ${this.apiTimeoutMs}ms`);
+          throw new RequestTimeoutException(
+            `Navasan API request timed out after ${this.apiTimeoutMs}ms`,
+          );
+        }
+
+        // Handle network errors
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+          this.logger.error(`🌐 Network error: ${error.code} - Cannot reach API server`);
+          throw new Error(`Cannot reach Navasan API server: ${error.message}`);
+        }
+      } else {
+        // Non-axios error
+        this.logger.error(`❌ Unexpected error type: ${error instanceof Error ? error.message : String(error)}`);
+        if (error instanceof Error && error.stack) {
+          this.logger.error(`❌ Stack trace: ${error.stack}`);
+        }
       }
 
       // Re-throw other errors
