@@ -47,15 +47,15 @@
   --background: #000000;  /* Pure black for deepest hierarchy level */
   --foreground: #f0f0f0;
 
-  /* Surface colors (backgrounds at different elevations) - LIGHTER for better visibility */
-  --section-background: 23 23 23; /* Slightly lighter than pure black - subtle elevation */
-  --surface: 55 65 81;           /* gray-700 - Much lighter for cards */
-  --surface-secondary: 75 85 99; /* gray-600 - Lighter hover state */
-  --surface-tertiary: 107 114 128; /* gray-500 - Even lighter tertiary */
+  /* Surface colors (backgrounds at different elevations) - Using iOS design tokens */
+  --section-background: 28 28 30; /* gray-6 - Subtle elevation above pure black */
+  --surface: 28 28 30;           /* gray-6 - Cards and elevated surfaces */
+  --surface-secondary: 44 44 46; /* gray-5 - Secondary elevation/hover states */
+  --surface-tertiary: 58 58 60;  /* gray-4 - Tertiary elevation */
 
-  /* Border colors */
-  --border: 107 114 128;         /* gray-500 - Adjusted for contrast with lighter surfaces */
-  --border-secondary: 156 163 175; /* gray-400 - Lighter secondary border */
+  /* Border colors - More visible for dark mode */
+  --border: 72 72 74;            /* gray-3 - Visible borders on dark surfaces */
+  --border-secondary: 99 99 102; /* gray-2 - Secondary borders */
 
   /* Text colors */
   --text-primary: 243 244 246;
@@ -179,13 +179,13 @@
     --background: #000000;  /* Pure black for deepest hierarchy level */
     --foreground: #f0f0f0;
 
-    --section-background: 23 23 23; /* Slightly lighter than pure black - subtle elevation */
-    --surface: 55 65 81;           /* gray-700 - Much lighter for cards */
-    --surface-secondary: 75 85 99; /* gray-600 - Lighter hover state */
-    --surface-tertiary: 107 114 128; /* gray-500 - Even lighter tertiary */
+    --section-background: 28 28 30; /* gray-6 - Subtle elevation above pure black */
+    --surface: 28 28 30;           /* gray-6 - Cards and elevated surfaces */
+    --surface-secondary: 44 44 46; /* gray-5 - Secondary elevation/hover states */
+    --surface-tertiary: 58 58 60;  /* gray-4 - Tertiary elevation */
 
-    --border: 107 114 128;         /* gray-500 - Adjusted for contrast with lighter surfaces */
-    --border-secondary: 156 163 175; /* gray-400 - Lighter secondary border */
+    --border: 72 72 74;            /* gray-3 - Visible borders on dark surfaces */
+    --border-secondary: 99 99 102; /* gray-2 - Secondary borders */
 
     --text-primary: 243 244 246;
     --text-secondary: 209 213 219;
@@ -266,6 +266,42 @@ button, a, [role="button"] {
 
 @layer utilities {
   /* Typography Utilities - Apple-style text patterns */
+
+  /* ============================================================================
+     Typography Scale - SF Pro Inspired
+     Complete token-based typography system for consistent text styling
+
+     Usage Guide:
+     - .text-apple-display: Large hero text (34px+), responsive scaling
+     - .text-apple-headline: Section headings (28px+), responsive scaling
+     - .text-apple-large-title: Page titles (34px), fixed size
+     - .text-apple-title: Card/component titles (22px)
+     - .text-apple-body: Body text (17px - iOS default)
+     - .text-apple-caption: Small text, labels (13px)
+
+     Design Token Reference (from tokens.css):
+     --text-4xl: 34px / 41px (Large Title)
+     --text-3xl: 28px / 34px (Title 1)
+     --text-2xl: 22px / 28px (Title 2)
+     --text-xl: 20px / 24px (Title 3)
+     --text-lg: 17px / 22px (Body - iOS default)
+     --text-sm: 13px / 18px (Caption 1)
+  ============================================================================ */
+
+  .text-apple-display {
+    font-size: var(--text-4xl); /* 34px */
+    line-height: 1.2;
+    font-weight: var(--font-semibold);
+    letter-spacing: -0.02em;
+  }
+
+  .text-apple-headline {
+    font-size: var(--text-3xl); /* 28px */
+    line-height: 1.2;
+    font-weight: var(--font-semibold);
+    letter-spacing: -0.02em;
+  }
+
   .text-apple-title {
     font-size: var(--text-2xl);
     line-height: var(--text-2xl-lh);
@@ -292,6 +328,29 @@ button, a, [role="button"] {
     font-weight: var(--font-regular);
   }
 
+  /* ============================================================================
+     Responsive Typography Variants
+     Scale display and headline text across breakpoints for optimal readability
+  ============================================================================ */
+
+  /* Small devices (640px+): Standard sizes */
+  @media (min-width: 640px) {
+    .text-apple-display {
+      font-size: var(--text-4xl);
+    }
+  }
+
+  /* Medium devices (768px+): 10% larger for better readability */
+  @media (min-width: 768px) {
+    .text-apple-display {
+      font-size: calc(var(--text-4xl) * 1.1);
+    }
+
+    .text-apple-headline {
+      font-size: calc(var(--text-3xl) * 1.1);
+    }
+  }
+
   /* Card Utilities - Apple-style card components */
   .card-apple {
     background: var(--background-elevated);
@@ -305,6 +364,14 @@ button, a, [role="button"] {
   .card-apple:hover {
     box-shadow: var(--shadow-md);
     background: var(--background-secondary);
+    transform: translateY(-2px);
+  }
+
+  /* Respect accessibility preference */
+  @media (prefers-reduced-motion: reduce) {
+    .card-apple:hover {
+      transform: none;
+    }
   }
 
   /* Button Utilities - Apple-style button variants */
@@ -495,6 +562,85 @@ button, a, [role="button"] {
     .animate-fade-in,
     .animate-slide-down,
     .animate-slide-up {
+      animation: none;
+    }
+  }
+
+  /* ============================================================================
+     Shimmer Animation for Skeleton Loading States
+     Replaces inline styles with Tailwind utility class for consistency
+  ============================================================================ */
+
+  /* Shimmer keyframes - smooth gradient sweep for loading skeletons */
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  /* Shimmer background utility - light mode */
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--gray-5)) 0%,
+      rgb(var(--gray-4)) 50%,
+      rgb(var(--gray-5)) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite ease-in-out;
+  }
+
+  /* Dark mode shimmer - uses darker grays for better contrast */
+  .dark .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--gray-6)) 0%,
+      rgb(var(--gray-5)) 50%,
+      rgb(var(--gray-6)) 100%
+    );
+  }
+
+  /* Respect motion preferences - disable animation for users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer-bg {
+      animation: none;
+      background: rgb(var(--gray-5));
+    }
+  }
+
+  /* ============================================================================
+     Pulse-Once Animation for Bottom Sheet Handle
+     Subtle attention-drawing animation that runs once when sheet opens
+  ============================================================================ */
+
+  /* Pulse-once keyframes - subtle opacity and scale change */
+  @keyframes pulse-once {
+    0% {
+      opacity: 0.6;
+      transform: scaleX(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scaleX(1.1);
+    }
+    100% {
+      opacity: 0.6;
+      transform: scaleX(1);
+    }
+  }
+
+  /* Pulse-once animation utility - draws attention to drag handle */
+  .animate-pulse-once {
+    animation: pulse-once 600ms ease-out;
+    animation-fill-mode: both;
+  }
+
+  /* Respect motion preferences - disable animation for users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-once {
       animation: none;
     }
   }

@@ -22,7 +22,7 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
       </h2>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-xl md:text-2xl font-mono font-semibold text-text-primary tabular-nums">
+          <p className="text-apple-headline font-mono text-text-primary tabular-nums">
             {formatToman(currentPrice)}{' '}
             <span className="text-sm font-normal text-text-secondary">تومان</span>
           </p>

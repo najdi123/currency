@@ -60,7 +60,10 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
           aria-label="نمودار قیمت"
         >
           {/* Drag Handle */}
-          <div className="mx-auto mt-3 mb-2 h-1.5 w-12 rounded-full bg-text-tertiary/30" />
+          <div
+            className="mx-auto mt-3 mb-2 h-[5px] w-9 rounded-full bg-text-tertiary/60 animate-pulse-once"
+            aria-hidden="true"
+          />
 
           {/* Accessible Title (required for screen readers) */}
           <Drawer.Title className="sr-only">

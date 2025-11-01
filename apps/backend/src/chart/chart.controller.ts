@@ -39,6 +39,10 @@ export class ChartController {
       throw new BadRequestException('Currency code is required');
     }
 
+    if (currencyCode.length > 20) {
+      throw new BadRequestException('Currency code too long (max 20 characters)');
+    }
+
     this.logger.log(
       `GET /api/chart/${currencyCode}?timeRange=${query.timeRange}&itemType=${query.itemType}`,
     );

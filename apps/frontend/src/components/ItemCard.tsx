@@ -151,7 +151,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           </div>
 
           {/* Price */}
-          <p className="text-xl sm:text-2xl md:text-3xl font-bold font-mono text-text-primary">
+          <p className="text-apple-display font-bold font-mono text-text-primary">
             {formatToman(value)}{' '}
             <span className="text-xs sm:text-sm md:text-base font-normal text-text-tertiary">تومان</span>
           </p>
@@ -202,7 +202,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         </div>
 
         {/* Price */}
-        <p className="text-xl sm:text-2xl md:text-3xl font-bold font-mono text-text-primary">
+        <p className="text-apple-display font-bold font-mono text-text-primary">
           {formatToman(value)}{' '}
           <span className="text-xs sm:text-sm md:text-base font-normal text-text-tertiary">تومان</span>
         </p>

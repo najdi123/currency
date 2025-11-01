@@ -112,7 +112,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // Active state and focus classes
     const interactionClasses = disabled
       ? ''
-      : 'active:scale-[0.97] focus:outline-none focus:ring-[3px] focus:ring-[rgba(var(--accent-primary),0.4)] focus:ring-offset-2 motion-reduce:transition-none motion-reduce:active:scale-100'
+      : 'active:scale-[0.98] focus:outline-none focus:ring-[3px] focus:ring-[rgba(var(--accent-primary),0.4)] focus:ring-offset-2 motion-reduce:transition-none motion-reduce:active:scale-100'
 
     // Combine all classes
     const combinedClasses = `${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${widthClass} ${cursorClass} ${interactionClasses} ${className}`.trim()
