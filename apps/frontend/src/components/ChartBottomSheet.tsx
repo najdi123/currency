@@ -20,11 +20,19 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
   item,
 }) => {
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('1w')
+  const [shouldLoadChart, setShouldLoadChart] = useState(false)
 
   // Reset time range when opening with new item
   useEffect(() => {
     if (isOpen) {
       setSelectedTimeRange('1w')
+      // Delay chart loading slightly to ensure drawer is fully mounted
+      const timer = setTimeout(() => {
+        setShouldLoadChart(true)
+      }, 100)
+      return () => clearTimeout(timer)
+    } else {
+      setShouldLoadChart(false)
     }
   }, [isOpen, item?.code])
 
@@ -56,12 +64,12 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
           onClick={onClose}
         />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[var(--radius-xl)] bg-bg-elevated border-t border-border-light shadow-xl z-50 max-h-[95vh] animate-slide-up"
+          className="fixed bottom-0 left-0 right-0 flex flex-col  bg-bg-elevated border-t border-border-light shadow-xl z-50 max-h-[95vh] animate-slide-up"
           aria-label="نمودار قیمت"
         >
           {/* Drag Handle */}
           <div
-            className="mx-auto mt-3 mb-2 h-[5px] w-9 rounded-full bg-text-tertiary/60 animate-pulse-once"
+            className="mx-auto mt-3 mb-2 h-[5px] w-9 bg-text-tertiary/60 animate-pulse-once"
             aria-hidden="true"
           />
 
@@ -94,12 +102,24 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
 
           {/* Chart */}
           <div className="flex-1 overflow-auto px-4 pb-4 pt-4">
-            <PriceChart
-              itemCode={item.code}
-              itemType={item.type}
-              timeRange={selectedTimeRange}
-              itemName={item.name}
-            />
+            {shouldLoadChart ? (
+              <PriceChart
+                itemCode={item.code}
+                itemType={item.type}
+                timeRange={selectedTimeRange}
+                itemName={item.name}
+              />
+            ) : (
+              <div className="w-full space-y-4">
+                <div className="flex items-center justify-center h-8 w-32 mx-auto rounded-lg shimmer-bg" />
+                <div className="h-[320px] sm:h-[360px] w-full rounded-lg shimmer-bg relative overflow-hidden" />
+                <div className="flex gap-2 justify-center">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-8 w-12 rounded-lg shimmer-bg" />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

@@ -356,7 +356,9 @@ button, a, [role="button"] {
     background: var(--background-elevated);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-sm);
-    padding: var(--space-card);
+    /* Note: Padding is now controlled per-component for more granular control */
+    /* Compact mode (2-column): p-3 (12px) */
+    /* Normal mode (1-column): p-4 (16px) */
     border: 1px solid rgb(var(--border-light));
     transition: var(--transition-default);
   }
@@ -451,6 +453,112 @@ button, a, [role="button"] {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
+  }
+
+  /* ============================================================================
+     Pill-Style Status Badges - Enhanced Design for ItemCard
+     More prominent, rounded pills with better visual hierarchy
+     Based on Apple HIG principles with full rounded corners
+  ============================================================================ */
+
+  /* Success pill - positive percentage change */
+  .badge-pill-success {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem; /* space-1 */
+    border-radius: var(--radius-full);
+    padding: 0.375rem 0.75rem; /* py-1.5 px-3 */
+    font-size: var(--text-sm); /* 13px */
+    line-height: 1.2;
+    font-weight: var(--font-semibold);
+    white-space: nowrap;
+
+    /* Success colors with opacity backgrounds for depth */
+    background: rgba(var(--success), 0.1);
+    color: rgb(var(--success));
+
+    /* Subtle ring border for definition */
+    box-shadow: 0 0 0 1px rgba(var(--success), 0.2) inset;
+
+    /* Smooth transition */
+    transition: var(--transition-colors);
+  }
+
+  /* Success pill dark mode - brighter background for visibility */
+  .dark .badge-pill-success {
+    background: rgba(var(--success), 0.2);
+    box-shadow: 0 0 0 1px rgba(var(--success), 0.3) inset;
+  }
+
+  /* Error pill - negative percentage change */
+  .badge-pill-error {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem; /* space-1 */
+    border-radius: var(--radius-full);
+    padding: 0.375rem 0.75rem; /* py-1.5 px-3 */
+    font-size: var(--text-sm); /* 13px */
+    line-height: 1.2;
+    font-weight: var(--font-semibold);
+    white-space: nowrap;
+
+    /* Error colors with opacity backgrounds for depth */
+    background: rgba(var(--error), 0.1);
+    color: rgb(var(--error));
+
+    /* Subtle ring border for definition */
+    box-shadow: 0 0 0 1px rgba(var(--error), 0.2) inset;
+
+    /* Smooth transition */
+    transition: var(--transition-colors);
+  }
+
+  /* Error pill dark mode - brighter background for visibility */
+  .dark .badge-pill-error {
+    background: rgba(var(--error), 0.2);
+    box-shadow: 0 0 0 1px rgba(var(--error), 0.3) inset;
+  }
+
+  /* Compact mode variants - slightly smaller for dense layouts */
+  .badge-pill-success-compact {
+    padding: 0.25rem 0.625rem; /* py-1 px-2.5 */
+    font-size: 0.75rem; /* text-xs - 12px */
+    gap: 0.1875rem; /* slightly tighter gap */
+  }
+
+  .badge-pill-error-compact {
+    padding: 0.25rem 0.625rem; /* py-1 px-2.5 */
+    font-size: 0.75rem; /* text-xs - 12px */
+    gap: 0.1875rem; /* slightly tighter gap */
+  }
+
+  /* Hover effects for interactive contexts (if needed) */
+  button:hover .badge-pill-success,
+  a:hover .badge-pill-success {
+    background: rgba(var(--success), 0.15);
+  }
+
+  button:hover .badge-pill-error,
+  a:hover .badge-pill-error {
+    background: rgba(var(--error), 0.15);
+  }
+
+  .dark button:hover .badge-pill-success,
+  .dark a:hover .badge-pill-success {
+    background: rgba(var(--success), 0.25);
+  }
+
+  .dark button:hover .badge-pill-error,
+  .dark a:hover .badge-pill-error {
+    background: rgba(var(--error), 0.25);
+  }
+
+  /* Accessibility - respect motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .badge-pill-success,
+    .badge-pill-error {
+      transition: none;
+    }
   }
 
   /* Focus Ring - Consistent focus states */

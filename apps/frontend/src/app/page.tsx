@@ -18,8 +18,9 @@ import type { ItemType, SelectedChartItem } from '@/types/chart'
 import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
 import { SiTether } from 'react-icons/si'
 import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
-import { FiClock, FiInfo, FiCheckCircle } from 'react-icons/fi'
+import { FiClock, FiInfo, FiCheckCircle, FiGrid } from 'react-icons/fi'
 import { HiRefresh } from 'react-icons/hi'
+import { BsGrid3X2 } from 'react-icons/bs'
 
 // Lazy load chart component to reduce initial bundle size
 const ChartBottomSheet = lazy<React.ComponentType<{
@@ -65,6 +66,34 @@ export default function Home() {
 
   // Track manual refresh to show success notification (not for initial load or polling)
   const isManualRefresh = useRef(false)
+
+  // Mobile view mode state
+  type ViewMode = 'single' | 'dual'
+  const [mobileViewMode, setMobileViewMode] = useState<ViewMode>('single')
+
+  // Load view mode from localStorage (SSR-safe)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mobileViewMode')
+      if (saved === 'single' || saved === 'dual') {
+        setMobileViewMode(saved as ViewMode)
+      }
+    } catch (error) {
+      // Silently fail and use default 'single' mode
+      // This handles Safari Private Browsing and disabled storage
+      console.warn('Failed to load view mode preference:', error)
+    }
+  }, [])
+
+  // Save view mode to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('mobileViewMode', mobileViewMode)
+    } catch (error) {
+      // Silently fail - preference won't persist but app still works
+      console.warn('Failed to save view mode preference:', error)
+    }
+  }, [mobileViewMode])
 
   const {
     data: currencies,
@@ -256,7 +285,22 @@ export default function Home() {
             <h1 className="text-apple-large-title text-text-primary">
               نرخ ارز، طلا و ارز دیجیتال
             </h1>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              {/* Mobile View Toggle - Only visible on mobile */}
+              <button
+                onClick={() => setMobileViewMode(prev => prev === 'single' ? 'dual' : 'single')}
+                disabled={currenciesLoading || cryptoLoading || goldLoading}
+                className="md:hidden p-2 rounded-lg bg-bg-elevated hover:bg-bg-secondary border border-border-light transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label={mobileViewMode === 'single' ? 'تبدیل به نمای دو ستونی' : 'تبدیل به نمای تک ستونی'}
+                title={mobileViewMode === 'single' ? 'دو ستونه' : 'یک ستونه'}
+              >
+                {mobileViewMode === 'single' ?
+                  <BsGrid3X2 className="w-5 h-5 text-text-primary" /> :
+                  <FiGrid className="w-5 h-5 text-text-primary" />
+                }
+              </button>
+              <ThemeToggle />
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4" dir="rtl">
             <Button
@@ -420,6 +464,7 @@ export default function Home() {
                   items={currencyItems}
                   data={currencies}
                   accentColor="blue"
+                  viewMode={mobileViewMode}
                   onItemClick={(key) => handleItemClick(key, 'currency')}
                 />
               </ErrorBoundary>
@@ -474,6 +519,7 @@ export default function Home() {
                   items={cryptoItems}
                   data={crypto}
                   accentColor="purple"
+                  viewMode={mobileViewMode}
                   onItemClick={(key) => handleItemClick(key, 'crypto')}
                 />
               </ErrorBoundary>
@@ -528,6 +574,7 @@ export default function Home() {
                   items={goldItems}
                   data={gold}
                   accentColor="gold"
+                  viewMode={mobileViewMode}
                   onItemClick={(key) => handleItemClick(key, 'gold')}
                 />
               </ErrorBoundary>

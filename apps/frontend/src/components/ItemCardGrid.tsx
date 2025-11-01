@@ -29,6 +29,13 @@ export interface ItemCardGridProps {
   accentColor?: AccentColorVariant
 
   /**
+   * View mode for mobile layout
+   * - 'single': One column on mobile (default)
+   * - 'dual': Two columns on mobile with compact cards
+   */
+  viewMode?: 'single' | 'dual'
+
+  /**
    * Optional click handler for items
    */
   onItemClick?: (itemKey: string) => void
@@ -77,6 +84,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   items,
   data,
   accentColor = 'blue',
+  viewMode = 'single',
   onItemClick,
 }) => {
   if (!data) {
@@ -96,7 +104,13 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
 
   return (
     <div
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 w-full"
+      className={`grid ${
+        viewMode === 'dual'
+          ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+      } ${
+        viewMode === 'dual' ? 'gap-3 sm:gap-4 lg:gap-6 xl:gap-8' : 'gap-4 sm:gap-6 lg:gap-8'
+      } w-full`}
       role="list"
       aria-label="لیست آیتم‌های قیمت"
     >
@@ -108,11 +122,13 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
           <ItemCard
             key={item.key}
             id={item.key}
+            code={item.key}
             name={item.name}
             icon={item.icon}
             iconColor={item.color}
             value={itemData.value}
             change={itemData.change}
+            compact={viewMode === 'dual'}
             accentColor={accentColor}
             onClick={clickHandlers[item.key]}
             role="listitem"
@@ -148,6 +164,7 @@ export const ItemCardGrid = React.memo<ItemCardGridProps>(
       if (prevProps.data !== nextProps.data) changedProps.push('data')
       if (prevProps.items !== nextProps.items) changedProps.push('items')
       if (prevProps.onItemClick !== nextProps.onItemClick) changedProps.push('onItemClick')
+      if (prevProps.viewMode !== nextProps.viewMode) changedProps.push('viewMode')
 
       if (changedProps.length > 0) {
         console.log('[ItemCardGrid] Re-rendering due to changed props:', changedProps)
@@ -162,6 +179,7 @@ export const ItemCardGrid = React.memo<ItemCardGridProps>(
     if (prevProps.data !== nextProps.data) return false
     if (prevProps.items !== nextProps.items) return false
     if (prevProps.onItemClick !== nextProps.onItemClick) return false
+    if (prevProps.viewMode !== nextProps.viewMode) return false
 
     // All props are equal, skip re-render
     return true
