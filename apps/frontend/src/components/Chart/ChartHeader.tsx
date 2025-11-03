@@ -16,7 +16,7 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
   const isPositive = priceChange >= 0
 
   return (
-    <div className="border-b border-border-light px-6 py-4 bg-bg-elevated" dir="rtl">
+    <div className="border-b border-border-light px-6 py-4 bg-bg-elevated flex flex-col items-center" dir="rtl">
       <h2 className="text-apple-title text-text-primary text-right mb-2">
         {itemName}
       </h2>

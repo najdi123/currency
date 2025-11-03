@@ -1,15 +1,22 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { NavasanResponse, NavasanOHLCDataPoint } from '../interfaces/navasan-response.interface';
 
 export type CacheDocument = Cache & Document;
+
+/**
+ * Discriminated union type for cache data
+ * This provides type safety based on what kind of data is cached
+ */
+export type CacheData = NavasanResponse | NavasanOHLCDataPoint[];
 
 @Schema({ timestamps: true })
 export class Cache {
   @Prop({ required: true, index: true })
-  category!: string; // e.g., 'currencies', 'crypto', 'gold', 'all'
+  category!: string; // e.g., 'currencies', 'crypto', 'gold', 'all', or 'ohlc_<itemCode>_<timeRange>'
 
   @Prop({ required: true, type: Object })
-  data!: Record<string, unknown>; // Cached API response data
+  data!: CacheData; // Cached API response data - properly typed
 
   @Prop({ required: true })
   timestamp!: Date; // When the data was cached

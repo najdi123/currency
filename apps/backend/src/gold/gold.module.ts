@@ -1,15 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { GoldService } from './gold.service';
 import { GoldController } from './gold.controller';
-import { Gold, GoldSchema } from './schemas/gold.schema';
+import { HistoryModule } from '../history/history.module';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: Gold.name, schema: GoldSchema },
-    ]),
-  ],
+  imports: [HistoryModule],
   controllers: [GoldController],
   providers: [GoldService],
   exports: [GoldService],

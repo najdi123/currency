@@ -39,11 +39,11 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
             aria-selected={isActive}
             aria-label={range.labelFa}
             className={`
-              px-4 py-2 rounded-lg text-sm font-medium transition-apple-fast active-scale-apple
+              px-4 py-2 rounded-xs text-sm font-medium transition-apple-fast active-scale-apple
               focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900
               ${isActive
                 ? 'bg-accent text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-text-secondary hover:bg-gray-200 dark:hover:bg-gray-700'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'
               }
               ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
             `}

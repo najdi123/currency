@@ -184,6 +184,14 @@ export function OfflineBanner({
     if (showPoorConnectionWarning && (quality === 'poor' || quality === 'fair')) {
       setIsVisible(true)
       setIsClosing(false)
+
+      // Auto-close 'fair' quality warning after 4 seconds
+      if (quality === 'fair') {
+        const timer = setTimeout(() => {
+          handleClose()
+        }, 4000)
+        return () => clearTimeout(timer)
+      }
       return
     }
 

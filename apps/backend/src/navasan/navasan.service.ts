@@ -10,7 +10,12 @@ import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
 import axios from 'axios';
 import { Cache, CacheDocument } from './schemas/cache.schema';
+import { PriceSnapshot, PriceSnapshotDocument } from './schemas/price-snapshot.schema';
 import { ApiResponse } from './interfaces/api-response.interface';
+import { NavasanResponse } from './interfaces/navasan-response.interface';
+import { isCurrencyResponse, isCryptoResponse, isGoldResponse } from './utils/type-guards';
+import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class NavasanService {
@@ -37,7 +42,9 @@ export class NavasanService {
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
+    @InjectModel(PriceSnapshot.name) private priceSnapshotModel: Model<PriceSnapshotDocument>,
     private configService: ConfigService,
+    private metricsService: MetricsService,
   ) {
     this.apiKey = this.configService.get<string>('NAVASAN_API_KEY') || '';
     if (!this.apiKey) {
@@ -69,21 +76,21 @@ export class NavasanService {
   /**
    * Get latest rates for all items (currencies, crypto, gold)
    */
-  async getLatestRates(): Promise<ApiResponse<Record<string, unknown>>> {
+  async getLatestRates(): Promise<ApiResponse<NavasanResponse>> {
     return this.fetchWithCache('all', this.items.all);
   }
 
   /**
    * Get latest currency rates only
    */
-  async getCurrencies(): Promise<ApiResponse<Record<string, unknown>>> {
+  async getCurrencies(): Promise<ApiResponse<NavasanResponse>> {
     return this.fetchWithCache('currencies', this.items.currencies);
   }
 
   /**
    * Get latest cryptocurrency rates only
    */
-  async getCrypto(): Promise<ApiResponse<Record<string, unknown>>> {
+  async getCrypto(): Promise<ApiResponse<NavasanResponse>> {
     return this.fetchWithCache('crypto', this.items.crypto);
   }
 
@@ -93,14 +100,14 @@ export class NavasanService {
    * We multiply by 1000 to get the actual value in tomans
    * 18ayar is already in tomans, so we don't multiply it
    */
-  async getGold(): Promise<ApiResponse<Record<string, unknown>>> {
+  async getGold(): Promise<ApiResponse<NavasanResponse>> {
     const response = await this.fetchWithCache('gold', this.items.gold);
 
     // Gold coins that need to be multiplied by 1000 (returned in thousands)
-    const coinsToMultiply = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami'];
+    const coinsToMultiply = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami'] as const;
 
-    // Multiply coin values by 1000
-    const transformedData = { ...response.data };
+    // Multiply coin values by 1000 - cast to Record for safe indexing
+    const transformedData = { ...response.data } as Record<string, unknown>;
     for (const coin of coinsToMultiply) {
       if (transformedData[coin] && typeof transformedData[coin] === 'object') {
         const coinData = transformedData[coin] as Record<string, unknown>;
@@ -114,18 +121,19 @@ export class NavasanService {
     }
 
     return {
-      data: transformedData,
+      data: transformedData as NavasanResponse,
       metadata: response.metadata,
     };
   }
 
   /**
    * Fetch data with caching logic and fallback to stale data on API failure
+   * Now with DB error handling and type safety
    */
   private async fetchWithCache(
     category: string,
     items: string,
-  ): Promise<ApiResponse<Record<string, unknown>>> {
+  ): Promise<ApiResponse<NavasanResponse>> {
     // Validate category to prevent NoSQL injection
     this.validateCategory(category);
 
@@ -155,6 +163,10 @@ export class NavasanService {
         // Cache save methods already reset apiErrorCount to 0 and clear lastApiError
         await this.saveToFreshCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
         await this.saveToStaleCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
+
+        // 📸 PERMANENT STORAGE: Save snapshot for historical record
+        // This data is never deleted and builds a permanent price history database
+        await this.savePriceSnapshot(category, apiResponse.data, apiResponse.metadata);
 
         this.logger.log(`✅ API fetch successful for category: ${category}`);
 
@@ -307,12 +319,13 @@ export class NavasanService {
   }
 
   /**
-   * Fetch data from Navasan API with timeout
+   * Fetch data from Navasan API with timeout and type validation
    * SECURITY: API key sent in header instead of URL to prevent exposure in logs
+   * TYPE SAFETY: Returns properly typed NavasanResponse
    */
   private async fetchFromApiWithTimeout(
     items: string,
-  ): Promise<{ data: Record<string, unknown>; metadata?: Record<string, unknown> }> {
+  ): Promise<{ data: NavasanResponse; metadata?: Record<string, unknown> }> {
     // NOTE: Navasan API requires the API key as a query parameter (not in headers)
     // This is not ideal from a security perspective, but it's how their API works
     const url = `${this.baseUrl}?api_key=${this.apiKey}&item=${items}`;
@@ -465,72 +478,89 @@ export class NavasanService {
 
   /**
    * Get fresh cached data (< 5 minutes old)
+   * Now with DB error handling - returns null on DB failure instead of throwing
    */
   private async getFreshCachedData(category: string): Promise<CacheDocument | null> {
     const freshExpiry = new Date(Date.now() - this.freshCacheMinutes * 60 * 1000);
 
-    const cached = await this.cacheModel
-      .findOne({
-        category,
-        cacheType: 'fresh',
-        timestamp: { $gte: freshExpiry },
-      })
-      .sort({ timestamp: -1 })
-      .exec();
-
-    return cached;
+    return safeDbRead(
+      () =>
+        this.cacheModel
+          .findOne({
+            category,
+            cacheType: 'fresh',
+            timestamp: { $gte: freshExpiry },
+          })
+          .sort({ timestamp: -1 })
+          .exec(),
+      'getFreshCachedData',
+      this.logger,
+      { category },
+    );
   }
 
   /**
    * Get stale cached data (up to 24 hours old) for fallback
+   * Now with DB error handling - returns null on DB failure instead of throwing
    */
   private async getStaleCachedData(category: string): Promise<CacheDocument | null> {
     const staleExpiry = new Date(Date.now() - this.staleCacheHours * 60 * 60 * 1000);
 
-    const cached = await this.cacheModel
-      .findOne({
-        category,
-        cacheType: { $in: ['fresh', 'stale'] },
-        timestamp: { $gte: staleExpiry },
-      })
-      .sort({ timestamp: -1 })
-      .exec();
-
-    return cached;
+    return safeDbRead(
+      () =>
+        this.cacheModel
+          .findOne({
+            category,
+            cacheType: { $in: ['fresh', 'stale'] },
+            timestamp: { $gte: staleExpiry },
+          })
+          .sort({ timestamp: -1 })
+          .exec(),
+      'getStaleCachedData',
+      this.logger,
+      { category },
+    );
   }
 
   /**
    * Save data to fresh cache using atomic upsert to prevent race conditions
    * SECURITY FIX: Using findOneAndUpdate with upsert instead of delete-then-create
-   * to prevent race conditions that could cause data loss or duplicates
+   * DB ERROR HANDLING: Uses safeDbWrite - won't throw on DB failure
    */
   private async saveToFreshCache(
     category: string,
-    data: Record<string, unknown>,
+    data: NavasanResponse,
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.freshCacheMinutes * 60 * 1000);
 
-    // Atomic upsert - no race condition, no data loss
-    await this.cacheModel
-      .findOneAndUpdate(
-        { category, cacheType: 'fresh' },
-        {
-          $set: {
-            data,
-            timestamp: now,
-            expiresAt,
-            lastApiSuccess: now,
-            apiErrorCount: 0,
-            isFallback: false,
-            lastApiError: undefined, // Clear error on success
-            apiMetadata: apiMetadata || undefined,
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
+    // Atomic upsert with DB error handling
+    await safeDbWrite(
+      () =>
+        this.cacheModel
+          .findOneAndUpdate(
+            { category, cacheType: 'fresh' },
+            {
+              $set: {
+                data,
+                timestamp: now,
+                expiresAt,
+                lastApiSuccess: now,
+                apiErrorCount: 0,
+                isFallback: false,
+                lastApiError: undefined, // Clear error on success
+                apiMetadata: apiMetadata || undefined,
+              },
+            },
+            { upsert: true, new: true },
+          )
+          .exec(),
+      'saveToFreshCache',
+      this.logger,
+      { category },
+      false, // Not critical - can continue without fresh cache
+    );
 
     this.logger.log(
       `💾 Saved fresh cache for category: ${category}, expires at: ${expiresAt.toISOString()}`,
@@ -540,33 +570,41 @@ export class NavasanService {
   /**
    * Save data to stale cache (long-term fallback) using atomic upsert
    * SECURITY FIX: Using findOneAndUpdate with upsert instead of delete-then-create
+   * DB ERROR HANDLING: Uses safeDbWrite with retry - critical for fallback functionality
    */
   private async saveToStaleCache(
     category: string,
-    data: Record<string, unknown>,
+    data: NavasanResponse,
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.staleCacheHours * 60 * 60 * 1000);
 
-    // Atomic upsert - no race condition
-    await this.cacheModel
-      .findOneAndUpdate(
-        { category, cacheType: 'stale' },
-        {
-          $set: {
-            data,
-            timestamp: now,
-            expiresAt,
-            lastApiSuccess: now,
-            isFallback: false,
-            lastApiError: undefined, // Clear error on success
-            apiMetadata: apiMetadata || undefined,
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
+    // Atomic upsert with DB error handling
+    await safeDbWrite(
+      () =>
+        this.cacheModel
+          .findOneAndUpdate(
+            { category, cacheType: 'stale' },
+            {
+              $set: {
+                data,
+                timestamp: now,
+                expiresAt,
+                lastApiSuccess: now,
+                isFallback: false,
+                lastApiError: undefined, // Clear error on success
+                apiMetadata: apiMetadata || undefined,
+              },
+            },
+            { upsert: true, new: true },
+          )
+          .exec(),
+      'saveToStaleCache',
+      this.logger,
+      { category },
+      true, // Critical - stale cache needed for fallback
+    );
 
     this.logger.log(
       `💾 Saved stale cache for category: ${category}, expires at: ${expiresAt.toISOString()}`,
@@ -579,7 +617,7 @@ export class NavasanService {
    */
   private async saveToFreshCacheWithRetry(
     category: string,
-    data: Record<string, unknown>,
+    data: NavasanResponse,
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     try {
@@ -598,7 +636,7 @@ export class NavasanService {
    */
   private async saveToStaleCacheWithRetry(
     category: string,
-    data: Record<string, unknown>,
+    data: NavasanResponse,
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     let retries = 0;
@@ -625,22 +663,30 @@ export class NavasanService {
   /**
    * Mark cache entry as being used as fallback and track API errors
    * Populates isFallback, lastApiError, and increments apiErrorCount
+   * DB ERROR HANDLING: Won't throw on DB failure
    */
   private async markCacheAsFallback(category: string, errorMessage: string): Promise<void> {
-    await this.cacheModel
-      .updateMany(
-        { category, cacheType: { $in: ['fresh', 'stale'] } },
-        {
-          $set: {
-            isFallback: true,
-            lastApiError: errorMessage,
-          },
-          $inc: {
-            apiErrorCount: 1,
-          },
-        },
-      )
-      .exec();
+    await safeDbWrite(
+      () =>
+        this.cacheModel
+          .updateMany(
+            { category, cacheType: { $in: ['fresh', 'stale'] } },
+            {
+              $set: {
+                isFallback: true,
+                lastApiError: errorMessage,
+              },
+              $inc: {
+                apiErrorCount: 1,
+              },
+            },
+          )
+          .exec(),
+      'markCacheAsFallback',
+      this.logger,
+      { category, errorMessage },
+      false, // Not critical - just metadata update
+    );
   }
 
   /**
@@ -648,5 +694,80 @@ export class NavasanService {
    */
   private getDataAgeMinutes(timestamp: Date): number {
     return Math.floor((Date.now() - timestamp.getTime()) / (1000 * 60));
+  }
+
+  /**
+   * Save hourly price snapshot to database with TTL
+   * ISSUE 4 FIX: Reduced from 5-minute to 1-hour snapshots
+   * Records are auto-deleted after 90 days via TTL index
+   * METRICS: Tracks snapshot save failures
+   */
+  private async savePriceSnapshot(
+    category: string,
+    data: NavasanResponse,
+    apiMetadata?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      // HOURLY SNAPSHOT LOGIC: Only save one snapshot per hour
+      const now = new Date();
+      const currentHour = new Date(Math.floor(now.getTime() / 3600000) * 3600000);
+
+      // Check if we already have a snapshot for this hour
+      const existingSnapshot = await safeDbRead(
+        () =>
+          this.priceSnapshotModel
+            .findOne({
+              category,
+              timestamp: { $gte: currentHour },
+            })
+            .exec(),
+        'checkExistingSnapshot',
+        this.logger,
+        { category, currentHour },
+      );
+
+      if (existingSnapshot) {
+        this.logger.debug(
+          `Snapshot already exists for ${category} in hour ${currentHour.toISOString()}, skipping`,
+        );
+        return;
+      }
+
+      // Save new hourly snapshot
+      const snapshot = new this.priceSnapshotModel({
+        category,
+        data,
+        timestamp: currentHour, // Use hour-rounded timestamp
+        source: 'api',
+        metadata: apiMetadata,
+      });
+
+      const saveResult = await safeDbWrite(
+        () => snapshot.save(),
+        'savePriceSnapshot',
+        this.logger,
+        { category },
+        true, // Critical - track failures
+      );
+
+      if (saveResult) {
+        this.logger.log(`📸 Saved hourly price snapshot for category: ${category}`);
+        // Reset failure counter on success
+        this.metricsService.resetSnapshotFailureCounter('price', category);
+      } else {
+        // Track failure
+        this.metricsService.trackSnapshotFailure(
+          'price',
+          category,
+          'Database write failed during snapshot save',
+        );
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to save price snapshot for ${category}: ${errorMessage}`);
+      // Track failure
+      this.metricsService.trackSnapshotFailure('price', category, errorMessage);
+      // Don't fail the request if snapshot saving fails
+    }
   }
 }

@@ -1,15 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
 import { CurrenciesService } from './currencies.service';
 import { CurrenciesController } from './currencies.controller';
-import { Currency, CurrencySchema } from './schemas/currency.schema';
+import { HistoryModule } from '../history/history.module';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      { name: Currency.name, schema: CurrencySchema },
-    ]),
-  ],
+  imports: [HistoryModule],
   controllers: [CurrenciesController],
   providers: [CurrenciesService],
   exports: [CurrenciesService],

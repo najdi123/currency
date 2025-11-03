@@ -6,19 +6,11 @@ import axios from 'axios';
 import { TimeRange, ItemType } from './dto/chart-query.dto';
 import { ChartDataPoint, ChartResponse } from './interfaces/chart.interface';
 import { Cache, CacheDocument } from '../navasan/schemas/cache.schema';
-
-/**
- * Interface for Navasan OHLC API response
- * NOTE: Navasan API returns price fields as numbers, not strings
- */
-interface NavasanOHLCDataPoint {
-  timestamp: number; // Unix timestamp
-  date: string; // Persian date YYYY-MM-DD
-  open: number | string; // Price as number or string
-  high: number | string; // Price as number or string
-  low: number | string; // Price as number or string
-  close: number | string; // Price as number or string
-}
+import { OhlcSnapshot, OhlcSnapshotDocument } from '../navasan/schemas/ohlc-snapshot.schema';
+import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
+import { MetricsService } from '../metrics/metrics.service';
+import { NavasanOHLCDataPoint } from '../navasan/interfaces/navasan-response.interface';
+import { isOHLCDataArray } from '../navasan/utils/type-guards';
 
 @Injectable()
 export class ChartService {
@@ -30,7 +22,9 @@ export class ChartService {
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
+    @InjectModel(OhlcSnapshot.name) private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     private configService: ConfigService,
+    private metricsService: MetricsService,
   ) {
     this.apiKey = this.configService.get<string>('NAVASAN_API_KEY') || '';
     if (!this.apiKey) {
@@ -246,6 +240,10 @@ export class ChartService {
         await this.saveOHLCToFreshCacheWithRetry(cacheKey, apiResponse.data, apiResponse.metadata);
         await this.saveOHLCToStaleCacheWithRetry(cacheKey, apiResponse.data, apiResponse.metadata);
 
+        // 📸 PERMANENT STORAGE: Save OHLC snapshot for historical record
+        // This data is never deleted and builds a permanent chart history database
+        await this.saveOhlcSnapshot(itemCode, timeRange, apiResponse.data, apiResponse.metadata);
+
         return apiResponse.data;
       } catch (apiError) {
         // Step 3: API failed, try to serve stale data
@@ -460,21 +458,28 @@ export class ChartService {
 
   /**
    * Get fresh cached OHLC data (< 1 hour old)
+   * DB ERROR HANDLING: Returns null on DB failure instead of throwing
    */
-  private async getFreshCachedOHLCData(cacheKey: string): Promise<unknown[] | null> {
+  private async getFreshCachedOHLCData(cacheKey: string): Promise<NavasanOHLCDataPoint[] | null> {
     const freshExpiry = new Date(Date.now() - this.freshCacheMinutes * 60 * 1000);
 
-    const cached = await this.cacheModel
-      .findOne({
-        category: cacheKey,
-        cacheType: 'fresh',
-        timestamp: { $gte: freshExpiry },
-      })
-      .sort({ timestamp: -1 })
-      .exec();
+    const cached = await safeDbRead(
+      () =>
+        this.cacheModel
+          .findOne({
+            category: cacheKey,
+            cacheType: 'fresh',
+            timestamp: { $gte: freshExpiry },
+          })
+          .sort({ timestamp: -1 })
+          .exec(),
+      'getFreshCachedOHLCData',
+      this.logger,
+      { cacheKey },
+    );
 
-    if (cached && Array.isArray(cached.data)) {
-      return cached.data as unknown[];
+    if (cached && Array.isArray(cached.data) && isOHLCDataArray(cached.data)) {
+      return cached.data;
     }
 
     return null;
@@ -482,21 +487,28 @@ export class ChartService {
 
   /**
    * Get stale cached OHLC data (up to 72 hours old) for fallback
+   * DB ERROR HANDLING: Returns null on DB failure instead of throwing
    */
-  private async getStaleCachedOHLCData(cacheKey: string): Promise<unknown[] | null> {
+  private async getStaleCachedOHLCData(cacheKey: string): Promise<NavasanOHLCDataPoint[] | null> {
     const staleExpiry = new Date(Date.now() - this.staleCacheHours * 60 * 60 * 1000);
 
-    const cached = await this.cacheModel
-      .findOne({
-        category: cacheKey,
-        cacheType: { $in: ['fresh', 'stale'] },
-        timestamp: { $gte: staleExpiry },
-      })
-      .sort({ timestamp: -1 })
-      .exec();
+    const cached = await safeDbRead(
+      () =>
+        this.cacheModel
+          .findOne({
+            category: cacheKey,
+            cacheType: { $in: ['fresh', 'stale'] },
+            timestamp: { $gte: staleExpiry },
+          })
+          .sort({ timestamp: -1 })
+          .exec(),
+      'getStaleCachedOHLCData',
+      this.logger,
+      { cacheKey },
+    );
 
-    if (cached && Array.isArray(cached.data)) {
-      return cached.data as unknown[];
+    if (cached && Array.isArray(cached.data) && isOHLCDataArray(cached.data)) {
+      return cached.data;
     }
 
     return null;
@@ -505,7 +517,7 @@ export class ChartService {
   /**
    * Save OHLC data to fresh cache using atomic upsert
    * SECURITY FIX: Using findOneAndUpdate with upsert instead of delete-then-create
-   * ERROR TRACKING FIX: Reset apiErrorCount to 0 on successful API calls
+   * DB ERROR HANDLING: Uses safeDbWrite - won't throw on DB failure
    */
   private async saveOHLCToFreshCache(
     cacheKey: string,
@@ -515,25 +527,32 @@ export class ChartService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.freshCacheMinutes * 60 * 1000);
 
-    // Atomic upsert - no race condition, no data loss
-    await this.cacheModel
-      .findOneAndUpdate(
-        { category: cacheKey, cacheType: 'fresh' },
-        {
-          $set: {
-            data: data,
-            timestamp: now,
-            expiresAt,
-            lastApiSuccess: now,
-            apiErrorCount: 0, // Reset error count on success
-            isFallback: false,
-            lastApiError: undefined,
-            apiMetadata: apiMetadata || undefined,
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
+    // Atomic upsert with DB error handling
+    await safeDbWrite(
+      () =>
+        this.cacheModel
+          .findOneAndUpdate(
+            { category: cacheKey, cacheType: 'fresh' },
+            {
+              $set: {
+                data: data,
+                timestamp: now,
+                expiresAt,
+                lastApiSuccess: now,
+                apiErrorCount: 0, // Reset error count on success
+                isFallback: false,
+                lastApiError: undefined,
+                apiMetadata: apiMetadata || undefined,
+              },
+            },
+            { upsert: true, new: true },
+          )
+          .exec(),
+      'saveOHLCToFreshCache',
+      this.logger,
+      { cacheKey },
+      false, // Not critical
+    );
 
     this.logger.log(
       `💾 Saved fresh OHLC cache for ${cacheKey}, expires at: ${expiresAt.toISOString()}`,
@@ -543,7 +562,7 @@ export class ChartService {
   /**
    * Save OHLC data to stale cache using atomic upsert
    * SECURITY FIX: Using findOneAndUpdate with upsert instead of delete-then-create
-   * ERROR TRACKING FIX: Reset apiErrorCount to 0 on successful API calls
+   * DB ERROR HANDLING: Uses safeDbWrite - critical for fallback functionality
    */
   private async saveOHLCToStaleCache(
     cacheKey: string,
@@ -553,25 +572,32 @@ export class ChartService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.staleCacheHours * 60 * 60 * 1000);
 
-    // Atomic upsert - no race condition
-    await this.cacheModel
-      .findOneAndUpdate(
-        { category: cacheKey, cacheType: 'stale' },
-        {
-          $set: {
-            data: data,
-            timestamp: now,
-            expiresAt,
-            lastApiSuccess: now,
-            apiErrorCount: 0, // Reset error count on success
-            isFallback: false,
-            lastApiError: undefined,
-            apiMetadata: apiMetadata || undefined,
-          },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
+    // Atomic upsert with DB error handling
+    await safeDbWrite(
+      () =>
+        this.cacheModel
+          .findOneAndUpdate(
+            { category: cacheKey, cacheType: 'stale' },
+            {
+              $set: {
+                data: data,
+                timestamp: now,
+                expiresAt,
+                lastApiSuccess: now,
+                apiErrorCount: 0, // Reset error count on success
+                isFallback: false,
+                lastApiError: undefined,
+                apiMetadata: apiMetadata || undefined,
+              },
+            },
+            { upsert: true, new: true },
+          )
+          .exec(),
+      'saveOHLCToStaleCache',
+      this.logger,
+      { cacheKey },
+      true, // Critical for fallback
+    );
 
     this.logger.log(
       `💾 Saved stale OHLC cache for ${cacheKey}, expires at: ${expiresAt.toISOString()}`,
@@ -630,23 +656,30 @@ export class ChartService {
   /**
    * Mark OHLC cache entry as being used as fallback and track API errors
    * Populates isFallback, lastApiError, and increments apiErrorCount
-   * This enables monitoring of when stale OHLC data is being served
+   * DB ERROR HANDLING: Won't throw on DB failure
    */
   private async markOHLCCacheAsFallback(cacheKey: string, errorMessage: string): Promise<void> {
-    await this.cacheModel
-      .updateMany(
-        { category: cacheKey, cacheType: { $in: ['fresh', 'stale'] } },
-        {
-          $set: {
-            isFallback: true,
-            lastApiError: errorMessage,
-          },
-          $inc: {
-            apiErrorCount: 1,
-          },
-        },
-      )
-      .exec();
+    await safeDbWrite(
+      () =>
+        this.cacheModel
+          .updateMany(
+            { category: cacheKey, cacheType: { $in: ['fresh', 'stale'] } },
+            {
+              $set: {
+                isFallback: true,
+                lastApiError: errorMessage,
+              },
+              $inc: {
+                apiErrorCount: 1,
+              },
+            },
+          )
+          .exec(),
+      'markOHLCCacheAsFallback',
+      this.logger,
+      { cacheKey, errorMessage },
+      false, // Not critical - just metadata
+    );
   }
 
   /**
@@ -672,5 +705,56 @@ export class ChartService {
         volume: 0, // Navasan doesn't provide volume data
       };
     });
+  }
+
+  /**
+   * Save OHLC snapshot to database with TTL and metrics tracking
+   * ISSUE 4 FIX: Records auto-deleted after 90 days via TTL index
+   * METRICS: Tracks snapshot save failures
+   * DB ERROR HANDLING: Uses safeDbWrite
+   */
+  private async saveOhlcSnapshot(
+    itemCode: string,
+    timeRange: TimeRange,
+    data: NavasanOHLCDataPoint[],
+    apiMetadata?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const snapshot = new this.ohlcSnapshotModel({
+        itemCode,
+        timeRange,
+        data,
+        timestamp: new Date(),
+        source: 'api',
+        metadata: apiMetadata,
+      });
+
+      const saveResult = await safeDbWrite(
+        () => snapshot.save(),
+        'saveOhlcSnapshot',
+        this.logger,
+        { itemCode, timeRange },
+        true, // Critical - track failures
+      );
+
+      if (saveResult) {
+        this.logger.log(`📸 Saved OHLC snapshot for ${itemCode} (${timeRange})`);
+        // Reset failure counter on success
+        this.metricsService.resetSnapshotFailureCounter('ohlc', `${itemCode}_${timeRange}`);
+      } else {
+        // Track failure
+        this.metricsService.trackSnapshotFailure(
+          'ohlc',
+          `${itemCode}_${timeRange}`,
+          'Database write failed during OHLC snapshot save',
+        );
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to save OHLC snapshot for ${itemCode}: ${errorMessage}`);
+      // Track failure
+      this.metricsService.trackSnapshotFailure('ohlc', `${itemCode}_${timeRange}`, errorMessage);
+      // Don't fail the request if snapshot saving fails
+    }
   }
 }

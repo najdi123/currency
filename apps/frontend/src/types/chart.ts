@@ -44,3 +44,22 @@ export interface TransformedChartData {
   prices: number[]
   dataPoints: ChartDataPoint[]
 }
+
+/**
+ * Historical price point for sparkline
+ */
+export interface HistoricalPricePoint {
+  date: string // ISO 8601 date string
+  price: number // Price in Toman
+  timestamp?: number // Unix timestamp (optional)
+}
+
+/**
+ * API response for historical price data
+ */
+export interface HistoricalPriceResponse {
+  success: boolean
+  data: HistoricalPricePoint[]
+  code?: string // For currencies and gold
+  symbol?: string // For digital currencies
+}

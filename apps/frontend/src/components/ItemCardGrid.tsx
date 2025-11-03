@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { IconType } from 'react-icons'
+import type { ItemType } from '@/types/chart'
 import { ItemCard, AccentColorVariant } from './ItemCard'
 
 export interface ItemCardGridProps {
@@ -22,6 +23,11 @@ export interface ItemCardGridProps {
       change: number
     }
   } | null
+
+  /**
+   * Item type for fetching historical data
+   */
+  itemType: ItemType
 
   /**
    * Accent color variant for hover effect
@@ -83,6 +89,7 @@ export interface ItemCardGridProps {
 const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   items,
   data,
+  itemType,
   accentColor = 'blue',
   viewMode = 'single',
   onItemClick,
@@ -109,7 +116,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
           ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
           : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
       } ${
-        viewMode === 'dual' ? 'gap-3 sm:gap-4 lg:gap-6 xl:gap-8' : 'gap-4 sm:gap-6 lg:gap-8'
+        viewMode === 'dual' ? 'gap-2 sm:gap-4 lg:gap-6 xl:gap-8' : 'gap-4 sm:gap-6 lg:gap-8'
       } w-full`}
       role="list"
       aria-label="لیست آیتم‌های قیمت"
@@ -128,6 +135,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             iconColor={item.color}
             value={itemData.value}
             change={itemData.change}
+            type={itemType}
             compact={viewMode === 'dual'}
             accentColor={accentColor}
             onClick={clickHandlers[item.key]}
@@ -163,6 +171,7 @@ export const ItemCardGrid = React.memo<ItemCardGridProps>(
       if (prevProps.accentColor !== nextProps.accentColor) changedProps.push('accentColor')
       if (prevProps.data !== nextProps.data) changedProps.push('data')
       if (prevProps.items !== nextProps.items) changedProps.push('items')
+      if (prevProps.itemType !== nextProps.itemType) changedProps.push('itemType')
       if (prevProps.onItemClick !== nextProps.onItemClick) changedProps.push('onItemClick')
       if (prevProps.viewMode !== nextProps.viewMode) changedProps.push('viewMode')
 
@@ -178,6 +187,7 @@ export const ItemCardGrid = React.memo<ItemCardGridProps>(
     if (prevProps.accentColor !== nextProps.accentColor) return false
     if (prevProps.data !== nextProps.data) return false
     if (prevProps.items !== nextProps.items) return false
+    if (prevProps.itemType !== nextProps.itemType) return false
     if (prevProps.onItemClick !== nextProps.onItemClick) return false
     if (prevProps.viewMode !== nextProps.viewMode) return false
 

@@ -1,126 +1,41 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
-import { Gold, GoldDocument } from './schemas/gold.schema';
-import { CreateGoldDto } from './dto/create-gold.dto';
-import { UpdateGoldDto } from './dto/update-gold.dto';
+import { Injectable, Logger } from '@nestjs/common';
+import { HistoryService } from '../history/history.service';
 
 @Injectable()
 export class GoldService {
   private readonly logger = new Logger(GoldService.name);
 
-  constructor(
-    @InjectModel(Gold.name) private goldModel: Model<GoldDocument>,
-  ) {}
+  constructor(private readonly historyService: HistoryService) {}
 
-  async create(createGoldDto: CreateGoldDto): Promise<Gold> {
+  async getHistory(code: string, days: number = 7) {
     try {
-      this.logger.log(`Creating gold entry: ${createGoldDto.type}`);
-      const gold = new this.goldModel({
-        ...createGoldDto,
-        lastUpdated: new Date(),
-      });
-      return await gold.save();
-    } catch (error: unknown) {
-      // Check if error is a MongoDB duplicate key error
-      if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
-        this.logger.warn(`Duplicate gold type: ${createGoldDto.type}`);
-        throw new ConflictException(
-          `Gold entry with type ${createGoldDto.type} already exists`,
-        );
+      this.logger.log(`Fetching real historical data for ${code}`);
+      const realHistoryData = await this.historyService.getHistory(code, 'gold', days);
+
+      if (realHistoryData && realHistoryData.length > 0) {
+        this.logger.log(`Successfully fetched ${realHistoryData.length} real data points for ${code}`);
+        return {
+          success: true,
+          data: realHistoryData,
+          code,
+        };
       }
-      this.logger.error(`Failed to create gold entry: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
-      throw error;
+
+      this.logger.warn(`No real historical data available for ${code}`);
+      return {
+        success: false,
+        data: [],
+        code,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch real historical data for ${code}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return {
+        success: false,
+        data: [],
+        code,
+      };
     }
-  }
-
-  async findAll(): Promise<Gold[]> {
-    return this.goldModel.find().exec();
-  }
-
-  async findActive(): Promise<Gold[]> {
-    return this.goldModel.find({ isActive: true }).exec();
-  }
-
-  async findOne(id: string): Promise<Gold> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid gold entry ID format');
-    }
-    const gold = await this.goldModel.findById(id).exec();
-    if (!gold) {
-      throw new NotFoundException(`Gold type with ID ${id} not found`);
-    }
-    return gold;
-  }
-
-  async findByType(type: string): Promise<Gold> {
-    const gold = await this.goldModel.findOne({ type }).exec();
-    if (!gold) {
-      throw new NotFoundException(`Gold type ${type} not found`);
-    }
-    return gold;
-  }
-
-  async update(id: string, updateGoldDto: UpdateGoldDto): Promise<Gold> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid gold entry ID format');
-    }
-    const gold = await this.goldModel
-      .findByIdAndUpdate(
-        id,
-        { ...updateGoldDto, lastUpdated: new Date() },
-        { new: true },
-      )
-      .exec();
-
-    if (!gold) {
-      throw new NotFoundException(`Gold type with ID ${id} not found`);
-    }
-    this.logger.log(`Updated gold entry: ${id}`);
-    return gold;
-  }
-
-  async remove(id: string): Promise<Gold> {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid gold entry ID format');
-    }
-    const gold = await this.goldModel.findByIdAndDelete(id).exec();
-    if (!gold) {
-      throw new NotFoundException(`Gold type with ID ${id} not found`);
-    }
-    this.logger.log(`Removed gold entry: ${id}`);
-    return gold;
-  }
-
-  async updatePrice(
-    type: string,
-    priceInToman: number,
-    changePercentage24h?: number,
-    changeAmount24h?: number,
-  ): Promise<Gold> {
-    const gold = await this.goldModel
-      .findOneAndUpdate(
-        { type },
-        {
-          priceInToman,
-          changePercentage24h,
-          changeAmount24h,
-          lastUpdated: new Date(),
-        },
-        { new: true },
-      )
-      .exec();
-
-    if (!gold) {
-      throw new NotFoundException(`Gold type ${type} not found`);
-    }
-    return gold;
-  }
-
-  async findByPurity(minPurity: number): Promise<Gold[]> {
-    return this.goldModel
-      .find({ isActive: true, purity: { $gte: minPurity } })
-      .sort({ purity: -1 })
-      .exec();
   }
 }

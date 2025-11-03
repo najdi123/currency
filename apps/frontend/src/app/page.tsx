@@ -1,270 +1,92 @@
 'use client'
 
-import { useState, useEffect, useMemo, lazy, Suspense, useRef } from 'react'
-import {
-  useGetCurrenciesQuery,
-  useGetCryptoQuery,
-  useGetGoldQuery,
-} from '@/lib/store/services/api'
+import { lazy, Suspense, useCallback } from 'react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { ErrorDisplay } from '@/components/ErrorDisplay'
-import { ItemCardGrid } from '@/components/ItemCardGrid'
-import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { Button } from '@/components/ui/Button'
+import { PageHeader } from '@/components/PageHeader'
+import { SuccessNotification } from '@/components/SuccessNotification'
+import { StaleDataWarning } from '@/components/StaleDataWarning'
+import { GlobalErrorDisplay } from '@/components/GlobalErrorDisplay'
+import { RateLimitBanner } from '@/components/RateLimitBanner'
+import { DataSection } from '@/components/DataSection'
 import { useChartBottomSheet } from '@/lib/hooks/useChartBottomSheet'
+import { useViewModePreference } from '@/lib/hooks/useViewModePreference'
+import { useMarketData } from '@/lib/hooks/useMarketData'
+import { useRefreshNotification } from '@/lib/hooks/useRefreshNotification'
+import { useChartPreload } from '@/lib/hooks/useChartPreload'
+import { useLastUpdatedTimestamp } from '@/lib/hooks/useLastUpdatedTimestamp'
 import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
+import {
+  currencyItems,
+  cryptoItems,
+  goldItems,
+  getItemData,
+  getItemName,
+} from '@/lib/utils/dataItemHelpers'
 import type { ItemType, SelectedChartItem } from '@/types/chart'
-import { FaDollarSign, FaEuroSign, FaPoundSign, FaBitcoin, FaEthereum } from 'react-icons/fa'
-import { SiTether } from 'react-icons/si'
-import { GiGoldBar, GiTwoCoins } from 'react-icons/gi'
-import { FiClock, FiInfo, FiCheckCircle, FiGrid } from 'react-icons/fi'
-import { HiRefresh } from 'react-icons/hi'
-import { BsGrid3X2 } from 'react-icons/bs'
+import { FaDollarSign, FaBitcoin } from 'react-icons/fa'
+import { GiGoldBar } from 'react-icons/gi'
+import { FiInfo } from 'react-icons/fi'
 
 // Lazy load chart component to reduce initial bundle size
-const ChartBottomSheet = lazy<React.ComponentType<{
-  isOpen: boolean
-  onClose: () => void
-  item: SelectedChartItem | null
-}>>(() =>
+const ChartBottomSheet = lazy<
+  React.ComponentType<{
+    isOpen: boolean
+    onClose: () => void
+    item: SelectedChartItem | null
+  }>
+>(() =>
   import(
     /* webpackChunkName: "chart-bottom-sheet" */
     /* webpackPrefetch: true */
     '@/components/ChartBottomSheet'
-  ).then(mod => ({ default: mod.ChartBottomSheet }))
+  ).then((mod) => ({ default: mod.ChartBottomSheet }))
 )
 
-// Currency items to display
-const currencyItems = [
-  { key: 'usd_sell', name: 'دلار آمریکا', icon: FaDollarSign, color: 'text-blue-600' },
-  { key: 'eur', name: 'یورو', icon: FaEuroSign, color: 'text-blue-600' },
-  { key: 'gbp', name: 'پوند انگلیس', icon: FaPoundSign, color: 'text-blue-600' },
-  { key: 'cad', name: 'دلار کانادا', icon: FaDollarSign, color: 'text-blue-600' },
-  { key: 'aud', name: 'دلار استرالیا', icon: FaDollarSign, color: 'text-blue-600' },
-]
-
-const cryptoItems = [
-  { key: 'usdt', name: 'تتر', icon: SiTether, color: 'text-purple-600' },
-  { key: 'btc', name: 'بیت کوین', icon: FaBitcoin, color: 'text-purple-600' },
-  { key: 'eth', name: 'اتریوم', icon: FaEthereum, color: 'text-purple-600' },
-]
-
-const goldItems = [
-  { key: 'sekkeh', name: 'سکه امامی', icon: GiTwoCoins, color: 'text-gold-400' },
-  { key: 'bahar', name: 'بهار آزادی', icon: GiTwoCoins, color: 'text-gold-400' },
-  { key: 'nim', name: 'نیم سکه', icon: GiTwoCoins, color: 'text-gold-400' },
-  { key: 'rob', name: 'ربع سکه', icon: GiTwoCoins, color: 'text-gold-400' },
-  { key: 'gerami', name: 'سکه گرمی', icon: GiTwoCoins, color: 'text-gold-400' },
-  { key: '18ayar', name: 'طلای 18 عیار', icon: GiGoldBar, color: 'text-gold-400' },
-]
-
 export default function Home() {
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [showSuccess, setShowSuccess] = useState(false)
+  // Custom hooks for state management
+  const { mobileViewMode, setMobileViewMode } = useViewModePreference()
+  const marketData = useMarketData()
   const chartSheet = useChartBottomSheet()
 
-  // Track manual refresh to show success notification (not for initial load or polling)
-  const isManualRefresh = useRef(false)
+  // Debug: Log metadata to verify stale data detection
+  console.log('[Page] Currencies metadata:', marketData.currencies?._metadata)
+  console.log('[Page] Crypto metadata:', marketData.crypto?._metadata)
+  console.log('[Page] Gold metadata:', marketData.gold?._metadata)
 
-  // Mobile view mode state
-  type ViewMode = 'single' | 'dual'
-  const [mobileViewMode, setMobileViewMode] = useState<ViewMode>('single')
+  const lastUpdated = useLastUpdatedTimestamp(
+    marketData.currencies,
+    marketData.crypto,
+    marketData.gold,
+    marketData.currenciesError,
+    marketData.cryptoError,
+    marketData.goldError
+  )
 
-  // Load view mode from localStorage (SSR-safe)
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('mobileViewMode')
-      if (saved === 'single' || saved === 'dual') {
-        setMobileViewMode(saved as ViewMode)
-      }
-    } catch (error) {
-      // Silently fail and use default 'single' mode
-      // This handles Safari Private Browsing and disabled storage
-      console.warn('Failed to load view mode preference:', error)
-    }
-  }, [])
+  const { showSuccess, isStaleData, staleDataTime, handleRefresh } = useRefreshNotification(
+    marketData.currenciesFetching,
+    marketData.cryptoFetching,
+    marketData.goldFetching,
+    marketData.currencies,
+    marketData.crypto,
+    marketData.gold,
+    marketData.currenciesError,
+    marketData.cryptoError,
+    marketData.goldError,
+    marketData.refetchAll
+  )
 
-  // Save view mode to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('mobileViewMode', mobileViewMode)
-    } catch (error) {
-      // Silently fail - preference won't persist but app still works
-      console.warn('Failed to save view mode preference:', error)
-    }
-  }, [mobileViewMode])
+  // Preload chart component for better UX
+  useChartPreload()
 
-  const {
-    data: currencies,
-    isLoading: currenciesLoading,
-    isFetching: currenciesFetching,
-    error: currenciesError,
-    refetch: refetchCurrencies,
-  } = useGetCurrenciesQuery(undefined, {
-    pollingInterval: 300000, // 5 minutes
-  })
-  const {
-    data: crypto,
-    isLoading: cryptoLoading,
-    isFetching: cryptoFetching,
-    error: cryptoError,
-    refetch: refetchCrypto,
-  } = useGetCryptoQuery(undefined, {
-    pollingInterval: 300000, // 5 minutes
-  })
-  const {
-    data: gold,
-    isLoading: goldLoading,
-    isFetching: goldFetching,
-    error: goldError,
-    refetch: refetchGold,
-  } = useGetGoldQuery(undefined, {
-    pollingInterval: 300000, // 5 minutes
-  })
-
-  // Preload chart component when user scrolls near item cards
-  const hasPreloadedChart = useRef(false)
-
-  useEffect(() => {
-    // Only preload once
-    if (hasPreloadedChart.current) return
-
-    // SSR guard - only run in browser
-    if (typeof window === 'undefined') return
-
-    // Use requestAnimationFrame to ensure DOM is painted
-    const rafId = requestAnimationFrame(() => {
-      // Query for item cards
-      const cards = document.querySelectorAll('[role="listitem"]')
-
-      // If no cards found, DOM might not be ready yet - skip preload
-      // Chart will load on demand when user clicks
-      if (cards.length === 0) {
-        console.debug('Chart preload: No item cards found, skipping preload')
-        return
-      }
-
-      // Create intersection observer to detect when cards enter viewport
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries.some(entry => entry.isIntersecting)) {
-            // Preload the chart component
-            import('@/components/ChartBottomSheet')
-              .then(() => {
-                hasPreloadedChart.current = true
-                console.debug('Chart preloaded successfully')
-              })
-              .catch((err) => {
-                // Don't set hasPreloadedChart on error, allow retry on click
-                console.warn('Chart preload failed (will load on demand):', err)
-              })
-            observer.disconnect()
-          }
-        },
-        {
-          rootMargin: '100px', // Start loading 100px before visible
-          threshold: 0.1
-        }
-      )
-
-      // Observe all item cards
-      cards.forEach(card => observer.observe(card))
-    })
-
-    return () => {
-      cancelAnimationFrame(rafId)
-    }
-  }, []) // Empty deps - run once after mount
-
-  // Update timestamp when data is successfully fetched
-  useEffect(() => {
-    if (!currenciesError && !cryptoError && !goldError && (currencies || crypto || gold)) {
-      setLastUpdated(new Date())
-    }
-  }, [currencies, crypto, gold, currenciesError, cryptoError, goldError])
-
-  // Show success notification after manual refresh completes
-  useEffect(() => {
-    // Only show success if:
-    // 1. Manual refresh was triggered
-    // 2. Not currently fetching
-    // 3. Data successfully loaded (at least one dataset available)
-    // 4. No errors
-    const wasManualRefresh = isManualRefresh.current
-    const notFetching = !currenciesFetching && !cryptoFetching && !goldFetching
-    const hasData = currencies || crypto || gold
-    const noErrors = !currenciesError && !cryptoError && !goldError
-
-    if (wasManualRefresh && notFetching && hasData && noErrors) {
-      // Reset manual refresh flag
-      isManualRefresh.current = false
-
-      // Show success notification
-      setShowSuccess(true)
-
-      // Auto-hide after 1.5 seconds
-      const timer = setTimeout(() => {
-        setShowSuccess(false)
-      }, 1500)
-
-      // Cleanup timeout on unmount
-      return () => clearTimeout(timer)
-    }
-  }, [
-    currenciesFetching,
-    cryptoFetching,
-    goldFetching,
-    currencies,
-    crypto,
-    gold,
-    currenciesError,
-    cryptoError,
-    goldError,
-  ])
-
-  const handleRefresh = async () => {
-    isManualRefresh.current = true
-    await Promise.all([refetchCurrencies(), refetchCrypto(), refetchGold()])
-  }
-
-  // Memoize computed state to prevent unnecessary re-renders
-  const computedState = useMemo(() => ({
-    isRefreshing: currenciesLoading || cryptoLoading || goldLoading,
-    isFetching: currenciesFetching || cryptoFetching || goldFetching,
-    hasAllErrors: currenciesError && cryptoError && goldError,
-    hasStaleData: (currenciesError && currencies) || (cryptoError && crypto) || (goldError && gold),
-    anyError: currenciesError || cryptoError || goldError
-  }), [
-    currenciesLoading, cryptoLoading, goldLoading,
-    currenciesFetching, cryptoFetching, goldFetching,
-    currenciesError, cryptoError, goldError,
-    currencies, crypto, gold
-  ])
-
-  const { isRefreshing, isFetching, hasAllErrors, hasStaleData } = computedState
-
-  // Helper functions for chart integration
-  const getItemData = (itemKey: string, itemType: ItemType) => {
-    switch (itemType) {
-      case 'currency':
-        return currencies?.[itemKey]
-      case 'crypto':
-        return crypto?.[itemKey]
-      case 'gold':
-        return gold?.[itemKey]
-      default:
-        return null
-    }
-  }
-
-  const getItemName = (itemKey: string, itemType: ItemType): string => {
-    const items = itemType === 'currency' ? currencyItems : itemType === 'crypto' ? cryptoItems : goldItems
-    return items.find(item => item.key === itemKey)?.name || itemKey
-  }
-
-  const handleItemClick = (itemKey: string, itemType: ItemType) => {
-    const itemData = getItemData(itemKey, itemType)
+  // Handler for chart click - memoized to prevent unnecessary re-renders
+  const handleItemClick = useCallback((itemKey: string, itemType: ItemType) => {
+    const itemData = getItemData(
+      itemKey,
+      itemType,
+      marketData.currencies,
+      marketData.crypto,
+      marketData.gold
+    )
     if (itemData) {
       chartSheet.openChart({
         code: mapItemCodeToApi(itemKey),
@@ -274,389 +96,212 @@ export default function Home() {
         change: itemData.change,
       })
     }
-  }
+  }, [marketData.currencies, marketData.crypto, marketData.gold, chartSheet])
 
   return (
     <div className="min-h-screen bg-background-base">
+      {/* Skip to main content link for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent-primary focus:text-white focus:rounded-lg focus:shadow-lg"
+      >
+        انتقال به محتوای اصلی
+      </a>
       <div className="max-w-7xl mx-auto">
-        {/* Main Header - Apple-style clean design */}
-        <div className="bg-bg-elevated border-b border-border-light shadow-sm text-center py-8 sm:py-10 lg:py-12 px-4 sm:px-6 lg:px-8 mb-8 sm:mb-10 lg:mb-12">
-          <div className="flex items-center justify-center gap-4 mb-6" dir="rtl">
-            <h1 className="text-apple-large-title text-text-primary">
-              نرخ ارز، طلا و ارز دیجیتال
-            </h1>
-            <div className="flex items-center gap-2">
-              {/* Mobile View Toggle - Only visible on mobile */}
-              <button
-                onClick={() => setMobileViewMode(prev => prev === 'single' ? 'dual' : 'single')}
-                disabled={currenciesLoading || cryptoLoading || goldLoading}
-                className="md:hidden p-2 rounded-lg bg-bg-elevated hover:bg-bg-secondary border border-border-light transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label={mobileViewMode === 'single' ? 'تبدیل به نمای دو ستونی' : 'تبدیل به نمای تک ستونی'}
-                title={mobileViewMode === 'single' ? 'دو ستونه' : 'یک ستونه'}
-              >
-                {mobileViewMode === 'single' ?
-                  <BsGrid3X2 className="w-5 h-5 text-text-primary" /> :
-                  <FiGrid className="w-5 h-5 text-text-primary" />
-                }
-              </button>
-              <ThemeToggle />
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4" dir="rtl">
-            <Button
-              variant="filled"
-              size="lg"
-              onClick={handleRefresh}
-              disabled={isRefreshing || isFetching}
-              aria-label={isRefreshing ? 'در حال بروزرسانی قیمت‌ها' : 'بروزرسانی قیمت‌ها'}
-              aria-busy={isRefreshing || isFetching}
-            >
-              <HiRefresh className={`text-xl ${isFetching ? 'animate-spin' : ''}`} aria-hidden="true" />
-              {isRefreshing ? 'در حال بروزرسانی...' : isFetching ? 'در حال دریافت...' : 'بروزرسانی'}
-            </Button>
-            <div className="flex items-center gap-2 text-apple-caption text-text-secondary">
-              <span className="relative flex h-3 w-3" aria-hidden="true">
-                {isFetching ? (
-                  <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
-                  </>
-                ) : (
-                  <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-success"></span>
-                  </>
-                )}
-              </span>
-              <FiClock className="text-base" aria-hidden="true" />
-              <p aria-live="polite">
-                آخرین بروزرسانی: {lastUpdated ? (
-                  <time dateTime={lastUpdated.toISOString()}>
-                    {lastUpdated.toLocaleTimeString('fa-IR')}
-                  </time>
-                ) : '--:--:--'}
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Main Header */}
+        <PageHeader
+          mobileViewMode={mobileViewMode}
+          onViewModeChange={setMobileViewMode}
+          onRefresh={handleRefresh}
+          isRefreshing={marketData.isRefreshing}
+          isFetching={marketData.isFetching}
+          lastUpdated={lastUpdated}
+          isLoading={
+            marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading
+          }
+        />
 
-        {/* Success Notification - Shows after successful manual refresh */}
-        {showSuccess && (
-          <div
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-50
-              bg-green-100 dark:bg-green-900/30
-              border border-green-300 dark:border-green-700
-              text-green-800 dark:text-green-200
-              px-4 py-3 rounded-lg shadow-lg
-              flex items-center gap-2
-              animate-success-in"
-            role="status"
-            aria-live="polite"
-            dir="rtl"
-          >
-            <FiCheckCircle className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
-            <span className="text-sm font-medium">داده‌ها با موفقیت به‌روز شد</span>
-          </div>
-        )}
+        {/* Success Notification */}
+        <SuccessNotification
+          show={showSuccess}
+          isStaleData={isStaleData}
+          staleDataTime={staleDataTime}
+        />
 
         {/* ARIA Live Region for Screen Readers */}
         <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {(currenciesFetching || cryptoFetching || goldFetching) && 'در حال بروزرسانی قیمت‌ها...'}
-          {!currenciesFetching && !cryptoFetching && !goldFetching && lastUpdated &&
-            `قیمت‌ها به‌روز شدند. آخرین بروزرسانی: ${new Date(lastUpdated).toLocaleTimeString('fa-IR')}`
-          }
+          {(marketData.currenciesFetching ||
+            marketData.cryptoFetching ||
+            marketData.goldFetching) &&
+            'در حال بروزرسانی قیمت‌ها...'}
+          {!marketData.currenciesFetching &&
+            !marketData.cryptoFetching &&
+            !marketData.goldFetching &&
+            lastUpdated &&
+            `قیمت‌ها به‌روز شدند. آخرین بروزرسانی: ${new Date(lastUpdated).toLocaleTimeString(
+              'fa-IR'
+            )}`}
         </div>
 
         {/* Content Container */}
-        <div className="px-4 sm:px-6 lg:px-8">
+        <div id="main-content" className="px-3 xl:px-4 sm:px-6 lg:px-8">
+          {/* Stale Data Warning Banner - Check if any data is marked as stale by backend */}
+          {(marketData.currencies?._metadata?.isStale ||
+            marketData.crypto?._metadata?.isStale ||
+            marketData.gold?._metadata?.isStale) && (
+            <StaleDataWarning lastUpdated={lastUpdated} onRetry={handleRefresh} />
+          )}
 
-        {/* Stale Data Warning Banner */}
-        {hasStaleData && !hasAllErrors && (
-          <div className="bg-warning-bg border border-warning-text/30 dark:border-warning-text/50 rounded-[var(--radius-lg)] p-4 mb-6 animate-fade-in" dir="rtl">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="w-5 h-5 text-warning-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-warning-text mb-1">
-                  داده‌ها ممکن است قدیمی باشند
-                </h3>
-                <p className="text-sm text-warning-text">
-                  امکان دریافت آخرین اطلاعات وجود ندارد. داده‌های ذخیره‌شده قبلی نمایش داده می‌شوند.
-                  {lastUpdated && (
-                    <> آخرین بروزرسانی موفق: {lastUpdated.toLocaleTimeString('fa-IR')}</>
-                  )}
-                </p>
-                <button
-                  onClick={handleRefresh}
-                  className="mt-2 text-sm text-warning-text hover:opacity-80 font-medium underline"
-                >
-                  تلاش مجدد برای بروزرسانی
-                </button>
-              </div>
-            </div>
+          {/* Rate Limit Banner - Show when API returns 429 but we have cached data */}
+          {(marketData.currenciesError || marketData.cryptoError || marketData.goldError) &&
+            (marketData.currencies || marketData.crypto || marketData.gold) && (
+            <RateLimitBanner />
+          )}
+
+          {/* Global Error Message - only show if no cached data at all */}
+          {marketData.hasAllErrors &&
+            !marketData.currencies &&
+            !marketData.crypto &&
+            !marketData.gold && <GlobalErrorDisplay onRetry={handleRefresh} />}
+
+          <div className="space-y-8 sm:space-y-10 lg:space-y-12">
+            {/* SECTION 1: Currencies */}
+            <DataSection
+              title="ارزها"
+              headingId="currencies-heading"
+              icon={FaDollarSign}
+              items={currencyItems}
+              data={marketData.currencies}
+              isLoading={marketData.currenciesLoading}
+              error={marketData.currenciesError}
+              itemType="currency"
+              accentColor="blue"
+              viewMode={mobileViewMode}
+              onItemClick={(key) => handleItemClick(key, 'currency')}
+              onRetry={marketData.refetchCurrencies}
+              errorTitle="خطا در دریافت اطلاعات ارزها"
+              boundaryName="CurrenciesGrid"
+            />
+
+            {/* SECTION 2: Cryptocurrencies */}
+            <DataSection
+              title="ارزهای دیجیتال"
+              headingId="crypto-heading"
+              icon={FaBitcoin}
+              items={cryptoItems}
+              data={marketData.crypto}
+              isLoading={marketData.cryptoLoading}
+              error={marketData.cryptoError}
+              itemType="crypto"
+              accentColor="purple"
+              viewMode={mobileViewMode}
+              onItemClick={(key) => handleItemClick(key, 'crypto')}
+              onRetry={marketData.refetchCrypto}
+              errorTitle="خطا در دریافت اطلاعات ارزهای دیجیتال"
+              boundaryName="CryptoGrid"
+            />
+
+            {/* SECTION 3: Gold & Coins */}
+            <DataSection
+              title="طلا و سکه"
+              headingId="gold-heading"
+              icon={GiGoldBar}
+              items={goldItems}
+              data={marketData.gold}
+              isLoading={marketData.goldLoading}
+              error={marketData.goldError}
+              itemType="gold"
+              accentColor="gold"
+              viewMode={mobileViewMode}
+              onItemClick={(key) => handleItemClick(key, 'gold')}
+              onRetry={marketData.refetchGold}
+              errorTitle="خطا در دریافت اطلاعات طلا و سکه"
+              boundaryName="GoldGrid"
+            />
           </div>
-        )}
 
-        {/* Global Error Message - only show if no cached data at all */}
-        {hasAllErrors && !currencies && !crypto && !gold && (
-          <div className="bg-error-bg border border-error-text/30 dark:border-error-text/50 rounded-[var(--radius-lg)] p-6 mb-6 animate-fade-in" dir="rtl">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-error-text mb-2">خطا در دریافت اطلاعات</h3>
-              <p className="text-error-text mb-4">امکان دریافت اطلاعات از سرور وجود ندارد. لطفاً دوباره تلاش کنید.</p>
-              <button
-                onClick={handleRefresh}
-                className="bg-red-600 dark:bg-red-700 text-white rounded px-6 py-2 hover:bg-red-700 dark:hover:bg-red-800 transition-colors"
-              >
-                تلاش مجدد
-              </button>
-            </div>
+          {/* Footer */}
+          <div
+            className="text-center mt-8 sm:mt-10 lg:mt-12 py-6 border-t border-border-light"
+            dir="rtl"
+          >
+            <p className="text-apple-caption text-text-secondary flex items-center justify-center gap-2">
+              <FiInfo className="text-base" aria-hidden="true" />
+              <span>داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند</span>
+            </p>
           </div>
-        )}
 
-        <div className="space-y-8 sm:space-y-10 lg:space-y-12">
-          {/* SECTION 1: Currencies */}
-          <section
-            className="bg-bg-elevated rounded-[var(--radius-lg)] shadow-sm overflow-hidden animate-fade-in"
-            dir="rtl"
-            lang="fa"
-            aria-labelledby="currencies-heading"
-          >
-            <div className="px-6 py-5 border-b border-border-light">
-              <h2
-                id="currencies-heading"
-                className="text-apple-title text-text-primary text-center flex items-center justify-center gap-2"
-              >
-                <FaDollarSign className="text-2xl text-accent" aria-hidden="true" />
-                ارزها
-              </h2>
-            </div>
-            <div className="p-6">
-
-            {currenciesLoading && !currencies && <ItemCardSkeleton count={5} />}
-
-            {currenciesError && !currencies && (
-              <ErrorDisplay
-                error={currenciesError}
-                onRetry={() => refetchCurrencies()}
-                title="خطا در دریافت اطلاعات ارزها"
-              />
-            )}
-
-            {currencies && (
-              <ErrorBoundary
-                boundaryName="CurrenciesGrid"
-                fallback={(_error, reset) => (
-                  <div className="p-4 text-center text-text-secondary" dir="rtl" role="alert" aria-live="assertive">
-                    <p className="mb-2">خطا در نمایش اطلاعات ارزها.</p>
-                    <button
-                      onClick={reset}
-                      className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors text-sm"
-                    >
-                      تلاش مجدد
-                    </button>
-                  </div>
-                )}
-              >
-                <ItemCardGrid
-                  items={currencyItems}
-                  data={currencies}
-                  accentColor="blue"
-                  viewMode={mobileViewMode}
-                  onItemClick={(key) => handleItemClick(key, 'currency')}
-                />
-              </ErrorBoundary>
-            )}
-            </div>
-          </section>
-
-          {/* SECTION 2: Cryptocurrencies */}
-          <section
-            className="bg-bg-elevated rounded-[var(--radius-lg)] shadow-sm overflow-hidden animate-fade-in"
-            dir="rtl"
-            lang="fa"
-            aria-labelledby="crypto-heading"
-          >
-            <div className="px-6 py-5 border-b border-border-light">
-              <h2
-                id="crypto-heading"
-                className="text-apple-title text-text-primary text-center flex items-center justify-center gap-2"
-              >
-                <FaBitcoin className="text-2xl text-accent" aria-hidden="true" />
-                ارزهای دیجیتال
-              </h2>
-            </div>
-            <div className="p-6">
-
-            {cryptoLoading && !crypto && <ItemCardSkeleton count={3} />}
-
-            {cryptoError && !crypto && (
-              <ErrorDisplay
-                error={cryptoError}
-                onRetry={() => refetchCrypto()}
-                title="خطا در دریافت اطلاعات ارزهای دیجیتال"
-              />
-            )}
-
-            {crypto && (
-              <ErrorBoundary
-                boundaryName="CryptoGrid"
-                fallback={(_error, reset) => (
-                  <div className="p-4 text-center text-text-secondary" dir="rtl" role="alert" aria-live="assertive">
-                    <p className="mb-2">خطا در نمایش اطلاعات ارزهای دیجیتال.</p>
-                    <button
-                      onClick={reset}
-                      className="bg-purple-600 dark:bg-purple-700 text-white px-4 py-2 rounded hover:bg-purple-700 dark:hover:bg-purple-800 transition-colors text-sm"
-                    >
-                      تلاش مجدد
-                    </button>
-                  </div>
-                )}
-              >
-                <ItemCardGrid
-                  items={cryptoItems}
-                  data={crypto}
-                  accentColor="purple"
-                  viewMode={mobileViewMode}
-                  onItemClick={(key) => handleItemClick(key, 'crypto')}
-                />
-              </ErrorBoundary>
-            )}
-            </div>
-          </section>
-
-          {/* SECTION 3: Gold & Coins */}
-          <section
-            className="bg-bg-elevated rounded-[var(--radius-lg)] shadow-sm overflow-hidden animate-fade-in"
-            dir="rtl"
-            lang="fa"
-            aria-labelledby="gold-heading"
-          >
-            <div className="px-6 py-5 border-b border-border-light">
-              <h2
-                id="gold-heading"
-                className="text-apple-title text-text-primary text-center flex items-center justify-center gap-2"
-              >
-                <GiGoldBar className="text-2xl text-accent" aria-hidden="true" />
-                طلا و سکه
-              </h2>
-            </div>
-            <div className="p-6">
-
-            {goldLoading && !gold && <ItemCardSkeleton count={6} />}
-
-            {goldError && !gold && (
-              <ErrorDisplay
-                error={goldError}
-                onRetry={() => refetchGold()}
-                title="خطا در دریافت اطلاعات طلا و سکه"
-              />
-            )}
-
-            {gold && (
-              <ErrorBoundary
-                boundaryName="GoldGrid"
-                fallback={(_error, reset) => (
-                  <div className="p-4 text-center text-text-secondary" dir="rtl" role="alert" aria-live="assertive">
-                    <p className="mb-2">خطا در نمایش اطلاعات طلا و سکه.</p>
-                    <button
-                      onClick={reset}
-                      className="bg-gold-400 dark:bg-gold-700 text-white px-4 py-2 rounded hover:bg-gold-700 dark:hover:bg-gold-800 transition-colors text-sm"
-                    >
-                      تلاش مجدد
-                    </button>
-                  </div>
-                )}
-              >
-                <ItemCardGrid
-                  items={goldItems}
-                  data={gold}
-                  accentColor="gold"
-                  viewMode={mobileViewMode}
-                  onItemClick={(key) => handleItemClick(key, 'gold')}
-                />
-              </ErrorBoundary>
-            )}
-            </div>
-          </section>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-8 sm:mt-10 lg:mt-12 py-6 border-t border-border-light" dir="rtl">
-          <p className="text-apple-caption text-text-secondary flex items-center justify-center gap-2">
-            <FiInfo className="text-base" aria-hidden="true" />
-            <span>داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند</span>
-          </p>
-        </div>
-
-        {/* Chart Bottom Sheet - Lazy loaded for performance */}
-        <ErrorBoundary
-          boundaryName="ChartLazyLoad"
-          fallback={(error, reset) => (
-            // Only show error UI if chart is open
-            chartSheet.isOpen ? (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-                onClick={chartSheet.closeChart}
-              >
+          {/* Chart Bottom Sheet - Lazy loaded for performance */}
+          <ErrorBoundary
+            boundaryName="ChartLazyLoad"
+            fallback={(_error, reset) =>
+              // Only show error UI if chart is open
+              chartSheet.isOpen ? (
                 <div
-                  className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
-                  onClick={(e) => e.stopPropagation()}
-                  dir="rtl"
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                  onClick={chartSheet.closeChart}
                 >
-                  <div className="text-center">
-                    <div className="mb-4 text-red-500 text-5xl">⚠️</div>
-                    <h3 className="text-lg font-semibold text-error-text mb-2">
-                      خطا در بارگذاری نمودار
-                    </h3>
-                    <p className="text-text-secondary mb-4 text-sm">
-                      امکان بارگذاری نمودار وجود ندارد. لطفاً اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.
-                    </p>
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={() => {
-                          reset()
-                          window.location.reload()
-                        }}
-                        className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      >
-                        تلاش مجدد
-                      </button>
-                      <button
-                        onClick={chartSheet.closeChart}
-                        className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                      >
-                        بستن
-                      </button>
+                  <div
+                    className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
+                    onClick={(e) => e.stopPropagation()}
+                    dir="rtl"
+                  >
+                    <div className="text-center">
+                      <div className="mb-4 text-red-500 text-5xl">⚠️</div>
+                      <h3 className="text-lg font-semibold text-error-text mb-2">
+                        خطا در بارگذاری نمودار
+                      </h3>
+                      <p className="text-text-secondary mb-4 text-sm">
+                        امکان بارگذاری نمودار وجود ندارد. لطفاً اتصال اینترنت خود را بررسی کنید
+                        و دوباره تلاش کنید.
+                      </p>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => {
+                            reset()
+                            window.location.reload()
+                          }}
+                          className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        >
+                          تلاش مجدد
+                        </button>
+                        <button
+                          onClick={chartSheet.closeChart}
+                          className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        >
+                          بستن
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : null
-          )}
-        >
-          <Suspense fallback={
-            // Only show loading UI if chart is open
-            chartSheet.isOpen ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                <div className="bg-surface rounded-lg p-6 shadow-xl">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-text-primary text-sm" dir="rtl">در حال بارگذاری نمودار...</p>
+              ) : null
+            }
+          >
+            <Suspense
+              fallback={
+                // Only show loading UI if chart is open
+                chartSheet.isOpen ? (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="bg-surface rounded-lg p-6 shadow-xl">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-text-primary text-sm" dir="rtl">
+                          در حال بارگذاری نمودار...
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ) : null
-          }>
-            <ChartBottomSheet
-              isOpen={chartSheet.isOpen}
-              onClose={chartSheet.closeChart}
-              item={chartSheet.selectedItem}
-            />
-          </Suspense>
-        </ErrorBoundary>
+                ) : null
+              }
+            >
+              <ChartBottomSheet
+                isOpen={chartSheet.isOpen}
+                onClose={chartSheet.closeChart}
+                item={chartSheet.selectedItem}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </div>
     </div>

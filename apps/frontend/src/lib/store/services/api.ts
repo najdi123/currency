@@ -14,7 +14,7 @@ import {
   type RtkQueryError,
 } from '@/types/errors'
 import { logApiError, addBreadcrumb, logPerformance } from '@/lib/errorLogger'
-import type { ChartResponse, ChartQueryParams } from '@/types/chart'
+import type { ChartResponse, ChartQueryParams, HistoricalPriceResponse } from '@/types/chart'
 
 // TypeScript interfaces for API responses
 export interface RateItem {
@@ -24,16 +24,30 @@ export interface RateItem {
   date: string
 }
 
-export interface CurrenciesResponse {
-  [key: string]: RateItem
+export interface ApiResponseMetadata {
+  isFresh: boolean
+  isStale: boolean
+  dataAge?: number // Age in minutes
+  lastUpdated: Date | string
+  source: 'cache' | 'api' | 'fallback'
+  warning?: string
 }
 
-export interface CryptoResponse {
-  [key: string]: RateItem
+export interface ApiResponse<T> {
+  data: T
+  metadata: ApiResponseMetadata
 }
 
-export interface GoldResponse {
-  [key: string]: RateItem
+export type CurrenciesResponse = Record<string, RateItem> & {
+  _metadata?: ApiResponseMetadata
+}
+
+export type CryptoResponse = Record<string, RateItem> & {
+  _metadata?: ApiResponseMetadata
+}
+
+export type GoldResponse = Record<string, RateItem> & {
+  _metadata?: ApiResponseMetadata
 }
 
 export interface LatestRatesResponse {
@@ -159,14 +173,16 @@ const baseQueryWithInterceptor: BaseQueryFn<
 }
 
 // Add retry logic with exponential backoff
+// Reduced retries to prevent error loops when rate-limited
 const baseQueryWithRetry = retry(
   async (args: string | FetchArgs, api, extraOptions) => {
     const result = await baseQueryWithInterceptor(args, api, extraOptions)
 
-    // Don't retry on client errors (4xx) except 429 (rate limit)
+    // Don't retry on any client errors (4xx) including 429 (rate limit)
+    // This prevents retry loops when API quota is exhausted
     if (result.error) {
       const status = result.error.status
-      if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) {
+      if (typeof status === 'number' && status >= 400 && status < 500) {
         retry.fail(result.error)
       }
     }
@@ -174,7 +190,7 @@ const baseQueryWithRetry = retry(
     return result
   },
   {
-    maxRetries: 3,
+    maxRetries: 1, // Reduced from 3 to prevent excessive retries when rate-limited
   }
 )
 
@@ -182,11 +198,12 @@ const baseQueryWithRetry = retry(
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithRetry,
-  tagTypes: ['Rates', 'ChartData'],
+  tagTypes: ['Rates', 'ChartData', 'History'],
   // Configure RTK Query behavior for stale data handling
-  refetchOnFocus: true, // Refetch when window gains focus
+  // Disable refetch on focus to prevent excessive API calls when rate-limited
+  refetchOnFocus: false, // Don't refetch when window gains focus (prevents 429 errors)
   refetchOnReconnect: true, // Refetch when network reconnects
-  refetchOnMountOrArgChange: 60, // Refetch if data is older than 60 seconds
+  refetchOnMountOrArgChange: false, // Don't auto-refetch, rely on manual refresh
   // Keep unused data for 20 minutes - allows showing stale data when refetch fails
   keepUnusedDataFor: 1200, // 20 minutes in seconds
   endpoints: (builder) => ({
@@ -197,20 +214,47 @@ export const api = createApi({
       // This allows showing stale data when network fails
       keepUnusedDataFor: 1200, // 20 minutes in seconds
     }),
-    getCurrencies: builder.query<CurrenciesResponse, void>({
+    getCurrencies: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/currencies',
       providesTags: ['Rates'],
       keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        // Backend sends: { ...currencyData, _metadata: {...} }
+        // Just return as-is, _metadata is already at root level
+        console.log('[RTK Query] Currencies response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Metadata:', response._metadata)
+        }
+        return response as CurrenciesResponse & { _metadata?: ApiResponseMetadata }
+      },
     }),
-    getCrypto: builder.query<CryptoResponse, void>({
+    getCrypto: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/crypto',
       providesTags: ['Rates'],
       keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        // Backend sends: { ...cryptoData, _metadata: {...} }
+        // Just return as-is, _metadata is already at root level
+        console.log('[RTK Query] Crypto response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Metadata:', response._metadata)
+        }
+        return response as CryptoResponse & { _metadata?: ApiResponseMetadata }
+      },
     }),
-    getGold: builder.query<GoldResponse, void>({
+    getGold: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/gold',
       providesTags: ['Rates'],
       keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        // Backend sends: { ...goldData, _metadata: {...} }
+        // Just return as-is, _metadata is already at root level
+        console.log('[RTK Query] Gold response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Metadata:', response._metadata)
+        }
+        return response as GoldResponse & { _metadata?: ApiResponseMetadata }
+      },
     }),
     getChartData: builder.query<ChartResponse, ChartQueryParams>({
       query: ({ itemCode, timeRange, itemType }) => ({
@@ -222,6 +266,28 @@ export const api = createApi({
       ],
       keepUnusedDataFor: 600,
     }),
+    // Historical data endpoints for sparklines (7-day data)
+    getCurrencyHistory: builder.query<HistoricalPriceResponse, { code: string }>({
+      query: ({ code }) => `/currencies/code/${code}/history?days=7`,
+      providesTags: (result, error, { code }) => [
+        { type: 'History' as const, id: `currency-${code}` }
+      ],
+      keepUnusedDataFor: 1200, // 20 minutes cache
+    }),
+    getDigitalCurrencyHistory: builder.query<HistoricalPriceResponse, { symbol: string }>({
+      query: ({ symbol }) => `/digital-currencies/symbol/${symbol}/history?days=7`,
+      providesTags: (result, error, { symbol }) => [
+        { type: 'History' as const, id: `crypto-${symbol}` }
+      ],
+      keepUnusedDataFor: 1200,
+    }),
+    getGoldHistory: builder.query<HistoricalPriceResponse, { code: string }>({
+      query: ({ code }) => `/gold/code/${code}/history?days=7`,
+      providesTags: (result, error, { code }) => [
+        { type: 'History' as const, id: `gold-${code}` }
+      ],
+      keepUnusedDataFor: 1200,
+    }),
   }),
 })
 
@@ -232,6 +298,9 @@ export const {
   useGetCryptoQuery,
   useGetGoldQuery,
   useGetChartDataQuery,
+  useGetCurrencyHistoryQuery,
+  useGetDigitalCurrencyHistoryQuery,
+  useGetGoldHistoryQuery,
 } = api
 
 // Re-export typed error utilities for component use

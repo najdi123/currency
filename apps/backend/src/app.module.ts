@@ -9,6 +9,7 @@ import { GoldModule } from './gold/gold.module';
 import { NavasanModule } from './navasan/navasan.module';
 import { ChartModule } from './chart/chart.module';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -74,6 +75,9 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
       },
       inject: [ConfigService],
     }),
+
+    // Global modules
+    MetricsModule, // Global module for metrics tracking
 
     // Feature modules
     CurrenciesModule,
