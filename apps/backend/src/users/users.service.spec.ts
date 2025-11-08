@@ -401,10 +401,10 @@ describe('UsersService', () => {
 
       const result = await service.list(1, 10);
 
-      expect(result.items).toHaveLength(2);
-      expect(result.total).toBe(2);
-      expect(result.page).toBe(1);
-      expect(result.pageSize).toBe(10);
+      expect(result.users).toHaveLength(2);
+      expect(result.pagination.total).toBe(2);
+      expect(result.pagination.page).toBe(1);
+      expect(result.pagination.pageSize).toBe(10);
     });
 
     it('should exclude password hashes', async () => {
@@ -427,7 +427,7 @@ describe('UsersService', () => {
       const result = await service.list(1, 10);
 
       expect(mockQuery.select).toHaveBeenCalledWith('-passwordHash');
-      result.items.forEach(user => {
+      result.users.forEach((user: any) => {
         expect(user.passwordHash).toBeUndefined();
       });
     });
@@ -449,7 +449,7 @@ describe('UsersService', () => {
 
       const result = await service.list(1, 10);
 
-      expect(result.total).toBe(50);
+      expect(result.pagination.total).toBe(50);
     });
 
     it('should respect pagination parameters', async () => {

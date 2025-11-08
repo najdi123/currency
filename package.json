@@ -12,7 +12,16 @@
     "backend:build": "npm run build --workspace=apps/backend",
     "backend:start": "npm run start:prod --workspace=apps/backend"
   },
-  "keywords": ["currency", "toman", "cryptocurrency", "gold", "exchange-rate"],
+  "keywords": [
+    "currency",
+    "toman",
+    "cryptocurrency",
+    "gold",
+    "exchange-rate"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@nestjs/throttler": "^6.4.0"
+  }
 }
