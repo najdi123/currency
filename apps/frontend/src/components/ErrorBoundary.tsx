@@ -129,7 +129,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       // Default fallback UI
       return (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 my-4" dir="rtl">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 my-4" >
           <div className="flex items-start gap-3">
             {/* Error Icon */}
             <div className="flex-shrink-0">

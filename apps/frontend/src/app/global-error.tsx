@@ -44,7 +44,7 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <html lang="fa" dir="rtl">
+    <html lang="fa" >
       <body>
         <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl p-8 max-w-lg w-full text-center">

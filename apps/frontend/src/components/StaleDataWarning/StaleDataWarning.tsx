@@ -1,13 +1,18 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 interface StaleDataWarningProps {
   lastUpdated: Date | null
   onRetry: () => void
 }
 
 export const StaleDataWarning = ({ lastUpdated, onRetry }: StaleDataWarningProps) => {
+  const t = useTranslations('Notifications');
   return (
     <div
       className="bg-warning-bg border border-warning-text/30 dark:border-warning-text/50 rounded-[var(--radius-lg)] p-4 mb-6 animate-fade-in"
-      dir="rtl"
+      
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
@@ -28,19 +33,19 @@ export const StaleDataWarning = ({ lastUpdated, onRetry }: StaleDataWarningProps
         </div>
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-warning-text mb-1">
-            داده‌ها ممکن است قدیمی باشند
+            {t('staleWarning.title')}
           </h3>
           <p className="text-sm text-warning-text">
-            امکان دریافت آخرین اطلاعات وجود ندارد. داده‌های ذخیره‌شده قبلی نمایش داده می‌شوند.
+            {t('staleWarning.message')}
             {lastUpdated && (
-              <> آخرین بروزرسانی موفق: {lastUpdated.toLocaleTimeString('fa-IR')}</>
+              <> {t('staleWarning.lastUpdate', { time: lastUpdated.toLocaleTimeString('fa-IR') })}</>
             )}
           </p>
           <button
             onClick={onRetry}
             className="mt-2 text-sm text-warning-text hover:opacity-80 font-medium underline focus:outline-none focus:ring-2 focus:ring-warning-text focus:ring-offset-2 rounded"
           >
-            تلاش مجدد برای بروزرسانی
+            {t('staleWarning.retry')}
           </button>
         </div>
       </div>

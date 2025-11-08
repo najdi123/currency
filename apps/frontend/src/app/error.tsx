@@ -45,7 +45,7 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4" dir="rtl">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4" >
       <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
         {/* Error Icon */}
         <div className="mb-6 text-center">

@@ -16,6 +16,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   useNetworkStatus,
   getQualityText,
@@ -87,39 +88,51 @@ function getBannerMessage(
   quality: ConnectionQuality,
   isOnline: boolean,
   connectionType?: string,
-  wasOffline?: boolean
+  wasOffline?: boolean,
+  t?: (key: string, params?: any) => string
 ): { title: string; subtitle?: string } {
+  if (!t) {
+    // Fallback for when t is not provided
+    if (!isOnline || quality === 'offline') {
+      return {
+        title: 'You are offline',
+        subtitle: 'Please check your internet connection',
+      }
+    }
+    return { title: 'Connected', subtitle: 'Internet connection established' }
+  }
+
   if (!isOnline || quality === 'offline') {
     return {
-      title: 'شما آفلاین هستید',
-      subtitle: 'لطفاً اتصال اینترنت خود را بررسی کنید',
+      title: t('offlineTitle'),
+      subtitle: t('offlineSubtitle'),
     }
   }
 
   if (wasOffline) {
     return {
-      title: 'اتصال برقرار شد',
-      subtitle: connectionType ? `نوع اتصال: ${connectionType}` : 'به اینترنت متصل شدید',
+      title: t('onlineTitle'),
+      subtitle: connectionType ? `${t('connectionType')} ${connectionType}` : t('onlineSubtitle'),
     }
   }
 
   if (quality === 'poor') {
     return {
-      title: 'اتصال ضعیف',
-      subtitle: 'سرعت اینترنت شما کند است',
+      title: t('poorConnectionTitle'),
+      subtitle: t('poorConnectionSubtitle'),
     }
   }
 
   if (quality === 'fair') {
     return {
-      title: 'کیفیت اتصال متوسط',
-      subtitle: 'ممکن است برخی از عملیات کند باشند',
+      title: t('fairConnectionTitle'),
+      subtitle: t('fairConnectionSubtitle'),
     }
   }
 
   return {
-    title: 'اتصال برقرار شد',
-    subtitle: `کیفیت اتصال: ${getQualityText(quality)}`,
+    title: t('onlineTitle'),
+    subtitle: `${t('connectionQuality')} ${getQualityText(quality)}`,
   }
 }
 
@@ -133,6 +146,8 @@ export function OfflineBanner({
   autoHideDelay = 3000,
   className = '',
 }: OfflineBannerProps) {
+  const t = useTranslations('Notifications')
+  const tCommon = useTranslations('Common')
   const { isOnline, quality, connectionType } = useNetworkStatus()
   const [isVisible, setIsVisible] = useState(false)
   const [wasOffline, setWasOffline] = useState(false)
@@ -217,7 +232,7 @@ export function OfflineBanner({
   if (!isVisible) return null
 
   const style = getBannerStyle(quality)
-  const message = getBannerMessage(quality, isOnline, getConnectionTypeText(connectionType), wasOffline)
+  const message = getBannerMessage(quality, isOnline, getConnectionTypeText(connectionType), wasOffline, t)
 
   return (
     <div
@@ -230,7 +245,7 @@ export function OfflineBanner({
           isClosing ? 'transform -translate-y-full opacity-0' : 'transform translate-y-0 opacity-100 animate-slide-down'
         }`}
       >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3" dir="rtl">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3" >
           <div className="flex items-center justify-between gap-4">
             {/* Icon and Message */}
             <div className="flex items-center gap-3 flex-1">
@@ -257,7 +272,7 @@ export function OfflineBanner({
               <button
                 onClick={handleClose}
                 className="flex-shrink-0 p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-apple-fast active-scale-apple focus:outline-none focus:ring-2 focus:ring-current focus:ring-offset-2"
-                aria-label="بستن"
+                aria-label={tCommon('close')}
                 type="button"
               >
                 <svg
@@ -286,6 +301,7 @@ export function OfflineBanner({
  * Minimal Offline Indicator (for bottom-right corner)
  */
 export function OfflineIndicator() {
+  const t = useTranslations('Notifications')
   const { isOnline, quality } = useNetworkStatus()
   const [isVisible, setIsVisible] = useState(false)
 
@@ -301,7 +317,7 @@ export function OfflineIndicator() {
     <div
       className="fixed bottom-4 right-4 z-40 animate-pulse"
       role="status"
-      aria-label={isOnline ? 'اتصال ضعیف' : 'آفلاین'}
+      aria-label={isOnline ? t('weakConnection') : t('offlineIndicator')}
     >
       <div
         className={`${style.bg} ${style.text} rounded-full shadow-lg px-4 py-2 flex items-center gap-2 text-sm font-medium`}
@@ -309,7 +325,7 @@ export function OfflineIndicator() {
         <span className="text-lg" aria-hidden="true">
           {style.icon}
         </span>
-        <span>{isOnline ? 'اتصال ضعیف' : 'آفلاین'}</span>
+        <span>{isOnline ? t('weakConnection') : t('offlineIndicator')}</span>
       </div>
     </div>
   )

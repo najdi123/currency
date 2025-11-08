@@ -43,7 +43,7 @@ export const SuccessNotification = ({ show, isStaleData = false, staleDataTime }
           animate-success-in max-w-md"
         role="status"
         aria-live="polite"
-        dir="rtl"
+        
       >
         <FiAlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
         <div className="text-sm">
@@ -68,7 +68,7 @@ export const SuccessNotification = ({ show, isStaleData = false, staleDataTime }
         animate-success-in"
       role="status"
       aria-live="polite"
-      dir="rtl"
+      
     >
       <FiCheckCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
       <span className="text-sm font-medium">داده‌ها با موفقیت به‌روز شد</span>

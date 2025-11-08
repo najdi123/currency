@@ -1,7 +1,11 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { ItemCardGrid } from '@/components/ItemCardGrid'
 import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
+import { DataFreshnessIndicator } from '@/components/DataFreshnessIndicator'
 import type { IconType } from 'react-icons'
 import type { ViewMode } from '@/lib/hooks/useViewModePreference'
 import type { ItemType } from '@/types/chart'
@@ -22,6 +26,7 @@ interface DataSectionProps {
   onRetry: () => void
   errorTitle: string
   boundaryName: string
+  isRefreshing?: boolean
 }
 
 export const DataSection = ({
@@ -39,24 +44,44 @@ export const DataSection = ({
   onRetry,
   errorTitle,
   boundaryName,
+  isRefreshing = false,
 }: DataSectionProps) => {
+  const t = useTranslations('DataSection')
   const skeletonCount = items.length
+
+  // Extract metadata if available
+  const metadata = data?._metadata
+  const lastUpdated = metadata?.lastUpdated
+
+  // Wrap onRetry to return a Promise
+  const handleRefresh = async () => {
+    await onRetry()
+  }
 
   return (
     <section
       className=" overflow-hidden mb-0"
-      dir="rtl"
-      lang="fa"
       aria-labelledby={headingId}
     >
       <div className=" pt-5">
-        <h2
-          id={headingId}
-          className="text-apple-title text-text-primary text-center flex items-center justify-center gap-2"
-        >
-          <Icon className="text-2xl text-accent" aria-hidden="true" />
-          {title}
-        </h2>
+        <div className="flex flex-col items-center gap-2">
+          <h2
+            id={headingId}
+            className="text-apple-title text-text-primary text-center flex items-center justify-center gap-2"
+          >
+            <Icon className="text-2xl text-accent" aria-hidden="true" />
+            {title}
+          </h2>
+
+          {/* Data Freshness Indicator */}
+          {lastUpdated && data && !isLoading && !error && (
+            <DataFreshnessIndicator
+              lastUpdated={lastUpdated}
+              onRefresh={handleRefresh}
+              isRefreshing={isRefreshing}
+            />
+          )}
+        </div>
       </div>
       <div className="py-6">
         {isLoading && !data && <ItemCardSkeleton count={skeletonCount} />}
@@ -71,11 +96,10 @@ export const DataSection = ({
             fallback={(_error, reset) => (
               <div
                 className="p-4 text-center text-text-secondary"
-                dir="rtl"
                 role="alert"
                 aria-live="assertive"
               >
-                <p className="mb-2">خطا در نمایش اطلاعات {title}.</p>
+                <p className="mb-2">{t('error', { section: title })}</p>
                 <button
                   onClick={reset}
                   className={`${
@@ -86,7 +110,7 @@ export const DataSection = ({
                       : 'bg-gold-400 dark:bg-gold-700 hover:bg-gold-700 dark:hover:bg-gold-800'
                   } text-white px-4 py-2 rounded transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${accentColor}-400`}
                 >
-                  تلاش مجدد
+                  {t('retry')}
                 </button>
               </div>
             )}

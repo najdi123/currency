@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { formatToman, formatChange } from '@/lib/utils/formatters'
 import { FiArrowUp, FiArrowDown } from 'react-icons/fi'
 
@@ -13,10 +14,11 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
   currentPrice,
   priceChange,
 }) => {
+  const t = useTranslations('Chart')
   const isPositive = priceChange >= 0
 
   return (
-    <div className="border-b border-border-light px-6 py-4 bg-bg-elevated flex flex-col items-center" dir="rtl">
+    <div className="border-b border-border-light px-6 py-4 bg-bg-elevated flex flex-col items-center" >
       <h2 className="text-apple-title text-text-primary text-right mb-2">
         {itemName}
       </h2>
@@ -24,7 +26,7 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
         <div className="flex items-center gap-3">
           <p className="text-apple-headline font-mono text-text-primary tabular-nums">
             {formatToman(currentPrice)}{' '}
-            <span className="text-sm font-normal text-text-secondary">تومان</span>
+            <span className="text-sm font-normal text-text-secondary">{t('toman')}</span>
           </p>
           <div
             className={`

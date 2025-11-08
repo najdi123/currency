@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Drawer } from 'vaul'
 import type { SelectedChartItem, TimeRange } from '@/types/chart'
 import { ChartHeader } from './Chart/ChartHeader'
@@ -19,6 +20,7 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
   onClose,
   item,
 }) => {
+  const t = useTranslations('Chart')
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('1w')
   const [shouldLoadChart, setShouldLoadChart] = useState(false)
 
@@ -65,7 +67,7 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
         />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 flex flex-col  bg-bg-elevated border-t border-border-light shadow-xl z-50 max-h-[95vh] animate-slide-up"
-          aria-label="نمودار قیمت"
+          aria-label={t('priceChart')}
         >
           {/* Drag Handle */}
           <div
@@ -75,14 +77,14 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
 
           {/* Accessible Title (required for screen readers) */}
           <Drawer.Title className="sr-only">
-            نمودار قیمت {item.name}
+            {t('priceChart')} {item.name}
           </Drawer.Title>
 
           {/* Close Button */}
           <button
             onClick={onClose}
             className="absolute top-4 left-4 p-2 rounded-full bg-accent-primary-subtle text-accent transition-apple-fast active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-10"
-            aria-label="بستن نمودار"
+            aria-label={t('closeChart')}
           >
             <HiX className="text-xl" />
           </button>

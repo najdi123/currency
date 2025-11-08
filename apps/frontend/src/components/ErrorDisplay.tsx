@@ -85,7 +85,7 @@ export function ErrorDisplay({
   return (
     <div
       className={`bg-bg-elevated border border-border-light rounded-[var(--radius-lg)] ${compact ? 'p-4' : 'p-6'} ${className} animate-fade-in`}
-      dir="rtl"
+      
       role="alert"
     >
       <div className="flex items-start gap-3">
@@ -265,7 +265,7 @@ export function SimpleErrorMessage({ error }: { error: unknown }) {
   const errorMessage = getUserErrorMessage(error)
 
   return (
-    <div className="text-error text-apple-caption" dir="rtl">
+    <div className="text-error text-apple-caption" >
       {errorMessage.title}
     </div>
   )

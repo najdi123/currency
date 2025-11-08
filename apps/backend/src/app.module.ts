@@ -1,6 +1,8 @@
 import { Module, Logger, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CurrenciesModule } from './currencies/currencies.module';
@@ -11,6 +13,9 @@ import { ChartModule } from './chart/chart.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { WalletsModule } from './wallets/wallets.module';
+import { AuthModule } from './auth/auth.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -76,8 +81,17 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
       inject: [ConfigService],
     }),
 
+    // Throttler for rate limiting
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds
+        limit: 100, // 100 requests per minute (default)
+      },
+    ]),
+
     // Global modules
     MetricsModule, // Global module for metrics tracking
+    CommonModule, // Global module for common services (audit, etc.)
 
     // Feature modules
     CurrenciesModule,
@@ -86,9 +100,17 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     NavasanModule,
     ChartModule,
     HealthModule,
+     WalletsModule,
+     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

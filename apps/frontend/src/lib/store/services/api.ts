@@ -4,11 +4,7 @@ import { config } from '@/lib/config'
 import {
   getErrorMessage,
   getErrorCode,
-  formatError,
   isFetchBaseQueryError,
-  isHttpError,
-  isNetworkError,
-  isConnectionError,
   isServerError,
   isClientError,
   type RtkQueryError,
@@ -54,9 +50,6 @@ export interface LatestRatesResponse {
   [key: string]: RateItem
 }
 
-// Note: Error message mapping is now handled by @/types/errors module
-// This provides type-safe error handling with proper type guards
-
 // Request ID generator for tracing
 let requestIdCounter = 0
 const generateRequestId = (): string => {
@@ -68,15 +61,35 @@ const generateRequestId = (): string => {
 if (!config.apiUrl) {
   throw new Error(
     '❌ API URL is not configured.\n\n' +
-    'Please ensure NEXT_PUBLIC_API_URL is set in your .env.local file.\n' +
-    'Example: NEXT_PUBLIC_API_URL=http://localhost:4000/api'
+      'Please ensure NEXT_PUBLIC_API_URL is set in your .env.local file.\n' +
+      'Example: NEXT_PUBLIC_API_URL=http://localhost:4000/api'
   )
 }
 
-// Base query with timeout
+// Base query with timeout + headers + no-cache + (optional) auth/cookies
 const baseQuery = fetchBaseQuery({
   baseUrl: config.apiUrl,
-  timeout: 30000, // 30 seconds timeout
+  timeout: 30000, // 30s
+  // If you use cookie-based auth to your API, switch to 'include'
+  credentials: 'omit', // 'include' | 'same-origin' | 'omit'
+  prepareHeaders: (headers, { type }) => {
+    // Accept JSON by default
+    if (!headers.has('accept')) headers.set('accept', 'application/json')
+    // Only set content-type when we're actually sending a JSON body
+    if (type === 'mutation' && !headers.has('content-type')) {
+      headers.set('content-type', 'application/json')
+    }
+    return headers
+  },
+  // Disable Next.js caching globally for these requests
+  fetchFn: (input, init) => {
+    const initWithNext: RequestInit & { next?: { revalidate?: number } } = {
+      ...init,
+      cache: 'no-store',
+      next: { revalidate: 0 },
+    }
+    return fetch(input as RequestInfo, initWithNext)
+  },
 })
 
 // Custom base query with error interceptor and logging
@@ -102,7 +115,6 @@ const baseQueryWithInterceptor: BaseQueryFn<
     },
   })
 
-  // Log request in development
   if (config.isDevelopment) {
     console.log(`🔵 [${requestId}] API Request:`, {
       endpoint,
@@ -135,7 +147,6 @@ const baseQueryWithInterceptor: BaseQueryFn<
 
   // Handle errors
   if (result.error) {
-    // Add error breadcrumb
     addBreadcrumb({
       category: 'http',
       message: `API Error: ${method} ${endpoint} - ${result.error.status}`,
@@ -149,22 +160,18 @@ const baseQueryWithInterceptor: BaseQueryFn<
       },
     })
 
-    // Log to error monitoring service
     logApiError(
       new Error(`API Error: ${getErrorMessage(result.error)}`),
       endpoint,
       method,
-      typeof args === 'object' && 'body' in args ? args.body : undefined,
+      typeof args === 'object' && 'body' in args ? (args as FetchArgs).body : undefined,
       duration
     )
   } else {
     // Log performance for slow requests (> 2 seconds)
     if (duration > 2000) {
       logPerformance(`API Request: ${method} ${endpoint}`, duration, {
-        tags: {
-          endpoint,
-          method,
-        },
+        tags: { endpoint, method },
       })
     }
   }
@@ -179,7 +186,6 @@ const baseQueryWithRetry = retry(
     const result = await baseQueryWithInterceptor(args, api, extraOptions)
 
     // Don't retry on any client errors (4xx) including 429 (rate limit)
-    // This prevents retry loops when API quota is exhausted
     if (result.error) {
       const status = result.error.status
       if (typeof status === 'number' && status >= 400 && status < 500) {
@@ -189,38 +195,30 @@ const baseQueryWithRetry = retry(
 
     return result
   },
-  {
-    maxRetries: 1, // Reduced from 3 to prevent excessive retries when rate-limited
-  }
+  { maxRetries: 1 }
 )
 
 // Create the API
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithRetry,
-  tagTypes: ['Rates', 'ChartData', 'History'],
-  // Configure RTK Query behavior for stale data handling
-  // Disable refetch on focus to prevent excessive API calls when rate-limited
-  refetchOnFocus: false, // Don't refetch when window gains focus (prevents 429 errors)
-  refetchOnReconnect: true, // Refetch when network reconnects
-  refetchOnMountOrArgChange: false, // Don't auto-refetch, rely on manual refresh
-  // Keep unused data for 20 minutes - allows showing stale data when refetch fails
-  keepUnusedDataFor: 1200, // 20 minutes in seconds
+  tagTypes: ['Rates', 'ChartData', 'History', 'Currencies', 'DigitalCurrencies', 'Gold'],
+  // Stale-data handling
+  refetchOnFocus: false,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: false,
+  keepUnusedDataFor: 1200, // 20 minutes
   endpoints: (builder) => ({
     getLatestRates: builder.query<LatestRatesResponse, void>({
       query: () => '/navasan/latest',
       providesTags: ['Rates'],
-      // Keep cached data for 20 minutes even if unused
-      // This allows showing stale data when network fails
-      keepUnusedDataFor: 1200, // 20 minutes in seconds
+      keepUnusedDataFor: 1200,
     }),
     getCurrencies: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/currencies',
-      providesTags: ['Rates'],
+      providesTags: ['Rates', 'Currencies'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: any) => {
-        // Backend sends: { ...currencyData, _metadata: {...} }
-        // Just return as-is, _metadata is already at root level
         console.log('[RTK Query] Currencies response has _metadata:', '_metadata' in response)
         if ('_metadata' in response) {
           console.log('[RTK Query] Metadata:', response._metadata)
@@ -230,11 +228,9 @@ export const api = createApi({
     }),
     getCrypto: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/crypto',
-      providesTags: ['Rates'],
+      providesTags: ['Rates', 'DigitalCurrencies'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: any) => {
-        // Backend sends: { ...cryptoData, _metadata: {...} }
-        // Just return as-is, _metadata is already at root level
         console.log('[RTK Query] Crypto response has _metadata:', '_metadata' in response)
         if ('_metadata' in response) {
           console.log('[RTK Query] Metadata:', response._metadata)
@@ -244,11 +240,9 @@ export const api = createApi({
     }),
     getGold: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/gold',
-      providesTags: ['Rates'],
+      providesTags: ['Rates', 'Gold'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: any) => {
-        // Backend sends: { ...goldData, _metadata: {...} }
-        // Just return as-is, _metadata is already at root level
         console.log('[RTK Query] Gold response has _metadata:', '_metadata' in response)
         if ('_metadata' in response) {
           console.log('[RTK Query] Metadata:', response._metadata)
@@ -262,31 +256,51 @@ export const api = createApi({
         params: { timeRange, itemType },
       }),
       providesTags: (_result, _error, arg) => [
-        { type: 'ChartData' as const, id: `${arg.itemCode}-${arg.timeRange}-${arg.itemType}` }
+        { type: 'ChartData' as const, id: `${arg.itemCode}-${arg.timeRange}-${arg.itemType}` },
       ],
       keepUnusedDataFor: 600,
     }),
     // Historical data endpoints for sparklines (7-day data)
     getCurrencyHistory: builder.query<HistoricalPriceResponse, { code: string }>({
       query: ({ code }) => `/currencies/code/${code}/history?days=7`,
-      providesTags: (result, error, { code }) => [
-        { type: 'History' as const, id: `currency-${code}` }
-      ],
-      keepUnusedDataFor: 1200, // 20 minutes cache
+      providesTags: (_result, _error, { code }) => [{ type: 'History' as const, id: `currency-${code}` }],
+      keepUnusedDataFor: 1200,
     }),
     getDigitalCurrencyHistory: builder.query<HistoricalPriceResponse, { symbol: string }>({
       query: ({ symbol }) => `/digital-currencies/symbol/${symbol}/history?days=7`,
-      providesTags: (result, error, { symbol }) => [
-        { type: 'History' as const, id: `crypto-${symbol}` }
-      ],
+      providesTags: (_result, _error, { symbol }) => [{ type: 'History' as const, id: `crypto-${symbol}` }],
       keepUnusedDataFor: 1200,
     }),
     getGoldHistory: builder.query<HistoricalPriceResponse, { code: string }>({
       query: ({ code }) => `/gold/code/${code}/history?days=7`,
-      providesTags: (result, error, { code }) => [
-        { type: 'History' as const, id: `gold-${code}` }
-      ],
+      providesTags: (_result, _error, { code }) => [{ type: 'History' as const, id: `gold-${code}` }],
       keepUnusedDataFor: 1200,
+    }),
+    // Manual refresh mutations - force fresh data fetch
+    refreshCurrencyData: builder.mutation<void, void>({
+      query: () => ({
+        url: '/navasan/currencies',
+        method: 'GET',
+        // Force bypass cache by adding timestamp
+        params: { _t: Date.now() }
+      }),
+      invalidatesTags: ['Currencies', 'Rates'],
+    }),
+    refreshCryptoData: builder.mutation<void, void>({
+      query: () => ({
+        url: '/navasan/crypto',
+        method: 'GET',
+        params: { _t: Date.now() }
+      }),
+      invalidatesTags: ['DigitalCurrencies', 'Rates'],
+    }),
+    refreshGoldData: builder.mutation<void, void>({
+      query: () => ({
+        url: '/navasan/gold',
+        method: 'GET',
+        params: { _t: Date.now() }
+      }),
+      invalidatesTags: ['Gold', 'Rates'],
     }),
   }),
 })
@@ -301,26 +315,18 @@ export const {
   useGetCurrencyHistoryQuery,
   useGetDigitalCurrencyHistoryQuery,
   useGetGoldHistoryQuery,
+  useRefreshCurrencyDataMutation,
+  useRefreshCryptoDataMutation,
+  useRefreshGoldDataMutation,
 } = api
 
 // Re-export typed error utilities for component use
-// These provide type-safe error handling with proper type guards
 export {
   getErrorMessage as getApiErrorMessage,
   getErrorCode,
-  formatError,
   isFetchBaseQueryError,
-  isHttpError,
-  isNetworkError,
-  isConnectionError,
   isServerError,
   isClientError,
-  isUnauthorizedError,
-  isForbiddenError,
-  isNotFoundError,
-  isRateLimitError,
-  isParsingError,
-  isTimeoutError,
 } from '@/types/errors'
 
 export type { RtkQueryError } from '@/types/errors'

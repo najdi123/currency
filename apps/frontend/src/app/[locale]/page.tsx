@@ -1,6 +1,7 @@
 'use client'
 
 import { lazy, Suspense, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PageHeader } from '@/components/PageHeader'
 import { SuccessNotification } from '@/components/SuccessNotification'
@@ -43,6 +44,8 @@ const ChartBottomSheet = lazy<
 )
 
 export default function Home() {
+  const t = useTranslations('Home')
+
   // Custom hooks for state management
   const { mobileViewMode, setMobileViewMode } = useViewModePreference()
   const marketData = useMarketData()
@@ -105,7 +108,7 @@ export default function Home() {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent-primary focus:text-white focus:rounded-lg focus:shadow-lg"
       >
-        انتقال به محتوای اصلی
+        {t('skipToMain')}
       </a>
       <div className="max-w-7xl mx-auto">
         {/* Main Header */}
@@ -133,14 +136,12 @@ export default function Home() {
           {(marketData.currenciesFetching ||
             marketData.cryptoFetching ||
             marketData.goldFetching) &&
-            'در حال بروزرسانی قیمت‌ها...'}
+            t('aria.updating')}
           {!marketData.currenciesFetching &&
             !marketData.cryptoFetching &&
             !marketData.goldFetching &&
             lastUpdated &&
-            `قیمت‌ها به‌روز شدند. آخرین بروزرسانی: ${new Date(lastUpdated).toLocaleTimeString(
-              'fa-IR'
-            )}`}
+            t('aria.updated', { time: new Date(lastUpdated).toLocaleTimeString('fa-IR') })}
         </div>
 
         {/* Content Container */}
@@ -167,7 +168,7 @@ export default function Home() {
           <div className="space-y-8 sm:space-y-10 lg:space-y-12">
             {/* SECTION 1: Currencies */}
             <DataSection
-              title="ارزها"
+              title={t('sections.currencies')}
               headingId="currencies-heading"
               icon={FaDollarSign}
               items={currencyItems}
@@ -179,13 +180,14 @@ export default function Home() {
               viewMode={mobileViewMode}
               onItemClick={(key) => handleItemClick(key, 'currency')}
               onRetry={marketData.refetchCurrencies}
-              errorTitle="خطا در دریافت اطلاعات ارزها"
+              errorTitle={t('errors.currencies')}
               boundaryName="CurrenciesGrid"
+              isRefreshing={marketData.currenciesFetching}
             />
 
             {/* SECTION 2: Cryptocurrencies */}
             <DataSection
-              title="ارزهای دیجیتال"
+              title={t('sections.crypto')}
               headingId="crypto-heading"
               icon={FaBitcoin}
               items={cryptoItems}
@@ -197,13 +199,14 @@ export default function Home() {
               viewMode={mobileViewMode}
               onItemClick={(key) => handleItemClick(key, 'crypto')}
               onRetry={marketData.refetchCrypto}
-              errorTitle="خطا در دریافت اطلاعات ارزهای دیجیتال"
+              errorTitle={t('errors.crypto')}
               boundaryName="CryptoGrid"
+              isRefreshing={marketData.cryptoFetching}
             />
 
             {/* SECTION 3: Gold & Coins */}
             <DataSection
-              title="طلا و سکه"
+              title={t('sections.gold')}
               headingId="gold-heading"
               icon={GiGoldBar}
               items={goldItems}
@@ -215,19 +218,19 @@ export default function Home() {
               viewMode={mobileViewMode}
               onItemClick={(key) => handleItemClick(key, 'gold')}
               onRetry={marketData.refetchGold}
-              errorTitle="خطا در دریافت اطلاعات طلا و سکه"
+              errorTitle={t('errors.gold')}
               boundaryName="GoldGrid"
+              isRefreshing={marketData.goldFetching}
             />
           </div>
 
           {/* Footer */}
           <div
             className="text-center mt-8 sm:mt-10 lg:mt-12 py-6 border-t border-border-light"
-            dir="rtl"
           >
             <p className="text-apple-caption text-text-secondary flex items-center justify-center gap-2">
               <FiInfo className="text-base" aria-hidden="true" />
-              <span>داده‌ها به‌صورت خودکار هر 5 دقیقه یکبار به‌روزرسانی می‌شوند</span>
+              <span>{t('footer.autoUpdate')}</span>
             </p>
           </div>
 
@@ -244,16 +247,14 @@ export default function Home() {
                   <div
                     className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
                     onClick={(e) => e.stopPropagation()}
-                    dir="rtl"
                   >
                     <div className="text-center">
                       <div className="mb-4 text-red-500 text-5xl">⚠️</div>
                       <h3 className="text-lg font-semibold text-error-text mb-2">
-                        خطا در بارگذاری نمودار
+                        {t('chart.loadError')}
                       </h3>
                       <p className="text-text-secondary mb-4 text-sm">
-                        امکان بارگذاری نمودار وجود ندارد. لطفاً اتصال اینترنت خود را بررسی کنید
-                        و دوباره تلاش کنید.
+                        {t('chart.loadErrorMessage')}
                       </p>
                       <div className="flex gap-2 justify-center">
                         <button
@@ -263,13 +264,13 @@ export default function Home() {
                           }}
                           className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                         >
-                          تلاش مجدد
+                          {t('chart.retry')}
                         </button>
                         <button
                           onClick={chartSheet.closeChart}
                           className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
                         >
-                          بستن
+                          {t('chart.close')}
                         </button>
                       </div>
                     </div>
@@ -286,8 +287,8 @@ export default function Home() {
                     <div className="bg-surface rounded-lg p-6 shadow-xl">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-text-primary text-sm" dir="rtl">
-                          در حال بارگذاری نمودار...
+                        <p className="text-text-primary text-sm">
+                          {t('chart.loading')}
                         </p>
                       </div>
                     </div>
