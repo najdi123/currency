@@ -12,7 +12,7 @@ export class RefreshToken {
   @Prop({ required: true, unique: true, index: true })
   token!: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   expiresAt!: Date;
 
   @Prop({ default: Date.now })
