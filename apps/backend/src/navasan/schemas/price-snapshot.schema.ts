@@ -4,15 +4,15 @@ import { Document } from 'mongoose';
 export type PriceSnapshotDocument = PriceSnapshot & Document;
 
 /**
- * Price Snapshot Schema with TTL
+ * Price Snapshot Schema - PERMANENT STORAGE
  *
- * This schema stores historical records of price data with automatic cleanup.
- * Records are automatically deleted after 90 days to prevent unbounded growth.
- * For long-term historical data, use daily aggregates instead.
+ * This schema stores historical records of price data permanently.
+ * Records are NEVER automatically deleted - they remain forever for historical analysis.
  *
  * Each snapshot represents the state of all items at a specific timestamp.
+ * One snapshot is saved per hour per category (currencies, crypto, gold).
  *
- * TTL: 90 days (7,776,000 seconds)
+ * Storage estimate: ~10-20 MB per month
  */
 @Schema({
   collection: 'price_snapshots',
@@ -54,9 +54,9 @@ export class PriceSnapshot {
 
 export const PriceSnapshotSchema = SchemaFactory.createForClass(PriceSnapshot);
 
-// TTL index - MongoDB will automatically delete documents after 90 days
-// 90 days = 7,776,000 seconds
-PriceSnapshotSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+// PERMANENT STORAGE: No TTL index - records are kept forever
+// If you want to enable automatic deletion after X days, uncomment the line below:
+// PriceSnapshotSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
 
 // Add compound indexes for efficient querying
 PriceSnapshotSchema.index({ category: 1, timestamp: -1 });

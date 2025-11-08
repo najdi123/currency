@@ -16,6 +16,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { WalletsModule } from './wallets/wallets.module';
 import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { CommonModule } from './common/common.module';
     HealthModule,
      WalletsModule,
      AuthModule,
+     SchedulerModule,
   ],
   controllers: [AppController],
   providers: [

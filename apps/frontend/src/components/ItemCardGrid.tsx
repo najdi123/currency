@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import { IconType } from 'react-icons'
 import type { ItemType } from '@/types/chart'
 import { ItemCard, AccentColorVariant } from './ItemCard'
@@ -9,7 +10,6 @@ export interface ItemCardGridProps {
    */
   items: Array<{
     key: string
-    name: string
     icon: IconType
     color: string
   }>
@@ -94,6 +94,8 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   viewMode = 'single',
   onItemClick,
 }) => {
+  const t = useTranslations('Home')
+
   if (!data) {
     return null
   }
@@ -130,7 +132,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             key={item.key}
             id={item.key}
             code={item.key}
-            name={item.name}
+            name={t(`items.${item.key}`)}
             icon={item.icon}
             iconColor={item.color}
             value={itemData.value}

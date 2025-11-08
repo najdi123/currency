@@ -313,7 +313,19 @@
     "connectionType": "نوع الاتصال:",
     "connectionQuality": "جودة الاتصال:",
     "weakConnection": "اتصال ضعيف",
-    "offlineIndicator": "غير متصل"
+    "offlineIndicator": "غير متصل",
+    "staleWarning": {
+      "title": "قد تكون البيانات قديمة",
+      "message": "تعذر جلب أحدث البيانات. عرض البيانات المخزنة مؤقتاً.",
+      "lastUpdate": "آخر تحديث: {time}",
+      "retry": "حاول التحديث مرة أخرى"
+    },
+    "Time": {
+      "now": "الآن",
+      "minutesAgo": "منذ {count} {count, plural, one {دقيقة} other {دقائق}}",
+      "hoursAgo": "منذ {count} {count, plural, one {ساعة} other {ساعات}}",
+      "daysAgo": "منذ {count} {count, plural, one {يوم} other {أيام}}"
+    }
   },
   "Chart": {
     "title": "مخطط الأسعار",
@@ -390,5 +402,41 @@
     "currencyCodeRequired": "لا يمكن أن يكون رمز العملة فارغاً",
     "currencyCodeLength": "يجب أن يكون رمز العملة بين 3 و 10 أحرف",
     "currencyCodeFormat": "يمكن أن يحتوي رمز العملة على أحرف وأرقام وشرطات وشرطات سفلية فقط"
+  },
+  "Home": {
+    "skipToMain": "الانتقال إلى المحتوى الرئيسي",
+    "sections": {
+      "currencies": "العملات",
+      "crypto": "العملات الرقمية",
+      "gold": "الذهب والعملات المعدنية"
+    },
+    "errors": {
+      "currencies": "خطأ في تحميل العملات",
+      "crypto": "خطأ في تحميل العملات الرقمية",
+      "gold": "خطأ في تحميل أسعار الذهب"
+    },
+    "footer": {
+      "autoUpdate": "يتم تحديث البيانات تلقائيًا كل 5 دقائق"
+    },
+    "aria": {
+      "updating": "جارٍ تحديث الأسعار...",
+      "updated": "تم تحديث الأسعار في {time}"
+    },
+    "items": {
+      "usd_sell": "الدولار الأمريكي",
+      "eur": "اليورو",
+      "gbp": "الجنيه الإسترليني",
+      "cad": "الدولار الكندي",
+      "aud": "الدولار الأسترالي",
+      "usdt": "تيثر",
+      "btc": "بيتكوين",
+      "eth": "إيثريوم",
+      "sekkeh": "عملة إمامي",
+      "bahar": "بهار أزادي",
+      "nim": "نصف عملة",
+      "rob": "ربع عملة",
+      "gerami": "عملة جرامي",
+      "18ayar": "ذهب عيار 18"
+    }
   }
 }

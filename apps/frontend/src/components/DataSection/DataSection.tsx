@@ -99,7 +99,7 @@ export const DataSection = ({
                 role="alert"
                 aria-live="assertive"
               >
-                <p className="mb-2">{t('error', { section: title })}</p>
+                <p className="mb-2">{t('errorDisplay', { title: title })}</p>
                 <button
                   onClick={reset}
                   className={`${
@@ -110,7 +110,7 @@ export const DataSection = ({
                       : 'bg-gold-400 dark:bg-gold-700 hover:bg-gold-700 dark:hover:bg-gold-800'
                   } text-white px-4 py-2 rounded transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${accentColor}-400`}
                 >
-                  {t('retry')}
+                  {t('retryButton')}
                 </button>
               </div>
             )}

@@ -25,8 +25,8 @@ export class NavasanService {
 
   // CACHE CONFIGURATION
   private readonly freshCacheMinutes = 5; // Fresh data validity
-  private readonly staleCacheHours = 24; // Keep stale data for fallback
-  private readonly maxStaleAgeHours = 72; // Maximum age before data is too old
+  private readonly staleCacheHours = 168; // 7 days - gives full week buffer when API key expires
+  private readonly maxStaleAgeHours = 168; // Maximum age before data is too old (aligned with stale cache)
   private readonly apiTimeoutMs = 10000; // 10 second timeout
 
   // ERROR TRACKING: Now handled by database cache schema fields
@@ -124,6 +124,49 @@ export class NavasanService {
       data: transformedData as NavasanResponse,
       metadata: response.metadata,
     };
+  }
+
+  /**
+   * Force fetch from API and update all caches
+   * Used by scheduler to proactively cache data
+   * Bypasses fresh cache check and always hits the API
+   *
+   * @param category - Category to fetch ('currencies', 'crypto', or 'gold')
+   * @returns Success status and optional error message
+   */
+  async forceFetchAndCache(
+    category: 'currencies' | 'crypto' | 'gold'
+  ): Promise<{ success: boolean; error?: string }> {
+    this.validateCategory(category);
+    const items = this.items[category];
+
+    try {
+      this.logger.log(`🔄 Force fetching ${category} from API...`);
+
+      const apiResponse = await this.fetchFromApiWithTimeout(items);
+
+      // Save to all three cache tiers
+      await this.saveToFreshCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
+      await this.saveToStaleCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
+      await this.savePriceSnapshot(category, apiResponse.data, apiResponse.metadata);
+
+      this.logger.log(`✅ Force fetch successful for ${category}`);
+      return { success: true };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `❌ Force fetch failed for ${category}: ${errorMessage}`,
+        errorStack
+      );
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
   }
 
   /**

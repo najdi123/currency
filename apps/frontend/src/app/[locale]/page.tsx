@@ -93,13 +93,13 @@ export default function Home() {
     if (itemData) {
       chartSheet.openChart({
         code: mapItemCodeToApi(itemKey),
-        name: getItemName(itemKey, itemType),
+        name: getItemName(itemKey, itemType, t),
         type: itemType,
         price: itemData.value,
         change: itemData.change,
       })
     }
-  }, [marketData.currencies, marketData.crypto, marketData.gold, chartSheet])
+  }, [marketData.currencies, marketData.crypto, marketData.gold, chartSheet, t])
 
   return (
     <div className="min-h-screen bg-background-base">

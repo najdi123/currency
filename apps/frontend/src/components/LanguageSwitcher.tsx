@@ -3,12 +3,18 @@
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
 import { locales } from '@/i18n/request';
+import { FiCheck } from 'react-icons/fi';
 
 const languageNames: Record<string, string> = {
   en: 'English',
   ar: 'العربية',
   fa: 'فارسی',
 };
+
+// cn utility for conditional classes
+const cn = (...classes: (string | boolean | undefined | null)[]) => {
+  return classes.filter((c) => typeof c === 'string' && c.length > 0).join(' ')
+}
 
 export function LanguageSwitcher() {
   const locale = useLocale();
@@ -28,13 +34,17 @@ export function LanguageSwitcher() {
         <button
           key={loc}
           onClick={() => handleChange(loc)}
-          className={`w-full text-right px-4 py-3 rounded-lg border transition-colors ${
+          className={cn(
+            "w-full flex items-center justify-between px-4 py-3.5 rounded-lg border transition-colors",
+            "active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
             locale === loc
               ? 'bg-accent text-white border-accent'
               : 'bg-bg-base hover:bg-bg-secondary border-border-light text-text-primary'
-          }`}
+          )}
+          aria-current={locale === loc ? 'true' : undefined}
         >
-          <span className="font-medium">{languageNames[loc]}</span>
+          <span className="font-medium text-apple-body">{languageNames[loc]}</span>
+          {locale === loc && <FiCheck className="w-5 h-5" aria-hidden="true" />}
         </button>
       ))}
     </div>

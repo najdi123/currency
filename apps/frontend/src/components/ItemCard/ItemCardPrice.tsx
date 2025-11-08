@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { formatToman } from '@/lib/utils/formatters'
 
 interface ItemCardPriceProps {
@@ -14,12 +15,12 @@ interface ItemCardPriceProps {
 }
 
 /**
- * ItemCardPrice - Displays the formatted price with "تومان" suffix
+ * ItemCardPrice - Displays the formatted price with "Toman" suffix
  *
  * Features:
  * - Large, bold price display with monospace font
  * - Formatted with comma separators
- * - Persian "تومان" suffix in smaller text
+ * - Localized "Toman" suffix in smaller text
  * - Responsive sizing for compact mode
  *
  * Accessibility:
@@ -31,6 +32,8 @@ export const ItemCardPrice: React.FC<ItemCardPriceProps> = ({
   value,
   compact = false,
 }) => {
+  const t = useTranslations('Chart')
+
   return (
     <p
       className={`${
@@ -43,7 +46,7 @@ export const ItemCardPrice: React.FC<ItemCardPriceProps> = ({
           compact ? 'text-[11px] sm:text-xs' : 'text-xs sm:text-sm'
         } font-normal text-text-tertiary`}
       >
-        تومان
+        {t('toman')}
       </span>
     </p>
   )

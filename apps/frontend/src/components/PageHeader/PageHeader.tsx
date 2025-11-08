@@ -49,10 +49,10 @@ export const PageHeader = ({
               className="md:hidden p-2 rounded-lg bg-bg-elevated hover:bg-bg-secondary border border-border-light transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label={
                 mobileViewMode === 'single'
-                  ? t('viewMode.switchToDual')
-                  : t('viewMode.switchToSingle')
+                  ? t('viewModeSingle')
+                  : t('viewModeDual')
               }
-              title={mobileViewMode === 'single' ? t('viewMode.dual') : t('viewMode.single')}
+              title={mobileViewMode === 'single' ? t('viewModeSingleTitle') : t('viewModeDualTitle')}
             >
               {mobileViewMode === 'single' ? (
                 <HiViewList className="w-5 h-5 text-text-primary" />
@@ -77,14 +77,14 @@ export const PageHeader = ({
             size="lg"
             onClick={onRefresh}
             disabled={isRefreshing || isFetching}
-            aria-label={isRefreshing ? t('refresh.updating') : t('refresh.update')}
+            aria-label={isRefreshing ? t('refreshing') : t('refreshButton')}
             aria-busy={isRefreshing || isFetching}
           >
             <HiRefresh
               className={`text-xl ${isFetching ? 'animate-spin' : ''}`}
               aria-hidden="true"
             />
-            {isRefreshing ? t('refresh.updating') : isFetching ? t('refresh.fetching') : t('refresh.update')}
+            {isRefreshing ? t('refreshing') : isFetching ? t('fetching') : t('refreshButton')}
           </Button>
           <div className="flex items-center gap-2 text-apple-caption text-text-secondary">
             <span className="relative flex h-3 w-3" aria-hidden="true">
@@ -102,7 +102,7 @@ export const PageHeader = ({
             </span>
             <FiClock className="text-base" aria-hidden="true" />
             <p aria-live="polite">
-              {t('lastUpdate')}:{' '}
+              {t('lastUpdated')}:{' '}
               {lastUpdated ? (
                 <time dateTime={lastUpdated.toISOString()}>
                   {lastUpdated.toLocaleTimeString('fa-IR')}

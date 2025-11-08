@@ -313,7 +313,19 @@
     "connectionType": "Connection type:",
     "connectionQuality": "Connection quality:",
     "weakConnection": "Weak connection",
-    "offlineIndicator": "Offline"
+    "offlineIndicator": "Offline",
+    "staleWarning": {
+      "title": "Data may be outdated",
+      "message": "Unable to fetch latest data. Showing cached data.",
+      "lastUpdate": "Last update: {time}",
+      "retry": "Try updating again"
+    },
+    "Time": {
+      "now": "Just now",
+      "minutesAgo": "{count} {count, plural, one {minute} other {minutes}} ago",
+      "hoursAgo": "{count} {count, plural, one {hour} other {hours}} ago",
+      "daysAgo": "{count} {count, plural, one {day} other {days}} ago"
+    }
   },
   "Chart": {
     "title": "Price Chart",
@@ -390,5 +402,41 @@
     "currencyCodeRequired": "Currency code cannot be empty",
     "currencyCodeLength": "Currency code must be between 3 and 10 characters",
     "currencyCodeFormat": "Currency code can only contain letters, numbers, hyphens and underscores"
+  },
+  "Home": {
+    "skipToMain": "Skip to main content",
+    "sections": {
+      "currencies": "Currencies",
+      "crypto": "Cryptocurrencies",
+      "gold": "Gold & Coins"
+    },
+    "errors": {
+      "currencies": "Error loading currencies",
+      "crypto": "Error loading cryptocurrencies",
+      "gold": "Error loading gold prices"
+    },
+    "footer": {
+      "autoUpdate": "Data automatically refreshes every 5 minutes"
+    },
+    "aria": {
+      "updating": "Updating prices...",
+      "updated": "Prices updated at {time}"
+    },
+    "items": {
+      "usd_sell": "US Dollar",
+      "eur": "Euro",
+      "gbp": "British Pound",
+      "cad": "Canadian Dollar",
+      "aud": "Australian Dollar",
+      "usdt": "Tether",
+      "btc": "Bitcoin",
+      "eth": "Ethereum",
+      "sekkeh": "Emami Coin",
+      "bahar": "Bahar Azadi",
+      "nim": "Half Coin",
+      "rob": "Quarter Coin",
+      "gerami": "Gerami Coin",
+      "18ayar": "18 Karat Gold"
+    }
   }
 }
