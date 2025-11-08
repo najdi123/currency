@@ -42,7 +42,7 @@ async function bootstrap() {
     // Get all users with pagination
     console.log('Fetching all users...');
     const usersList = await usersService.list(1, 100); // Max 100 users per page
-    const users = usersList.items;
+    const users = usersList.users;
 
     console.log(`Found ${users.length} total users`);
     console.log('');
