@@ -3,6 +3,9 @@ import {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
+  useGetCurrenciesYesterdayQuery,
+  useGetCryptoYesterdayQuery,
+  useGetGoldYesterdayQuery,
 } from '@/lib/store/services/api'
 import { computeMarketState } from '@/lib/utils/marketDataUtils'
 
@@ -16,15 +19,18 @@ const POLLING_INTERVAL = 0 // Disabled - was 5 minutes (300000)
  *
  * Note: Polling is disabled to prevent 429 rate limit errors.
  * Users can manually refresh data using the refresh button.
+ *
+ * @param showYesterday - If true, fetches yesterday's historical data instead of today's
  */
-export const useMarketData = () => {
+export const useMarketData = (showYesterday = false) => {
+  // Use yesterday's endpoints when showYesterday is true
   const {
     data: currencies,
     isLoading: currenciesLoading,
     isFetching: currenciesFetching,
     error: currenciesError,
     refetch: refetchCurrencies,
-  } = useGetCurrenciesQuery(undefined, {
+  } = (showYesterday ? useGetCurrenciesYesterdayQuery : useGetCurrenciesQuery)(undefined, {
     pollingInterval: POLLING_INTERVAL,
   })
 
@@ -34,7 +40,7 @@ export const useMarketData = () => {
     isFetching: cryptoFetching,
     error: cryptoError,
     refetch: refetchCrypto,
-  } = useGetCryptoQuery(undefined, {
+  } = (showYesterday ? useGetCryptoYesterdayQuery : useGetCryptoQuery)(undefined, {
     pollingInterval: POLLING_INTERVAL,
   })
 
@@ -44,7 +50,7 @@ export const useMarketData = () => {
     isFetching: goldFetching,
     error: goldError,
     refetch: refetchGold,
-  } = useGetGoldQuery(undefined, {
+  } = (showYesterday ? useGetGoldYesterdayQuery : useGetGoldQuery)(undefined, {
     pollingInterval: POLLING_INTERVAL,
   })
 

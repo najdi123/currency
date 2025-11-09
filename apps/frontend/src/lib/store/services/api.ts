@@ -250,6 +250,43 @@ export const api = createApi({
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
       },
     }),
+    // Yesterday's data endpoints
+    getCurrenciesYesterday: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, void>({
+      query: () => '/navasan/currencies/yesterday',
+      providesTags: ['Rates', 'Currencies'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        console.log('[RTK Query] Currencies Yesterday response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+        }
+        return response as CurrenciesResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
+    getCryptoYesterday: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, void>({
+      query: () => '/navasan/crypto/yesterday',
+      providesTags: ['Rates', 'DigitalCurrencies'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        console.log('[RTK Query] Crypto Yesterday response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+        }
+        return response as CryptoResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
+    getGoldYesterday: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, void>({
+      query: () => '/navasan/gold/yesterday',
+      providesTags: ['Rates', 'Gold'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        console.log('[RTK Query] Gold Yesterday response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+        }
+        return response as GoldResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
     getChartData: builder.query<ChartResponse, ChartQueryParams>({
       query: ({ itemCode, timeRange, itemType }) => ({
         url: `/chart/${itemCode}`,
@@ -311,6 +348,9 @@ export const {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
+  useGetCurrenciesYesterdayQuery,
+  useGetCryptoYesterdayQuery,
+  useGetGoldYesterdayQuery,
   useGetChartDataQuery,
   useGetCurrencyHistoryQuery,
   useGetDigitalCurrencyHistoryQuery,

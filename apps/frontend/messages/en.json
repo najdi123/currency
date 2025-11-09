@@ -502,6 +502,10 @@
       "showLess": "Show Less",
       "showMoreItems": "Show {count} more",
       "variants": "Price Variants"
+    },
+    "search": {
+      "temporarilyUnavailable": "Search temporarily unavailable",
+      "tryAgain": "Try again"
     }
   },
   "Search": {
@@ -510,6 +514,17 @@
     "noResults": "No results found",
     "typeCurrency": "Currency",
     "typeCrypto": "Cryptocurrency",
-    "typeGold": "Gold & Coins"
+    "typeGold": "Gold & Coins",
+    "results": "Search Results",
+    "searching": "Searching for",
+    "resultsCount": "{count} results found"
+  },
+  "Historical": {
+    "viewYesterday": "Yesterday",
+    "viewToday": "Today",
+    "viewingYesterdayData": "Viewing yesterday's data",
+    "yesterdayDataFrom": "Data from {date}",
+    "backToToday": "Back to Today",
+    "noDataAvailable": "No historical data available for this date"
   }
 }

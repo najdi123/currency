@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   BadRequestException,
   RequestTimeoutException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -833,6 +834,214 @@ export class NavasanService {
       // Track failure
       this.metricsService.trackSnapshotFailure('price', category, errorMessage);
       // Don't fail the request if snapshot saving fails
+    }
+  }
+
+  /**
+   * Find closest price snapshot to a specific timestamp
+   * Searches for snapshots within ±6 hours of target time
+   */
+  private async findClosestSnapshot(
+    category: string,
+    targetTimestamp: Date,
+  ): Promise<PriceSnapshotDocument | null> {
+    // Search window: ±6 hours from target
+    const sixHoursMs = 6 * 60 * 60 * 1000;
+    const startWindow = new Date(targetTimestamp.getTime() - sixHoursMs);
+    const endWindow = new Date(targetTimestamp.getTime() + sixHoursMs);
+
+    return safeDbRead(
+      () =>
+        this.priceSnapshotModel
+          .findOne({
+            category,
+            timestamp: {
+              $gte: startWindow,
+              $lte: endWindow,
+            },
+          })
+          .sort({ timestamp: -1 }) // Get the most recent one in the window
+          .exec(),
+      'findClosestSnapshot',
+      this.logger,
+      { category, targetTimestamp },
+    );
+  }
+
+  /**
+   * Fetch yesterday's data from OHLC API as fallback
+   * Gets the latest OHLC point (close price) from yesterday
+   */
+  private async fetchFromOHLCForYesterday(
+    category: string,
+  ): Promise<NavasanResponse | null> {
+    try {
+      // Calculate yesterday's date range
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+
+      const yesterdayEnd = new Date(yesterday);
+      yesterdayEnd.setHours(23, 59, 59, 999);
+
+      const startTimestamp = Math.floor(yesterday.getTime() / 1000);
+      const endTimestamp = Math.floor(yesterdayEnd.getTime() / 1000);
+
+      // Get the list of items for this category
+      const items = this.items[category as keyof typeof this.items];
+      if (!items) {
+        this.logger.error(`Invalid category for OHLC fallback: ${category}`);
+        return null;
+      }
+
+      // Split items into array
+      const itemCodes = items.split(',').map((code) => code.trim());
+
+      // Fetch OHLC data for each item
+      const result: Record<string, any> = {};
+      let hasAnyData = false;
+
+      for (const itemCode of itemCodes) {
+        try {
+          const url = `http://api.navasan.tech/ohlcSearch/?api_key=${this.apiKey}&item=${itemCode}&start=${startTimestamp}&end=${endTimestamp}`;
+
+          const response = await axios.get(url, {
+            timeout: 10000,
+            validateStatus: (status) => status < 500,
+          });
+
+          if (response.status === 200 && Array.isArray(response.data) && response.data.length > 0) {
+            // Get the last data point (most recent from yesterday)
+            const lastPoint = response.data[response.data.length - 1];
+
+            // Convert OHLC data to NavasanPriceItem format
+            const timestamp = new Date(lastPoint.timestamp * 1000);
+            result[itemCode] = {
+              value: String(lastPoint.close),
+              change: 0, // We don't have previous day data to calculate change
+              utc: timestamp.toISOString(),
+              date: lastPoint.date,
+              dt: timestamp.toTimeString().split(' ')[0],
+            };
+
+            hasAnyData = true;
+          }
+        } catch (itemError) {
+          // Log but continue with other items
+          this.logger.warn(
+            `Failed to fetch OHLC data for ${itemCode}: ${itemError instanceof Error ? itemError.message : String(itemError)}`,
+          );
+        }
+      }
+
+      if (!hasAnyData) {
+        this.logger.warn(`No OHLC data found for category: ${category} on yesterday`);
+        return null;
+      }
+
+      this.logger.log(`✅ Successfully fetched ${Object.keys(result).length} items from OHLC for ${category}`);
+      return result as NavasanResponse;
+
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch from OHLC for yesterday: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Get historical data for yesterday
+   * First tries to find data in price_snapshots database
+   * Falls back to OHLC API if not found
+   */
+  async getHistoricalData(category: string): Promise<ApiResponse<NavasanResponse>> {
+    // Validate category to prevent NoSQL injection
+    this.validateCategory(category);
+
+    this.logger.log(`📅 Fetching historical data for category: ${category} (yesterday)`);
+
+    try {
+      // Calculate yesterday's timestamp (same time as now, but 24 hours ago)
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Step 1: Try to find closest snapshot in database
+      const snapshot = await this.findClosestSnapshot(category, yesterday);
+
+      if (snapshot) {
+        const dataAgeMinutes = this.getDataAgeMinutes(snapshot.timestamp);
+        const timeDifferenceHours = Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) / (1000 * 60 * 60);
+
+        this.logger.log(
+          `✅ Found historical snapshot for ${category} from ${snapshot.timestamp.toISOString()} (${timeDifferenceHours.toFixed(1)}h difference)`,
+        );
+
+        return {
+          data: snapshot.data as NavasanResponse,
+          metadata: {
+            isFresh: false,
+            isStale: true,
+            dataAge: dataAgeMinutes,
+            lastUpdated: snapshot.timestamp,
+            source: 'snapshot',
+            isHistorical: true,
+            historicalDate: snapshot.timestamp,
+          },
+        };
+      }
+
+      // Step 2: Snapshot not found, try OHLC API fallback
+      this.logger.warn(`No snapshot found for ${category} at ${yesterday.toISOString()}, trying OHLC fallback`);
+
+      const ohlcData = await this.fetchFromOHLCForYesterday(category);
+
+      if (ohlcData) {
+        this.logger.log(`✅ Retrieved yesterday's data from OHLC API for ${category}`);
+
+        return {
+          data: ohlcData,
+          metadata: {
+            isFresh: false,
+            isStale: true,
+            dataAge: 1440, // 24 hours in minutes
+            lastUpdated: yesterday,
+            source: 'fallback',
+            isHistorical: true,
+            historicalDate: yesterday,
+          },
+        };
+      }
+
+      // Step 3: No data found in either source
+      this.logger.error(`❌ No historical data found for ${category} on ${yesterday.toISOString()}`);
+
+      throw new NotFoundException(
+        `No historical data available for ${category} on the requested date. Please try a different date.`,
+      );
+
+    } catch (error) {
+      // Re-throw NotFoundException as-is
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      // Unexpected error - sanitize and log
+      const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const sanitizedStack = error instanceof Error && error.stack
+        ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
+        : undefined;
+
+      this.logger.error(
+        `❌ Unexpected error fetching historical data for ${category}: ${sanitizedMessage}`,
+        sanitizedStack,
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to retrieve historical data. Please try again later.',
+      );
     }
   }
 }

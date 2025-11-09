@@ -16,6 +16,7 @@ import { useMarketData } from '@/lib/hooks/useMarketData'
 import { useRefreshNotification } from '@/lib/hooks/useRefreshNotification'
 import { useChartPreload } from '@/lib/hooks/useChartPreload'
 import { useLastUpdatedTimestamp } from '@/lib/hooks/useLastUpdatedTimestamp'
+import { useHistoricalToggle } from '@/hooks/useHistoricalToggle'
 import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
 import {
   currencyItems,
@@ -46,10 +47,12 @@ const ChartBottomSheet = lazy<
 
 export default function Home() {
   const t = useTranslations('Home')
+  const tHistorical = useTranslations('Historical')
 
   // Custom hooks for state management
   const { mobileViewMode, setMobileViewMode } = useViewModePreference()
-  const marketData = useMarketData()
+  const { showYesterday, toggleHistorical } = useHistoricalToggle()
+  const marketData = useMarketData(showYesterday)
   const chartSheet = useChartBottomSheet()
 
   // Debug: Log metadata to verify stale data detection
@@ -123,15 +126,37 @@ export default function Home() {
           isLoading={
             marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading
           }
+          showYesterday={showYesterday}
+          onToggleHistorical={toggleHistorical}
+          historicalDate={showYesterday ? new Date(Date.now() - 24 * 60 * 60 * 1000) : null}
         />
 
         {/* Search Bar */}
-        <SearchBar
-          currencies={marketData.currencies}
-          crypto={marketData.crypto}
-          gold={marketData.gold}
-          onItemClick={handleItemClick}
-        />
+        <ErrorBoundary
+          boundaryName="SearchBar"
+          fallback={(_error, reset) => (
+            <div className="px-3 sm:px-6 lg:px-8 mb-6">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-center">
+                <p className="text-sm text-red-600 dark:text-red-400 mb-2">
+                  {t('search.temporarilyUnavailable')}
+                </p>
+                <button
+                  onClick={reset}
+                  className="text-xs text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 underline"
+                >
+                  {t('search.tryAgain')}
+                </button>
+              </div>
+            </div>
+          )}
+        >
+          <SearchBar
+            currencies={marketData.currencies}
+            crypto={marketData.crypto}
+            gold={marketData.gold}
+            onItemClick={handleItemClick}
+          />
+        </ErrorBoundary>
 
         {/* Success Notification */}
         <SuccessNotification
@@ -155,6 +180,18 @@ export default function Home() {
 
         {/* Content Container */}
         <div id="main-content" className="px-3 xl:px-4 sm:px-6 lg:px-8">
+          {/* Historical Data Banner - Show when viewing yesterday's data */}
+          {showYesterday && (
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-center justify-center gap-2 text-blue-800 dark:text-blue-200">
+                <FiInfo className="text-lg flex-shrink-0" />
+                <p className="text-sm font-medium">
+                  {tHistorical('viewingYesterdayData')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Stale Data Warning Banner - Check if any data is marked as stale by backend */}
           {(marketData.currencies?._metadata?.isStale ||
             marketData.crypto?._metadata?.isStale ||

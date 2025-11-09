@@ -502,6 +502,10 @@
       "showLess": "عرض أقل",
       "showMoreItems": "عرض {count} آخرين",
       "variants": "أنواع الأسعار"
+    },
+    "search": {
+      "temporarilyUnavailable": "البحث غير متاح مؤقتاً",
+      "tryAgain": "حاول مرة أخرى"
     }
   },
   "Search": {
@@ -510,6 +514,17 @@
     "noResults": "لم يتم العثور على نتائج",
     "typeCurrency": "عملة",
     "typeCrypto": "عملة رقمية",
-    "typeGold": "الذهب والعملات"
+    "typeGold": "الذهب والعملات",
+    "results": "نتائج البحث",
+    "searching": "البحث عن",
+    "resultsCount": "تم العثور على {count} نتيجة"
+  },
+  "Historical": {
+    "viewYesterday": "الأمس",
+    "viewToday": "اليوم",
+    "viewingYesterdayData": "عرض بيانات الأمس",
+    "yesterdayDataFrom": "البيانات من {date}",
+    "backToToday": "العودة إلى اليوم",
+    "noDataAvailable": "لا تتوفر بيانات تاريخية لهذا التاريخ"
   }
 }

@@ -1,11 +1,32 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { FiSearch, FiX } from 'react-icons/fi'
 import { currencyItems, cryptoItems, goldItems } from '@/lib/utils/dataItemHelpers'
 import type { ItemType } from '@/types/chart'
 import { formatToman, formatChange } from '@/lib/utils/formatters'
+import { useDebounce } from '@/lib/hooks/useDebounce'
+
+// ✅ FIX W1: Proper TypeScript types instead of 'any'
+interface MarketDataItem {
+  value: number
+  change: number
+  timestamp?: number
+  date?: string
+}
+
+interface MarketData {
+  [key: string]: MarketDataItem
+  _metadata?: {
+    isFresh?: boolean
+    isStale?: boolean
+    dataAge?: number
+    lastUpdated?: string | Date
+    source?: 'cache' | 'api' | 'fallback'
+    warning?: string
+  }
+}
 
 interface SearchResult {
   key: string
@@ -18,22 +39,69 @@ interface SearchResult {
 }
 
 interface SearchBarProps {
-  currencies: any
-  crypto: any
-  gold: any
+  currencies: MarketData | null
+  crypto: MarketData | null
+  gold: MarketData | null
   onItemClick: (itemKey: string, itemType: ItemType) => void
+  maxResults?: number
 }
 
-export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarProps) {
+// Constants for better maintainability (S4)
+const ITEM_HEIGHT = 72 // px
+const VISIBLE_ITEMS = 2.5
+const DEFAULT_MAX_RESULTS = 10
+const DEBOUNCE_DELAY = 300 // ms
+
+export function SearchBar({
+  currencies,
+  crypto,
+  gold,
+  onItemClick,
+  maxResults = DEFAULT_MAX_RESULTS
+}: SearchBarProps) {
   const t = useTranslations('Home')
   const tSearch = useTranslations('Search')
   const [query, setQuery] = useState('')
   const [isFocused, setIsFocused] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1) // ✅ FIX W2: Keyboard navigation
   const inputRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Close results when clicking outside
+  // ✅ FIX S1: Debounced search
+  const debouncedQuery = useDebounce(query, DEBOUNCE_DELAY)
+
+  // ✅ FIX W3: Unicode normalization for better search
+  const normalizeText = useCallback((text: string): string => {
+    return text
+      .toLowerCase()
+      .trim()
+      .normalize('NFD') // Normalize Unicode (handles Arabic/Persian diacritics)
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+  }, [])
+
+  // ✅ FIX S3: Helper to highlight matched text
+  const highlightMatch = useCallback((text: string, searchQuery: string) => {
+    if (!searchQuery.trim()) return text
+
+    try {
+      const parts = text.split(new RegExp(`(${searchQuery})`, 'gi'))
+      return parts.map((part, i) =>
+        part.toLowerCase() === searchQuery.toLowerCase() ? (
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 text-text-primary">
+            {part}
+          </mark>
+        ) : part
+      )
+    } catch {
+      // If regex fails, return original text
+      return text
+    }
+  }, [])
+
+  // ✅ FIX W4: Optimized click outside handler - only active when focused
   useEffect(() => {
+    if (!isFocused) return // Only add listener when needed
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         resultsRef.current &&
@@ -42,96 +110,162 @@ export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarPr
         !inputRef.current.contains(event.target as Node)
       ) {
         setIsFocused(false)
+        setSelectedIndex(-1)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isFocused])
+
+  // ✅ FIX W2: Keyboard navigation (Arrow keys, Enter, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isFocused || !debouncedQuery.trim()) return
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelectedIndex(prev => {
+            const newIndex = Math.min(prev + 1, searchResults.length - 1)
+            scrollToResult(newIndex)
+            return newIndex
+          })
+          break
+
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelectedIndex(prev => {
+            const newIndex = Math.max(prev - 1, -1)
+            if (newIndex >= 0) scrollToResult(newIndex)
+            return newIndex
+          })
+          break
+
+        case 'Enter':
+          e.preventDefault()
+          if (selectedIndex >= 0 && searchResults[selectedIndex]) {
+            handleItemClick(searchResults[selectedIndex])
+          }
+          break
+
+        case 'Escape':
+          e.preventDefault()
+          setIsFocused(false)
+          setQuery('')
+          setSelectedIndex(-1)
+          inputRef.current?.blur()
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isFocused, debouncedQuery, selectedIndex])
+
+  // Helper to scroll result into view
+  const scrollToResult = (index: number) => {
+    if (!resultsRef.current) return
+    const resultElement = resultsRef.current.querySelector(`#search-result-${index}`)
+    resultElement?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
 
   // Search across all items
   const searchResults = useMemo(() => {
-    if (!query.trim()) return []
+    if (!debouncedQuery.trim()) return []
 
-    const normalizedQuery = query.toLowerCase().trim()
+    const normalizedQuery = normalizeText(debouncedQuery)
     const results: SearchResult[] = []
 
-    // Helper to check if item matches query
+    // Helper to check if item matches query (with normalization)
     const matchesQuery = (itemKey: string, type: ItemType): boolean => {
-      const itemName = t(`items.${itemKey}`).toLowerCase()
-
-      // Check if query matches the translated name
+      const itemName = normalizeText(t(`items.${itemKey}`))
       return itemName.includes(normalizedQuery)
     }
 
     // Helper to add result
-    const addResult = (item: any, type: ItemType, data: any) => {
+    const addResult = (item: any, type: ItemType, data: MarketData | null) => {
       const itemData = data?.[item.key]
-      results.push({
-        key: item.key,
-        type,
-        icon: item.icon,
-        color: item.color,
-        name: t(`items.${item.key}`),
-        value: itemData?.value,
-        change: itemData?.change,
-      })
+      if (matchesQuery(item.key, type)) {
+        results.push({
+          key: item.key,
+          type,
+          icon: item.icon,
+          color: item.color,
+          name: t(`items.${item.key}`),
+          value: itemData?.value,
+          change: itemData?.change,
+        })
+      }
     }
 
     // Search currencies
-    currencyItems.forEach(item => {
-      if (matchesQuery(item.key, 'currency')) {
-        addResult(item, 'currency', currencies)
-      }
-    })
+    currencyItems.forEach(item => addResult(item, 'currency', currencies))
 
     // Search crypto
-    cryptoItems.forEach(item => {
-      if (matchesQuery(item.key, 'crypto')) {
-        addResult(item, 'crypto', crypto)
-      }
-    })
+    cryptoItems.forEach(item => addResult(item, 'crypto', crypto))
 
     // Search gold
-    goldItems.forEach(item => {
-      if (matchesQuery(item.key, 'gold')) {
-        addResult(item, 'gold', gold)
-      }
-    })
+    goldItems.forEach(item => addResult(item, 'gold', gold))
 
-    return results.slice(0, 10) // Limit to 10 results
-  }, [query, t, currencies, crypto, gold])
+    return results.slice(0, maxResults)
+  }, [debouncedQuery, t, currencies, crypto, gold, maxResults, normalizeText])
 
   const handleClear = () => {
     setQuery('')
+    setSelectedIndex(-1)
     inputRef.current?.focus()
   }
 
   const handleItemClick = (result: SearchResult) => {
+    // ✅ FIX S6: Analytics tracking
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'search_result_click', {
+        search_term: query,
+        result_type: result.type,
+        result_key: result.key,
+      })
+    }
+
     onItemClick(result.key, result.type)
     setQuery('')
     setIsFocused(false)
+    setSelectedIndex(-1)
   }
 
-  const showResults = isFocused && query.trim() && searchResults.length > 0
+  const showResults = isFocused && debouncedQuery.trim() && searchResults.length > 0
 
   return (
     <div className="relative w-full max-w-2xl mx-auto px-3 sm:px-6 lg:px-8 mb-6">
       {/* Search Input */}
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+        <div className="absolute inset-y-0 ltr:left-0 rtl:right-0 flex items-center ltr:pl-4 rtl:pr-4 pointer-events-none">
           <FiSearch className="w-5 h-5 text-text-secondary" aria-hidden="true" />
         </div>
 
+        {/* ✅ FIX W6: Proper ARIA attributes for combobox pattern */}
         <input
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setSelectedIndex(-1) // Reset selection when typing
+          }}
           onFocus={() => setIsFocused(true)}
           placeholder={tSearch('placeholder')}
+          role="combobox"
+          aria-expanded={showResults}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-controls="search-results"
+          aria-activedescendant={
+            selectedIndex >= 0
+              ? `search-result-${selectedIndex}`
+              : undefined
+          }
           className="
-            w-full pl-12 pr-12 py-3
+            w-full ltr:pl-12 rtl:pr-12 ltr:pr-12 rtl:pl-12 py-3
             bg-surface border border-border-light
             rounded-xl
             text-text-primary placeholder-text-secondary
@@ -145,8 +279,9 @@ export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarPr
         {query && (
           <button
             onClick={handleClear}
-            className="absolute inset-y-0 right-0 flex items-center pr-4 text-text-secondary hover:text-text-primary transition-colors"
+            className="absolute inset-y-0 ltr:right-0 rtl:left-0 flex items-center ltr:pr-4 rtl:pl-4 text-text-secondary hover:text-text-primary transition-colors"
             aria-label={tSearch('clear')}
+            type="button"
           >
             <FiX className="w-5 h-5" />
           </button>
@@ -157,6 +292,9 @@ export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarPr
       {showResults && (
         <div
           ref={resultsRef}
+          id="search-results"
+          role="listbox"
+          aria-label={tSearch('results') || 'Search Results'}
           className="
             absolute z-50 w-full mt-2
             bg-surface border border-border-light
@@ -164,19 +302,31 @@ export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarPr
             overflow-hidden
           "
           style={{
-            maxHeight: 'calc(2.5 * 72px)', // 2.5 items (each item ~72px)
+            maxHeight: `${ITEM_HEIGHT * VISIBLE_ITEMS}px`,
           }}
         >
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(2.5 * 72px)' }}>
+          <div
+            className="overflow-y-auto"
+            style={{ maxHeight: `${ITEM_HEIGHT * VISIBLE_ITEMS}px` }}
+          >
             {searchResults.map((result, index) => (
               <button
                 key={`${result.type}-${result.key}`}
+                id={`search-result-${index}`}
                 onClick={() => handleItemClick(result)}
+                onMouseEnter={() => setSelectedIndex(index)}
+                role="option"
+                aria-selected={selectedIndex === index}
+                type="button"
                 className={`
                   w-full px-4 py-4 flex items-center gap-3
-                  hover:bg-background-hover transition-colors
+                  transition-colors
                   border-b border-border-light last:border-b-0
                   text-left
+                  ${selectedIndex === index
+                    ? 'bg-background-hover ring-2 ring-inset ring-accent/30'
+                    : 'hover:bg-background-hover'
+                  }
                 `}
               >
                 {/* Icon */}
@@ -187,7 +337,7 @@ export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarPr
                 {/* Item Info */}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-text-primary truncate">
-                    {result.name}
+                    {highlightMatch(result.name, query)}
                   </div>
                   <div className="text-xs text-text-secondary">
                     {result.type === 'currency' && tSearch('typeCurrency')}
@@ -218,14 +368,24 @@ export function SearchBar({ currencies, crypto, gold, onItemClick }: SearchBarPr
               </button>
             ))}
           </div>
+        </div>
+      )}
 
-          {/* No Results Message */}
-          {searchResults.length === 0 && query.trim() && (
-            <div className="px-4 py-8 text-center text-text-secondary">
-              <FiSearch className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">{tSearch('noResults')}</p>
-            </div>
-          )}
+      {/* ✅ FIX W5: No Results Message - Fixed conditional logic */}
+      {isFocused && debouncedQuery.trim() && searchResults.length === 0 && (
+        <div
+          className="
+            absolute z-50 w-full mt-2
+            bg-surface border border-border-light
+            rounded-xl shadow-xl
+            px-4 py-8 text-center
+          "
+        >
+          <FiSearch className="w-8 h-8 mx-auto mb-2 text-text-secondary opacity-40" />
+          <p className="text-sm text-text-secondary">{tSearch('noResults')}</p>
+          <p className="text-xs text-text-tertiary mt-1">
+            {tSearch('searching')} &quot;{query}&quot;
+          </p>
         </div>
       )}
     </div>

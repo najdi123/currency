@@ -17,6 +17,9 @@ interface PageHeaderProps {
   isFetching: boolean
   lastUpdated: Date | null
   isLoading: boolean
+  showYesterday?: boolean
+  onToggleHistorical?: () => void
+  historicalDate?: Date | null
 }
 
 export const PageHeader = ({
@@ -27,9 +30,13 @@ export const PageHeader = ({
   isFetching,
   lastUpdated,
   isLoading,
+  showYesterday,
+  onToggleHistorical,
+  historicalDate,
 }: PageHeaderProps) => {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const t = useTranslations('PageHeader')
+  const tHistorical = useTranslations('Historical')
 
   const toggleViewMode = () => {
     onViewModeChange(mobileViewMode === 'single' ? 'dual' : 'single')
@@ -87,6 +94,17 @@ export const PageHeader = ({
             />
             {isRefreshing ? t('refreshing') : isFetching ? t('fetching') : t('refreshButton')}
           </Button>
+          {onToggleHistorical && (
+            <Button
+              variant="tinted"
+              size="lg"
+              onClick={onToggleHistorical}
+              disabled={isFetching}
+              aria-label={showYesterday ? tHistorical('viewToday') : tHistorical('viewYesterday')}
+            >
+              {showYesterday ? tHistorical('viewToday') : tHistorical('viewYesterday')}
+            </Button>
+          )}
           <LastUpdatedDisplay lastUpdated={lastUpdated} isFetching={isFetching} />
         </div>
       </div>

@@ -502,6 +502,10 @@
       "showLess": "نمایش کمتر",
       "showMoreItems": "نمایش {count} مورد بیشتر",
       "variants": "نرخ‌های مختلف"
+    },
+    "search": {
+      "temporarilyUnavailable": "جستجو موقتاً در دسترس نیست",
+      "tryAgain": "تلاش مجدد"
     }
   },
   "Search": {
@@ -510,6 +514,17 @@
     "noResults": "نتیجه‌ای یافت نشد",
     "typeCurrency": "ارز",
     "typeCrypto": "ارز دیجیتال",
-    "typeGold": "طلا و سکه"
+    "typeGold": "طلا و سکه",
+    "results": "نتایج جستجو",
+    "searching": "جستجو برای",
+    "resultsCount": "{count} نتیجه یافت شد"
+  },
+  "Historical": {
+    "viewYesterday": "دیروز",
+    "viewToday": "امروز",
+    "viewingYesterdayData": "مشاهده داده‌های دیروز",
+    "yesterdayDataFrom": "داده‌ها از تاریخ {date}",
+    "backToToday": "بازگشت به امروز",
+    "noDataAvailable": "داده تاریخی برای این تاریخ موجود نیست"
   }
 }
