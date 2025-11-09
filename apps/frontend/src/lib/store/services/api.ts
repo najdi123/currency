@@ -27,6 +27,7 @@ export interface ApiResponseMetadata {
   lastUpdated: Date | string
   source: 'cache' | 'api' | 'fallback'
   warning?: string
+  historicalDate?: Date | string // Date for historical data queries
 }
 
 export interface ApiResponse<T> {

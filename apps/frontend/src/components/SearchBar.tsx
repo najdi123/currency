@@ -23,6 +23,7 @@ interface ApiResponseMetadata {
   lastUpdated?: string | Date
   source?: 'cache' | 'api' | 'fallback'
   warning?: string
+  historicalDate?: Date | string
 }
 
 // Use Record<> with intersection to allow _metadata property
