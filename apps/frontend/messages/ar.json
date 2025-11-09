@@ -503,5 +503,13 @@
       "showMoreItems": "عرض {count} آخرين",
       "variants": "أنواع الأسعار"
     }
+  },
+  "Search": {
+    "placeholder": "البحث في العملات والعملات الرقمية والذهب...",
+    "clear": "مسح",
+    "noResults": "لم يتم العثور على نتائج",
+    "typeCurrency": "عملة",
+    "typeCrypto": "عملة رقمية",
+    "typeGold": "الذهب والعملات"
   }
 }

@@ -4,6 +4,7 @@ import { lazy, Suspense, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PageHeader } from '@/components/PageHeader'
+import { SearchBar } from '@/components/SearchBar'
 import { SuccessNotification } from '@/components/SuccessNotification'
 import { StaleDataWarning } from '@/components/StaleDataWarning'
 import { GlobalErrorDisplay } from '@/components/GlobalErrorDisplay'
@@ -122,6 +123,14 @@ export default function Home() {
           isLoading={
             marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading
           }
+        />
+
+        {/* Search Bar */}
+        <SearchBar
+          currencies={marketData.currencies}
+          crypto={marketData.crypto}
+          gold={marketData.gold}
+          onItemClick={handleItemClick}
         />
 
         {/* Success Notification */}

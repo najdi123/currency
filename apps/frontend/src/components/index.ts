@@ -7,6 +7,7 @@ export { ItemCard } from './ItemCard'
 export { ItemCardGrid } from './ItemCardGrid'
 export { ItemCardSkeleton } from './ItemCardSkeleton'
 export { ThemeToggle } from './ThemeToggle'
+export { SearchBar } from './SearchBar'
 
 // Export types
 export type { ItemCardProps } from './ItemCard'

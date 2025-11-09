@@ -503,5 +503,13 @@
       "showMoreItems": "نمایش {count} مورد بیشتر",
       "variants": "نرخ‌های مختلف"
     }
+  },
+  "Search": {
+    "placeholder": "جستجو در ارزها، ارزهای دیجیتال و طلا...",
+    "clear": "پاک کردن",
+    "noResults": "نتیجه‌ای یافت نشد",
+    "typeCurrency": "ارز",
+    "typeCrypto": "ارز دیجیتال",
+    "typeGold": "طلا و سکه"
   }
 }

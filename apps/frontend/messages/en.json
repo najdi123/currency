@@ -503,5 +503,13 @@
       "showMoreItems": "Show {count} more",
       "variants": "Price Variants"
     }
+  },
+  "Search": {
+    "placeholder": "Search currencies, crypto, and gold...",
+    "clear": "Clear",
+    "noResults": "No results found",
+    "typeCurrency": "Currency",
+    "typeCrypto": "Cryptocurrency",
+    "typeGold": "Gold & Coins"
   }
 }
