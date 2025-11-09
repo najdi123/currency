@@ -13,7 +13,7 @@ import axios from 'axios';
 import { Cache, CacheDocument } from './schemas/cache.schema';
 import { PriceSnapshot, PriceSnapshotDocument } from './schemas/price-snapshot.schema';
 import { ApiResponse } from './interfaces/api-response.interface';
-import { NavasanResponse } from './interfaces/navasan-response.interface';
+import { NavasanResponse, NavasanPriceItem } from './interfaces/navasan-response.interface';
 import { isCurrencyResponse, isCryptoResponse, isGoldResponse } from './utils/type-guards';
 import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
 import { sanitizeUrl, sanitizeErrorMessage } from '../common/utils/sanitize-url';
