@@ -24,20 +24,24 @@ async function bootstrap() {
     expressApp.set('trust proxy', 1); // Trust first proxy
   }
 
-  // Security: Add rate limiting
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // limit each IP to 100 requests per windowMs
-      message: 'Too many requests from this IP, please try again later.',
-      standardHeaders: true,
-      legacyHeaders: false,
-      // Skip failed requests (don't count them)
-      skipFailedRequests: false,
-      // Skip successful requests (only count failed ones)
-      skipSuccessfulRequests: false,
-    })
-  );
+  // Security: Add rate limiting (ONLY in production)
+  // In development, we want unlimited requests for testing
+  if (isProduction) {
+    console.log('🛡️  Rate limiting ENABLED (Production)');
+    app.use(
+      rateLimit({
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        max: 100, // limit each IP to 100 requests per windowMs
+        message: 'Too many requests from this IP, please try again later.',
+        standardHeaders: true,
+        legacyHeaders: false,
+        skipFailedRequests: false,
+        skipSuccessfulRequests: false,
+      })
+    );
+  } else {
+    console.log('🔓 Rate limiting DISABLED (Development)');
+  }
 
   // Enable CORS for frontend integration
   app.enableCors({

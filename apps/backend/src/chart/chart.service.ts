@@ -20,6 +20,7 @@ export class ChartService {
   private readonly ohlcBaseUrl = 'http://api.navasan.tech/ohlcSearch/';
   private readonly freshCacheMinutes = 60; // 1 hour cache for OHLC data
   private readonly staleCacheHours = 72; // Keep stale OHLC data for 3 days
+  private readonly snapshotCoverageThreshold: number; // Minimum coverage % for price snapshot fallback
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
@@ -32,6 +33,17 @@ export class ChartService {
     if (!this.apiKey) {
       this.logger.error('NAVASAN_API_KEY is not set in environment variables');
       throw new Error('NAVASAN_API_KEY is required for chart service');
+    }
+
+    // Read snapshot coverage threshold from env (default: 50%)
+    this.snapshotCoverageThreshold =
+      parseInt(this.configService.get<string>('SNAPSHOT_COVERAGE_THRESHOLD') || '50', 10);
+
+    if (this.snapshotCoverageThreshold < 0 || this.snapshotCoverageThreshold > 100) {
+      this.logger.warn(
+        `Invalid SNAPSHOT_COVERAGE_THRESHOLD (${this.snapshotCoverageThreshold}), defaulting to 50%`,
+      );
+      this.snapshotCoverageThreshold = 50;
     }
   }
 
@@ -60,18 +72,67 @@ export class ChartService {
    * Frontend sends uppercase codes, we map them to Navasan's lowercase format
    */
   private readonly itemCodeMap: Record<string, string> = {
-    // Currencies
+    // Main Currencies
     USD_SELL: 'usd_sell',
     USD: 'usd_sell', // Fallback for backwards compatibility
     EUR: 'eur',
     GBP: 'gbp',
     CAD: 'cad',
     AUD: 'aud',
+    AED: 'aed',
+    CNY: 'cny',
+    TRY: 'try',
 
-    // Cryptocurrencies
+    // Additional Currencies
+    CHF: 'chf',
+    JPY: 'jpy',
+    RUB: 'rub',
+    INR: 'inr',
+    PKR: 'pkr',
+    IQD: 'iqd',
+    KWD: 'kwd',
+    SAR: 'sar',
+    QAR: 'qar',
+    OMR: 'omr',
+    BHD: 'bhd',
+
+    // Currency Variants
+    USD_BUY: 'usd_buy',
+    USD_HARAT_SELL: 'dolar_harat_sell',
+    USD_HARAT_CASH_SELL: 'harat_naghdi_sell',
+    USD_HARAT_CASH_BUY: 'harat_naghdi_buy',
+    USD_FARDA_SELL: 'usd_farda_sell',
+    USD_FARDA_BUY: 'usd_farda_buy',
+    USD_SHAKHS: 'usd_shakhs',
+    USD_SHERKAT: 'usd_sherkat',
+    USD_PP: 'usd_pp',
+    USD_MASHAD_SELL: 'dolar_mashad_sell',
+    USD_DESTAN_SELL: 'dolar_destan_sell',
+    USD_SOLEIMANIE_SELL: 'dolar_soleimanie_sell',
+    AED_SELL: 'aed_sell',
+    DIRHAM_DUBAI: 'dirham_dubai',
+    EUR_HAV: 'eur_hav',
+    GBP_HAV: 'gbp_hav',
+    GBP_WHT: 'gbp_wht',
+    CAD_HAV: 'cad_hav',
+    CAD_CASH: 'cad_cash',
+    AUD_HAV: 'aud_hav',
+    AUD_WHT: 'aud_wht',
+
+    // Main Cryptocurrencies
     USDT: 'usdt',
     BTC: 'btc',
     ETH: 'eth',
+
+    // Additional Cryptocurrencies
+    BNB: 'bnb',
+    XRP: 'xrp',
+    ADA: 'ada',
+    DOGE: 'doge',
+    SOL: 'sol',
+    MATIC: 'matic',
+    DOT: 'dot',
+    LTC: 'ltc',
 
     // Gold items
     SEKKEH: 'sekkeh',
@@ -80,6 +141,100 @@ export class ChartService {
     ROB: 'rob',
     GERAMI: 'gerami',
     '18AYAR': '18ayar',
+    ABSHODEH: 'abshodeh',
+  };
+
+  /**
+   * Gold price multipliers - Most gold items stored as thousands in Navasan API
+   * Items not in this map default to multiplier of 1
+   */
+  private readonly goldPriceMultipliers: Record<string, number> = {
+    sekkeh: 1000,
+    bahar: 1000,
+    nim: 1000,
+    rob: 1000,
+    gerami: 1000,
+    '18ayar': 1, // No multiplication for 18ayar
+    abshodeh: 1000,
+  };
+
+  /**
+   * Item code to category mapping - Centralized source of truth
+   * Used for price snapshot queries and category determination
+   */
+  private readonly itemCategoryMap: Record<string, string> = {
+    // Main Currencies
+    usd_sell: 'currencies',
+    eur: 'currencies',
+    gbp: 'currencies',
+    cad: 'currencies',
+    aud: 'currencies',
+    aed: 'currencies',
+    cny: 'currencies',
+    try: 'currencies',
+
+    // Additional Currencies
+    chf: 'currencies',
+    jpy: 'currencies',
+    rub: 'currencies',
+    inr: 'currencies',
+    pkr: 'currencies',
+    iqd: 'currencies',
+    kwd: 'currencies',
+    sar: 'currencies',
+    qar: 'currencies',
+    omr: 'currencies',
+    bhd: 'currencies',
+
+    // Currency Variants
+    usd_buy: 'currencies',
+    dolar_harat_sell: 'currencies',
+    harat_naghdi_sell: 'currencies',
+    harat_naghdi_buy: 'currencies',
+    usd_farda_sell: 'currencies',
+    usd_farda_buy: 'currencies',
+    usd_shakhs: 'currencies',
+    usd_sherkat: 'currencies',
+    usd_pp: 'currencies',
+    dolar_mashad_sell: 'currencies',
+    dolar_destan_sell: 'currencies',
+    dolar_soleimanie_sell: 'currencies',
+    aed_sell: 'currencies',
+    dirham_dubai: 'currencies',
+    eur_hav: 'currencies',
+    gbp_hav: 'currencies',
+    gbp_wht: 'currencies',
+    cad_hav: 'currencies',
+    cad_cash: 'currencies',
+    hav_cad_my: 'currencies',
+    hav_cad_cheque: 'currencies',
+    hav_cad_cash: 'currencies',
+    aud_hav: 'currencies',
+    aud_wht: 'currencies',
+
+    // Main Cryptocurrencies
+    usdt: 'crypto',
+    btc: 'crypto',
+    eth: 'crypto',
+
+    // Additional Cryptocurrencies
+    bnb: 'crypto',
+    xrp: 'crypto',
+    ada: 'crypto',
+    doge: 'crypto',
+    sol: 'crypto',
+    matic: 'crypto',
+    dot: 'crypto',
+    ltc: 'crypto',
+
+    // Gold
+    sekkeh: 'gold',
+    bahar: 'gold',
+    nim: 'gold',
+    rob: 'gold',
+    gerami: 'gold',
+    '18ayar': 'gold',
+    abshodeh: 'gold',
   };
 
   /**
@@ -165,9 +320,27 @@ export class ChartService {
    */
   private isValidCurrencyCode(code: string, itemType: ItemType): boolean {
     const validCodes = {
-      [ItemType.CURRENCY]: ['USD_SELL', 'USD', 'EUR', 'GBP', 'CAD', 'AUD'],
-      [ItemType.CRYPTO]: ['BTC', 'ETH', 'USDT'],
-      [ItemType.GOLD]: ['SEKKEH', 'BAHAR', 'NIM', 'ROB', 'GERAMI', '18AYAR'],
+      [ItemType.CURRENCY]: [
+        // Main currencies
+        'USD_SELL', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'AED', 'CNY', 'CNY_HAV', 'TRY', 'TRY_HAV',
+        // Additional currencies
+        'CHF', 'JPY', 'JPY_HAV', 'RUB', 'INR', 'PKR', 'IQD', 'KWD', 'SAR', 'QAR', 'OMR', 'BHD',
+        // Currency variants
+        'USD_BUY', 'USD_HARAT_SELL', 'USD_HARAT_CASH_SELL', 'USD_HARAT_CASH_BUY',
+        'USD_FARDA_SELL', 'USD_FARDA_BUY', 'USD_SHAKHS', 'USD_SHERKAT', 'USD_PP',
+        'USD_MASHAD_SELL', 'USD_DESTAN_SELL', 'USD_SOLEIMANIE_SELL',
+        'AED_SELL', 'DIRHAM_DUBAI',
+        'EUR_HAV', 'GBP_HAV', 'GBP_WHT', 'CAD_HAV', 'CAD_CASH', 'AUD_HAV', 'AUD_WHT'
+      ],
+      [ItemType.CRYPTO]: [
+        // Main crypto
+        'BTC', 'ETH', 'USDT',
+        // Additional crypto
+        'BNB', 'XRP', 'ADA', 'DOGE', 'SOL', 'MATIC', 'DOT', 'LTC'
+      ],
+      [ItemType.GOLD]: [
+        'SEKKEH', 'BAHAR', 'NIM', 'ROB', 'GERAMI', '18AYAR', 'ABSHODEH'
+      ],
     };
 
     return validCodes[itemType].includes(code);
@@ -790,15 +963,13 @@ export class ChartService {
    * @returns Category name ('currencies', 'crypto', or 'gold')
    */
   private mapItemCodeToCategory(itemCode: string): string {
-    const currencies = ['usd_sell', 'eur', 'gbp', 'cad', 'aud'];
-    const crypto = ['usdt', 'btc', 'eth'];
-    const gold = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar'];
+    const category = this.itemCategoryMap[itemCode];
 
-    if (currencies.includes(itemCode)) return 'currencies';
-    if (crypto.includes(itemCode)) return 'crypto';
-    if (gold.includes(itemCode)) return 'gold';
+    if (!category) {
+      throw new Error(`Unknown item code: ${itemCode}`);
+    }
 
-    throw new Error(`Unknown item code: ${itemCode}`);
+    return category;
   }
 
   /**
@@ -818,14 +989,15 @@ export class ChartService {
         return null;
       }
 
-      // Extract item data
-      const itemData = snapshot.data[itemCode] as any;
+      // Extract item data with proper type guard
+      const itemData = snapshot.data[itemCode];
       if (!itemData || typeof itemData !== 'object') {
         return null;
       }
 
-      // Extract value field
-      const valueStr = itemData.value;
+      // Type assertion with validation
+      const typedItemData = itemData as Record<string, unknown>;
+      const valueStr = typedItemData.value;
       if (typeof valueStr !== 'string') {
         return null;
       }
@@ -836,16 +1008,18 @@ export class ChartService {
         return null;
       }
 
-      // Gold items (except 18ayar) are stored in thousands - multiply by 1000
-      const goldItemsToMultiply = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami'];
-      if (goldItemsToMultiply.includes(itemCode)) {
-        price = price * 1000;
-      }
+      // Apply gold price multiplier if configured (defaults to 1 if not in map)
+      const multiplier = this.goldPriceMultipliers[itemCode] || 1;
+      price = price * multiplier;
 
       return price;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Error extracting price from snapshot for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
+        `Error extracting price from snapshot for ${itemCode}: ${errorMessage}`,
+        errorStack,
       );
       return null;
     }
@@ -867,6 +1041,31 @@ export class ChartService {
     timeRange: TimeRange,
   ): Promise<NavasanOHLCDataPoint[] | null> {
     try {
+      // Validate timestamps
+      if (startTimestamp < 0 || endTimestamp < 0) {
+        this.logger.error(
+          `Invalid timestamps for ${itemCode}: start=${startTimestamp}, end=${endTimestamp}`,
+        );
+        return null;
+      }
+
+      if (startTimestamp >= endTimestamp) {
+        this.logger.error(
+          `Start timestamp must be before end timestamp for ${itemCode}`,
+        );
+        return null;
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const maxRangeSeconds = 3 * 365 * 24 * 60 * 60; // 3 years maximum
+
+      if (endTimestamp - startTimestamp > maxRangeSeconds) {
+        this.logger.error(
+          `Time range too large for ${itemCode}: ${endTimestamp - startTimestamp} seconds (max: ${maxRangeSeconds})`,
+        );
+        return null;
+      }
+
       // Map item code to category for querying snapshots
       const category = this.mapItemCodeToCategory(itemCode);
 
@@ -906,10 +1105,11 @@ export class ChartService {
         `Found ${snapshots.length} snapshots (expected ~${expectedSnapshots}, coverage: ${coverage.toFixed(1)}%)`,
       );
 
-      // Require at least 50% coverage to serve snapshot-based charts
-      if (coverage < 50) {
+      // Check if coverage meets configured threshold
+      if (coverage < this.snapshotCoverageThreshold) {
         this.logger.warn(
-          `Insufficient snapshot coverage (${coverage.toFixed(1)}%) for ${itemCode}. Need at least 50%.`,
+          `Insufficient snapshot coverage (${coverage.toFixed(1)}%) for ${itemCode}. ` +
+            `Need at least ${this.snapshotCoverageThreshold}%.`,
         );
         return null;
       }
@@ -922,6 +1122,30 @@ export class ChartService {
 
         if (price === null) {
           // Skip snapshots where we can't extract the price
+          continue;
+        }
+
+        // Validate price sanity
+        if (price < 0) {
+          this.logger.warn(
+            `Negative price detected for ${itemCode} at ${snapshot.timestamp}: ${price}`,
+          );
+          continue;
+        }
+
+        if (price === 0) {
+          this.logger.warn(
+            `Zero price detected for ${itemCode} at ${snapshot.timestamp}`,
+          );
+          continue;
+        }
+
+        // Set reasonable maximum (1 billion Toman)
+        const maxReasonablePrice = 1_000_000_000;
+        if (price > maxReasonablePrice) {
+          this.logger.warn(
+            `Suspiciously high price for ${itemCode} at ${snapshot.timestamp}: ${price}`,
+          );
           continue;
         }
 
@@ -948,9 +1172,14 @@ export class ChartService {
 
       return ohlcData;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Failed to build chart from price snapshots for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to build chart from price snapshots for ${itemCode}: ${errorMessage}`,
+        errorStack,
       );
+
       return null;
     }
   }

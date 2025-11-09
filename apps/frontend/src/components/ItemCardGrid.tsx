@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { IconType } from 'react-icons'
 import type { ItemType } from '@/types/chart'
 import { ItemCard, AccentColorVariant } from './ItemCard'
+import { hasVariants, getVariantsForCurrency, getVariantData } from '@/lib/utils/dataItemHelpers'
 
 export interface ItemCardGridProps {
   /**
@@ -127,6 +128,14 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
         const itemData = data[item.key]
         if (!itemData) return null
 
+        // Check if this currency has variants and extract variant data
+        const itemHasVariants = itemType === 'currency' && hasVariants(item.key)
+        const variants = itemHasVariants
+          ? getVariantsForCurrency(item.key)
+              .map((v) => getVariantData(v, data))
+              .filter((v): v is NonNullable<typeof v> => v !== null)
+          : []
+
         return (
           <ItemCard
             key={item.key}
@@ -142,6 +151,8 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             accentColor={accentColor}
             onClick={clickHandlers[item.key]}
             role="listitem"
+            hasVariants={itemHasVariants}
+            variants={variants}
           />
         )
       })}

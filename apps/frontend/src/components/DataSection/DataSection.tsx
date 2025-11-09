@@ -6,6 +6,8 @@ import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { ItemCardGrid } from '@/components/ItemCardGrid'
 import { ItemCardSkeleton } from '@/components/ItemCardSkeleton'
 import { DataFreshnessIndicator } from '@/components/DataFreshnessIndicator'
+import { ExpandableSection } from '@/components/ExpandableSection'
+import { splitItemsByVisibility } from '@/lib/utils/dataItemHelpers'
 import type { IconType } from 'react-icons'
 import type { ViewMode } from '@/lib/hooks/useViewModePreference'
 import type { ItemType } from '@/types/chart'
@@ -27,6 +29,7 @@ interface DataSectionProps {
   errorTitle: string
   boundaryName: string
   isRefreshing?: boolean
+  category: 'currencies' | 'crypto' | 'gold'
 }
 
 export const DataSection = ({
@@ -45,9 +48,13 @@ export const DataSection = ({
   errorTitle,
   boundaryName,
   isRefreshing = false,
+  category,
 }: DataSectionProps) => {
   const t = useTranslations('DataSection')
   const skeletonCount = items.length
+
+  // Split items into main and additional for show more functionality
+  const { main: mainItems, additional: additionalItems } = splitItemsByVisibility(category, items)
 
   // Extract metadata if available
   const metadata = data?._metadata
@@ -115,13 +122,28 @@ export const DataSection = ({
               </div>
             )}
           >
-            <ItemCardGrid
-              items={items}
-              data={data}
-              itemType={itemType}
-              accentColor={accentColor}
-              viewMode={viewMode}
-              onItemClick={onItemClick}
+            <ExpandableSection
+              mainContent={
+                <ItemCardGrid
+                  items={mainItems}
+                  data={data}
+                  itemType={itemType}
+                  accentColor={accentColor}
+                  viewMode={viewMode}
+                  onItemClick={onItemClick}
+                />
+              }
+              additionalContent={
+                <ItemCardGrid
+                  items={additionalItems}
+                  data={data}
+                  itemType={itemType}
+                  accentColor={accentColor}
+                  viewMode={viewMode}
+                  onItemClick={onItemClick}
+                />
+              }
+              additionalItemCount={additionalItems.length}
             />
           </ErrorBoundary>
         )}

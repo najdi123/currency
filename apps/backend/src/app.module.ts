@@ -83,10 +83,14 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     }),
 
     // Throttler for rate limiting
+    // NOTE: This is a backup rate limiter. Primary rate limiting is in main.ts
+    // In development: Very high limit (10000/min = essentially unlimited)
+    // In production: Reasonable limit (500/min)
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 60 seconds
-        limit: 100, // 100 requests per minute (default)
+        // limit: process.env.NODE_ENV === 'production' ? 500 : 10000, // 10k/min in dev, 500/min in prod
+        limit: process.env.NODE_ENV === 'production' ? 5000 : 10000, // temporarily for demo i will increase this, for actual users we have to discuss this
       },
     ]),
 

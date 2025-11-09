@@ -22,21 +22,11 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
 }) => {
   const t = useTranslations('Chart')
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('1w')
-  const [shouldLoadChart, setShouldLoadChart] = useState(false)
 
-  // Reset time range when opening with new item
+  // Reset time range when item changes
   useEffect(() => {
-    if (isOpen) {
-      setSelectedTimeRange('1w')
-      // Delay chart loading slightly to ensure drawer is fully mounted
-      const timer = setTimeout(() => {
-        setShouldLoadChart(true)
-      }, 100)
-      return () => clearTimeout(timer)
-    } else {
-      setShouldLoadChart(false)
-    }
-  }, [isOpen, item?.code])
+    setSelectedTimeRange('1w')
+  }, [item?.code])
 
   // Handle Escape key
   useEffect(() => {
@@ -104,24 +94,12 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
 
           {/* Chart */}
           <div className="flex-1 overflow-auto px-4 pb-4 pt-4">
-            {shouldLoadChart ? (
-              <PriceChart
-                itemCode={item.code}
-                itemType={item.type}
-                timeRange={selectedTimeRange}
-                itemName={item.name}
-              />
-            ) : (
-              <div className="w-full space-y-4">
-                <div className="flex items-center justify-center h-8 w-32 mx-auto rounded-lg shimmer-bg" />
-                <div className="h-[320px] sm:h-[360px] w-full rounded-lg shimmer-bg relative overflow-hidden" />
-                <div className="flex gap-2 justify-center">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-8 w-12 rounded-lg shimmer-bg" />
-                  ))}
-                </div>
-              </div>
-            )}
+            <PriceChart
+              itemCode={item.code}
+              itemType={item.type}
+              timeRange={selectedTimeRange}
+              itemName={item.name}
+            />
           </div>
         </Drawer.Content>
       </Drawer.Portal>

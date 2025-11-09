@@ -183,6 +183,7 @@ export default function Home() {
               errorTitle={t('errors.currencies')}
               boundaryName="CurrenciesGrid"
               isRefreshing={marketData.currenciesFetching}
+              category="currencies"
             />
 
             {/* SECTION 2: Cryptocurrencies */}
@@ -202,6 +203,7 @@ export default function Home() {
               errorTitle={t('errors.crypto')}
               boundaryName="CryptoGrid"
               isRefreshing={marketData.cryptoFetching}
+              category="crypto"
             />
 
             {/* SECTION 3: Gold & Coins */}
@@ -221,6 +223,7 @@ export default function Home() {
               errorTitle={t('errors.gold')}
               boundaryName="GoldGrid"
               isRefreshing={marketData.goldFetching}
+              category="gold"
             />
           </div>
 

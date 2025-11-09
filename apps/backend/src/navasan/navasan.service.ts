@@ -15,6 +15,7 @@ import { ApiResponse } from './interfaces/api-response.interface';
 import { NavasanResponse } from './interfaces/navasan-response.interface';
 import { isCurrencyResponse, isCryptoResponse, isGoldResponse } from './utils/type-guards';
 import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
+import { sanitizeUrl, sanitizeErrorMessage } from '../common/utils/sanitize-url';
 import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
@@ -34,10 +35,10 @@ export class NavasanService {
 
   // Define items to fetch from Navasan API
   private readonly items = {
-    all: 'usd_sell,eur,gbp,cad,aud,usdt,btc,eth,sekkeh,bahar,nim,rob,gerami,18ayar',
-    currencies: 'usd_sell,eur,gbp,cad,aud',
-    crypto: 'usdt,btc,eth',
-    gold: 'sekkeh,bahar,nim,rob,gerami,18ayar',
+    all: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_destan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht,usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc,sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
+    currencies: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_destan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht',
+    crypto: 'usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc',
+    gold: 'sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
   };
 
   constructor(
@@ -154,8 +155,10 @@ export class NavasanService {
       return { success: true };
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
+      const errorMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const errorStack = error instanceof Error && error.stack
+        ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
+        : undefined;
 
       this.logger.error(
         `❌ Force fetch failed for ${category}: ${errorMessage}`,
@@ -280,10 +283,15 @@ export class NavasanService {
         );
       }
     } catch (error: unknown) {
-      // Unexpected error
+      // Unexpected error - sanitize before logging
+      const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const sanitizedStack = error instanceof Error && error.stack
+        ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
+        : undefined;
+
       this.logger.error(
-        `❌ Unexpected error in fetchWithCache for category ${category}: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
+        `❌ Unexpected error in fetchWithCache for category ${category}: ${sanitizedMessage}`,
+        sanitizedStack,
       );
       throw error;
     }
@@ -332,9 +340,16 @@ export class NavasanService {
     const requestedItems = items.split(',').map((item) => item.trim());
 
     // Define expected field structure for validation
-    const currencyFields = ['usd_sell', 'eur', 'gbp', 'cad', 'aud'];
-    const cryptoFields = ['usdt', 'btc', 'eth'];
-    const goldFields = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar'];
+    const currencyFields = [
+      'usd_sell', 'eur', 'gbp', 'cad', 'aud', 'aed', 'cny', 'try',
+      'chf', 'jpy', 'rub', 'inr', 'pkr', 'iqd', 'kwd', 'sar', 'qar', 'omr', 'bhd',
+      'usd_buy', 'dolar_harat_sell', 'harat_naghdi_sell', 'harat_naghdi_buy',
+      'usd_farda_sell', 'usd_farda_buy', 'usd_shakhs', 'usd_sherkat', 'usd_pp',
+      'eur_hav', 'gbp_hav', 'gbp_wht', 'cad_hav', 'cad_cash',
+      'hav_cad_my', 'hav_cad_cheque', 'hav_cad_cash', 'aud_hav', 'aud_wht'
+    ];
+    const cryptoFields = ['usdt', 'btc', 'eth', 'bnb', 'xrp', 'ada', 'doge', 'sol', 'matic', 'dot', 'ltc'];
+    const goldFields = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar', 'abshodeh'];
 
     // Check each requested item exists in the response
     for (const item of requestedItems) {
@@ -470,9 +485,11 @@ export class NavasanService {
 
       return { data: response.data, metadata: apiMetadata };
     } catch (error) {
-      // Log all errors with detailed information for debugging
+      // Log all errors with detailed information for debugging (with sanitization)
       if (axios.isAxiosError(error)) {
-        this.logger.error(`🌐 Axios Error - Code: ${error.code}, Message: ${error.message}`);
+        // Sanitize error message to prevent API key leakage
+        const sanitizedMessage = sanitizeErrorMessage(error);
+        this.logger.error(`🌐 Axios Error - Code: ${error.code}, Message: ${sanitizedMessage}`);
 
         if (error.response) {
           // The request was made and the server responded with a status code
@@ -490,7 +507,7 @@ export class NavasanService {
           })}`);
         } else {
           // Something happened in setting up the request that triggered an Error
-          this.logger.error(`🌐 Request setup error: ${error.message}`);
+          this.logger.error(`🌐 Request setup error: ${sanitizedMessage}`);
         }
 
         // Handle timeout
@@ -501,16 +518,21 @@ export class NavasanService {
           );
         }
 
-        // Handle network errors
+        // Handle network errors (sanitize error message)
         if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
           this.logger.error(`🌐 Network error: ${error.code} - Cannot reach API server`);
-          throw new Error(`Cannot reach Navasan API server: ${error.message}`);
+          throw new Error(`Cannot reach Navasan API server: ${sanitizeErrorMessage(error)}`);
         }
       } else {
-        // Non-axios error
-        this.logger.error(`❌ Unexpected error type: ${error instanceof Error ? error.message : String(error)}`);
-        if (error instanceof Error && error.stack) {
-          this.logger.error(`❌ Stack trace: ${error.stack}`);
+        // Non-axios error - sanitize before logging
+        const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+        const sanitizedStack = error instanceof Error && error.stack
+          ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
+          : undefined;
+
+        this.logger.error(`❌ Unexpected error type: ${sanitizedMessage}`);
+        if (sanitizedStack) {
+          this.logger.error(`❌ Stack trace: ${sanitizedStack}`);
         }
       }
 

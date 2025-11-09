@@ -9,6 +9,7 @@ import { ItemCardPrice } from './ItemCardPrice'
 import { ItemCardSparkline } from './ItemCardSparkline'
 import { useItemCardData } from './useItemCardData'
 import { isValidIconComponent, formatTomanForScreenReader } from './itemCard.utils'
+import { CurrencyVariantsDropdown } from '@/components/CurrencyVariantsDropdown'
 import type { ItemCardProps } from './itemCard.types'
 
 /**
@@ -59,6 +60,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   accentColor = 'blue',
   onClick,
   role,
+  hasVariants = false,
+  variants = [],
 }) => {
   // Process data using custom hook
   const { sparklineData, isPositive, sparklineColor } = useItemCardData({
@@ -105,7 +108,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         } ${formatTomanForScreenReader(Math.abs(change))} نسبت به قبل`}
       >
         {/* Header Section with fallback */}
-        <ItemCardHeader icon={icon} name={name} id={id} iconColor={iconColor} compact={compact} />
+        <ItemCardHeader
+          icon={icon}
+          name={name}
+          id={id}
+          iconColor={iconColor}
+          compact={compact}
+          variantsDropdown={
+            hasVariants && variants.length > 0 ? (
+              <CurrencyVariantsDropdown currencyCode={code} variants={variants} />
+            ) : undefined
+          }
+        />
 
         {/* Bottom Section: Badge + Price only (no sparkline) */}
         <div className="flex flex-col items-start gap-1.5 mt-auto">
@@ -127,7 +141,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       } ${formatTomanForScreenReader(Math.abs(change))} نسبت به قبل`}
     >
       {/* Header Section */}
-      <ItemCardHeader icon={icon} name={name} id={id} iconColor={iconColor} compact={compact} />
+      <ItemCardHeader
+        icon={icon}
+        name={name}
+        id={id}
+        iconColor={iconColor}
+        compact={compact}
+        variantsDropdown={
+          hasVariants && variants.length > 0 ? (
+            <CurrencyVariantsDropdown currencyCode={code} variants={variants} />
+          ) : undefined
+        }
+      />
 
       {/* Bottom Section: Left side (Change badge and Price) + Right side (Sparkline) */}
       <div className="flex items-end justify-between gap-2.5 mt-auto">
@@ -154,9 +179,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
  * Memoized ItemCard component with custom comparison function
  *
  * Optimization Strategy:
- * - Compares all visual props (id, value, change, name, iconColor, icon, accentColor)
+ * - Compares all visual props (id, value, change, name, iconColor, icon, accentColor, hasVariants)
  * - Excludes onClick and role from comparison (they're stable or don't affect visual rendering)
  * - Uses reference equality for icon (works because react-icons components are stable)
+ * - Uses shallow array comparison for variants
  * - Only re-renders when meaningful visual changes occur
  */
 export const ItemCard = React.memo<ItemCardProps>(
@@ -166,19 +192,46 @@ export const ItemCard = React.memo<ItemCardProps>(
     // Return false if props are different (perform re-render)
     // We intentionally exclude onClick and role from comparison as they may change
     // frequently or are stable references that don't affect rendering
-    return (
-      prevProps.id === nextProps.id &&
-      prevProps.code === nextProps.code &&
-      prevProps.value === nextProps.value &&
-      prevProps.change === nextProps.change &&
-      prevProps.name === nextProps.name &&
-      prevProps.iconColor === nextProps.iconColor &&
-      prevProps.icon === nextProps.icon &&
-      prevProps.type === nextProps.type &&
-      prevProps.accentColor === nextProps.accentColor &&
-      prevProps.compact === nextProps.compact
-      // Note: onClick and role are intentionally excluded from comparison
-    )
+
+    // Check basic props
+    if (
+      prevProps.id !== nextProps.id ||
+      prevProps.code !== nextProps.code ||
+      prevProps.value !== nextProps.value ||
+      prevProps.change !== nextProps.change ||
+      prevProps.name !== nextProps.name ||
+      prevProps.iconColor !== nextProps.iconColor ||
+      prevProps.icon !== nextProps.icon ||
+      prevProps.type !== nextProps.type ||
+      prevProps.accentColor !== nextProps.accentColor ||
+      prevProps.compact !== nextProps.compact ||
+      prevProps.hasVariants !== nextProps.hasVariants
+    ) {
+      return false
+    }
+
+    // Check variants array (shallow comparison)
+    if (prevProps.variants?.length !== nextProps.variants?.length) {
+      return false
+    }
+
+    // If both have variants, compare them
+    if (prevProps.variants && nextProps.variants) {
+      for (let i = 0; i < prevProps.variants.length; i++) {
+        const prev = prevProps.variants[i]
+        const next = nextProps.variants[i]
+        if (
+          prev.code !== next.code ||
+          prev.value !== next.value ||
+          prev.change !== next.change
+        ) {
+          return false
+        }
+      }
+    }
+
+    return true
+    // Note: onClick and role are intentionally excluded from comparison
   }
 )
 

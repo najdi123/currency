@@ -7,6 +7,17 @@ import type { ItemType } from '@/types/chart'
  */
 export type AccentColorVariant = 'blue' | 'purple' | 'gold'
 
+/**
+ * Currency variant data structure
+ */
+export interface VariantData {
+  code: string
+  apiCode: string
+  variantType: string
+  value: string
+  change: number
+}
+
 export interface ItemCardProps {
   /**
    * Unique identifier for the item
@@ -70,4 +81,14 @@ export interface ItemCardProps {
    * Optional role for ARIA relationships (e.g., "listitem")
    */
   role?: string
+
+  /**
+   * Whether this currency has variants (buy/sell, harat, etc.)
+   */
+  hasVariants?: boolean
+
+  /**
+   * Array of variant data for this currency
+   */
+  variants?: VariantData[]
 }

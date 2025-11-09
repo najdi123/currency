@@ -17,6 +17,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   getUserErrorMessage,
   getSeverityColor,
@@ -58,8 +59,9 @@ export function ErrorDisplay({
   showCopyButton = config.isDevelopment,
   compact = false,
 }: ErrorDisplayProps) {
+  const t = useTranslations('Errors')
   const [copied, setCopied] = useState(false)
-  const errorMessage = getUserErrorMessage(error)
+  const errorMessage = getUserErrorMessage(error, t)
   const errorCode = getErrorCode(error)
   const colors = getSeverityColor(errorMessage.severity)
 
@@ -79,7 +81,7 @@ export function ErrorDisplay({
     // TODO: Implement error reporting to support system
     // For now, just copy to clipboard
     handleCopy()
-    alert('جزئیات خطا کپی شد. لطفاً آن را به تیم پشتیبانی ارسال کنید.')
+    alert(t('copyToSupport'))
   }
 
   return (
@@ -111,7 +113,7 @@ export function ErrorDisplay({
           {/* Suggested Actions */}
           {!compact && errorMessage.suggestedActions.length > 0 && (
             <div className="mb-4">
-              <p className="text-text-primary font-semibold text-apple-caption mb-2">پیشنهادات:</p>
+              <p className="text-text-primary font-semibold text-apple-caption mb-2">{t('suggestions')}</p>
               <ul className="text-text-secondary text-apple-caption space-y-1 pr-5">
                 {errorMessage.suggestedActions.map((action, index) => (
                   <li key={index} className="list-disc">
@@ -128,11 +130,11 @@ export function ErrorDisplay({
               <details className="group">
                 <summary className="cursor-pointer text-xs text-text-secondary hover:text-text-primary transition-apple-fast select-none">
                   <span className="inline-block transition-transform group-open:rotate-90">▶</span>
-                  {' '}جزئیات فنی (فقط در حالت توسعه)
+                  {' '}{t('technicalDetails')}
                 </summary>
                 <div className="mt-2 bg-bg-secondary border border-border-light rounded-lg p-2">
                   <p className="text-xs font-mono text-text-secondary break-all">
-                    کد خطا: {errorCode}
+                    {t('errorCode')} {errorCode}
                   </p>
                 </div>
               </details>
@@ -160,7 +162,7 @@ export function ErrorDisplay({
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
-                تلاش مجدد
+                {t('retry')}
               </button>
             )}
 
@@ -183,7 +185,7 @@ export function ErrorDisplay({
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   />
                 </svg>
-                گزارش مشکل
+                {t('reportProblem')}
               </button>
             )}
 
@@ -209,7 +211,7 @@ export function ErrorDisplay({
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    کپی شد!
+                    {t('copied')}
                   </>
                 ) : (
                   <>
@@ -226,7 +228,7 @@ export function ErrorDisplay({
                         d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                       />
                     </svg>
-                    کپی جزئیات
+                    {t('copyDetails')}
                   </>
                 )}
               </button>
@@ -262,7 +264,8 @@ export function InlineError({
  * Simple Error Message (Text Only)
  */
 export function SimpleErrorMessage({ error }: { error: unknown }) {
-  const errorMessage = getUserErrorMessage(error)
+  const t = useTranslations('Errors')
+  const errorMessage = getUserErrorMessage(error, t)
 
   return (
     <div className="text-error text-apple-caption" >

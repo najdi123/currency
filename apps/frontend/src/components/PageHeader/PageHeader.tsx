@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { SettingsModal } from '@/components/SettingsModal'
+import { LastUpdatedDisplay } from '@/components/LastUpdatedDisplay'
 import { HiRefresh, HiViewList } from 'react-icons/hi'
-import { FiClock, FiGrid, FiSettings } from 'react-icons/fi'
+import { FiGrid, FiSettings } from 'react-icons/fi'
 import type { ViewMode } from '@/lib/hooks/useViewModePreference'
 
 interface PageHeaderProps {
@@ -86,32 +87,7 @@ export const PageHeader = ({
             />
             {isRefreshing ? t('refreshing') : isFetching ? t('fetching') : t('refreshButton')}
           </Button>
-          <div className="flex items-center gap-2 text-apple-caption text-text-secondary">
-            <span className="relative flex h-3 w-3" aria-hidden="true">
-              {isFetching ? (
-                <>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
-                </>
-              ) : (
-                <>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-success"></span>
-                </>
-              )}
-            </span>
-            <FiClock className="text-base" aria-hidden="true" />
-            <p aria-live="polite">
-              {t('lastUpdated')}:{' '}
-              {lastUpdated ? (
-                <time dateTime={lastUpdated.toISOString()}>
-                  {lastUpdated.toLocaleTimeString('fa-IR')}
-                </time>
-              ) : (
-                '--:--:--'
-              )}
-            </p>
-          </div>
+          <LastUpdatedDisplay lastUpdated={lastUpdated} isFetching={isFetching} />
         </div>
       </div>
 

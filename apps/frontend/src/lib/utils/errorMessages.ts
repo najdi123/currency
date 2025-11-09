@@ -34,19 +34,30 @@ export interface UserErrorMessage {
 }
 
 /**
+ * Translation keys for error messages
+ */
+export interface ErrorTranslations {
+  (key: string): string
+}
+
+/**
  * Get user-friendly error message based on error type
  */
-export function getUserErrorMessage(error: unknown): UserErrorMessage {
+export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): UserErrorMessage {
   // Network/Connection Errors
   if (isFetchBaseQueryError(error)) {
     if (isConnectionError(error)) {
       return {
-        title: 'خطا در اتصال به سرور',
-        description: 'امکان برقراری ارتباط با سرور وجود ندارد. لطفاً اتصال اینترنت خود را بررسی کنید.',
-        suggestedActions: [
-          'اتصال اینترنت خود را بررسی کنید',
-          'از فعال بودن وای‌فای یا داده موبایل مطمئن شوید',
-          'چند لحظه صبر کنید و دوباره تلاش کنید',
+        title: t ? t('connectionErrorTitle') : 'Connection error',
+        description: t ? t('connectionErrorDescription') : 'Unable to connect to server. Please check your internet connection.',
+        suggestedActions: t ? [
+          t('connectionErrorAction1'),
+          t('connectionErrorAction2'),
+          t('connectionErrorAction3'),
+        ] : [
+          'Check your internet connection',
+          'Make sure WiFi or mobile data is enabled',
+          'Wait a moment and try again',
         ],
         severity: 'error',
         icon: '🌐',
@@ -246,12 +257,16 @@ export function getUserErrorMessage(error: unknown): UserErrorMessage {
 
   // Generic Error (fallback)
   return {
-    title: 'خطای غیرمنتظره',
-    description: 'متأسفانه مشکلی پیش آمده است. لطفاً دوباره تلاش کنید.',
-    suggestedActions: [
-      'صفحه را رفرش کنید',
-      'دوباره تلاش کنید',
-      'اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید',
+    title: t ? t('unexpectedErrorTitle') : 'Unexpected error',
+    description: t ? t('unexpectedErrorDescription') : 'Unfortunately, something went wrong. Please try again.',
+    suggestedActions: t ? [
+      t('unexpectedErrorAction1'),
+      t('unexpectedErrorAction2'),
+      t('unexpectedErrorAction3'),
+    ] : [
+      'Refresh the page',
+      'Try again',
+      'If the problem persists, contact support',
     ],
     severity: 'error',
     icon: '🔴',
@@ -263,8 +278,8 @@ export function getUserErrorMessage(error: unknown): UserErrorMessage {
 /**
  * Get short error message (for inline display)
  */
-export function getShortErrorMessage(error: unknown): string {
-  const message = getUserErrorMessage(error)
+export function getShortErrorMessage(error: unknown, t?: ErrorTranslations): string {
+  const message = getUserErrorMessage(error, t)
   return message.title
 }
 

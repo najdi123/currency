@@ -27,6 +27,11 @@ interface ItemCardHeaderProps {
    * Compact mode flag
    */
   compact?: boolean
+
+  /**
+   * Optional variants dropdown to display (shown at the end)
+   */
+  variantsDropdown?: React.ReactNode
 }
 
 /**
@@ -34,7 +39,8 @@ interface ItemCardHeaderProps {
  *
  * Layout:
  * - Icon on the left (with responsive sizing)
- * - Name on the right (RTL text, truncated if needed)
+ * - Name in the middle (RTL text, truncated if needed)
+ * - Optional variants dropdown on the right
  * - Horizontal flex layout with gap
  *
  * Accessibility:
@@ -48,11 +54,12 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
   id,
   iconColor = 'text-accent',
   compact = false,
+  variantsDropdown,
 }) => {
   // If icon is invalid, render a placeholder circle
   if (!isValidIconComponent(Icon)) {
     return (
-      <div className="flex justify-between items-start gap-2.5 mb-auto" dir="ltr">
+      <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
         <div
           className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 bg-bg-tertiary rounded-full flex-shrink-0"
           aria-hidden="true"
@@ -64,12 +71,13 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
         >
           {name}
         </h3>
+        {variantsDropdown && <div className="flex-shrink-0">{variantsDropdown}</div>}
       </div>
     )
   }
 
   return (
-    <div className="flex justify-between items-start gap-2.5 mb-auto" dir="ltr">
+    <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
       <Icon
         className={`${
           compact
@@ -81,10 +89,11 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
       <h3
         className={`${
           compact ? 'text-xs sm:text-xs md:text-sm' : 'text-sm sm:text-base'
-        } font-semibold text-text-secondary truncate text-right flex-1`}
+        } font-semibold text-text-secondary truncate text-right flex-1 min-w-0`}
       >
         {name}
       </h3>
+      {variantsDropdown && <div className="flex-shrink-0">{variantsDropdown}</div>}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import React, { Component, ReactNode, ErrorInfo } from 'react'
 import { logComponentError, addBreadcrumb } from '@/lib/errorLogger'
+import { useTranslations } from 'next-intl'
 
 /**
  * Error Boundary Props
@@ -15,6 +16,14 @@ interface ErrorBoundaryProps {
   onError?: (error: Error, errorInfo: ErrorInfo) => void
   /** Name/ID for this boundary (for logging purposes) */
   boundaryName?: string
+  /** Translations object (provided by wrapper) */
+  translations?: {
+    errorBoundaryTitle: string
+    errorBoundaryTitleWithName: string
+    errorBoundaryDescription: string
+    retry: string
+    technicalDetails: string
+  }
 }
 
 /**
@@ -119,13 +128,26 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render(): ReactNode {
     const { hasError, error } = this.state
-    const { children, fallback, boundaryName } = this.props
+    const { children, fallback, boundaryName, translations } = this.props
 
     if (hasError && error) {
       // Use custom fallback if provided
       if (fallback) {
         return fallback(error, this.resetError)
       }
+
+      // Get translated text (with fallback to English)
+      const t = translations || {
+        errorBoundaryTitle: 'Error displaying section',
+        errorBoundaryTitleWithName: 'Error displaying section "{section}"',
+        errorBoundaryDescription: 'Unfortunately, a problem occurred while displaying this section.',
+        retry: 'Try again',
+        technicalDetails: 'Technical details (development only)',
+      }
+
+      const title = boundaryName
+        ? t.errorBoundaryTitleWithName.replace('{section}', boundaryName)
+        : t.errorBoundaryTitle
 
       // Default fallback UI
       return (
@@ -153,18 +175,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {/* Error Content */}
             <div className="flex-1">
               <h3 className="text-red-900 font-semibold mb-1">
-                خطا در نمایش بخش
-                {boundaryName && ` "${boundaryName}"`}
+                {title}
               </h3>
               <p className="text-red-700 text-sm mb-3">
-                متأسفانه مشکلی در نمایش این بخش رخ داده است.
+                {t.errorBoundaryDescription}
               </p>
 
               {/* Error details in development */}
               {process.env.NODE_ENV === 'development' && (
                 <details className="mb-3">
                   <summary className="cursor-pointer text-xs text-red-600 hover:text-red-800 select-none">
-                    جزئیات خطا (فقط در حالت توسعه)
+                    {t.technicalDetails}
                   </summary>
                   <div className="mt-2 bg-white border border-red-300 rounded p-2 overflow-auto max-h-32">
                     <p className="text-xs font-mono text-red-900 break-all">
@@ -179,7 +200,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 onClick={this.resetError}
                 className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors text-sm font-medium"
               >
-                تلاش مجدد
+                {t.retry}
               </button>
             </div>
           </div>
@@ -193,17 +214,41 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 }
 
 /**
+ * Wrapper component that provides translations to ErrorBoundary
+ */
+export function ErrorBoundaryWithTranslations({
+  children,
+  ...props
+}: Omit<ErrorBoundaryProps, 'translations'>) {
+  const t = useTranslations('Errors')
+
+  const translations = {
+    errorBoundaryTitle: t('errorBoundaryTitle'),
+    errorBoundaryTitleWithName: t('errorBoundaryTitleWithName'),
+    errorBoundaryDescription: t('errorBoundaryDescription'),
+    retry: t('retry'),
+    technicalDetails: t('technicalDetails'),
+  }
+
+  return (
+    <ErrorBoundary {...props} translations={translations}>
+      {children}
+    </ErrorBoundary>
+  )
+}
+
+/**
  * Hook-based wrapper for functional components
  * (Note: This is just a wrapper, the actual Error Boundary is still a class)
  */
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
-  errorBoundaryProps?: Omit<ErrorBoundaryProps, 'children'>
+  errorBoundaryProps?: Omit<ErrorBoundaryProps, 'children' | 'translations'>
 ) {
   const WrappedComponent = (props: P) => (
-    <ErrorBoundary {...errorBoundaryProps}>
+    <ErrorBoundaryWithTranslations {...errorBoundaryProps}>
       <Component {...props} />
-    </ErrorBoundary>
+    </ErrorBoundaryWithTranslations>
   )
 
   WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name || 'Component'})`
@@ -211,4 +256,4 @@ export function withErrorBoundary<P extends object>(
   return WrappedComponent
 }
 
-export default ErrorBoundary
+export default ErrorBoundaryWithTranslations
