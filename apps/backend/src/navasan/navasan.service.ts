@@ -885,7 +885,12 @@ export class NavasanService {
       const yesterdayEnd = new Date(yesterday);
       yesterdayEnd.setHours(23, 59, 59, 999);
 
-      const startTimestamp = Math.floor(yesterday.getTime() / 1000);
+      // Also get day before yesterday for change calculation
+      const dayBeforeYesterday = new Date(yesterday);
+      dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 1);
+      dayBeforeYesterday.setHours(0, 0, 0, 0);
+
+      const startTimestamp = Math.floor(dayBeforeYesterday.getTime() / 1000); // Start from 2 days ago
       const endTimestamp = Math.floor(yesterdayEnd.getTime() / 1000);
 
       // Get the list of items for this category
@@ -899,7 +904,8 @@ export class NavasanService {
       const itemCodes = items.split(',').map((code) => code.trim());
 
       // Fetch OHLC data for each item
-      const result: Record<string, any> = {};
+      type HistoricalPriceData = Record<string, NavasanPriceItem>;
+      const result: HistoricalPriceData = {};
       let hasAnyData = false;
 
       for (const itemCode of itemCodes) {
@@ -915,11 +921,22 @@ export class NavasanService {
             // Get the last data point (most recent from yesterday)
             const lastPoint = response.data[response.data.length - 1];
 
+            // Calculate real change from previous day
+            let change = 0;
+            if (response.data.length >= 2) {
+              // We have at least 2 days of data - calculate change from day before
+              const previousPoint = response.data[response.data.length - 2];
+              change = Number(lastPoint.close) - Number(previousPoint.close);
+            } else if (lastPoint.open) {
+              // Fall back to intraday change (close - open)
+              change = Number(lastPoint.close) - Number(lastPoint.open);
+            }
+
             // Convert OHLC data to NavasanPriceItem format
             const timestamp = new Date(lastPoint.timestamp * 1000);
             result[itemCode] = {
               value: String(lastPoint.close),
-              change: 0, // We don't have previous day data to calculate change
+              change: change,
               utc: timestamp.toISOString(),
               date: lastPoint.date,
               dt: timestamp.toTimeString().split(' ')[0],

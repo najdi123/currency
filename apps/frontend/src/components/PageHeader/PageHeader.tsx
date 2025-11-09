@@ -84,9 +84,10 @@ export const PageHeader = ({
             variant="filled"
             size="lg"
             onClick={onRefresh}
-            disabled={isRefreshing || isFetching}
+            disabled={isRefreshing || isFetching || showYesterday}
             aria-label={isRefreshing ? t('refreshing') : t('refreshButton')}
             aria-busy={isRefreshing || isFetching}
+            title={showYesterday ? 'Switch to today to refresh data' : undefined}
           >
             <HiRefresh
               className={`text-xl ${isFetching ? 'animate-spin' : ''}`}
@@ -102,7 +103,14 @@ export const PageHeader = ({
               disabled={isFetching}
               aria-label={showYesterday ? tHistorical('viewToday') : tHistorical('viewYesterday')}
             >
-              {showYesterday ? tHistorical('viewToday') : tHistorical('viewYesterday')}
+              <HiRefresh
+                className={`text-xl ${isFetching ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              {isFetching
+                ? (showYesterday ? t('fetching') : t('fetching'))
+                : (showYesterday ? tHistorical('viewToday') : tHistorical('viewYesterday'))
+              }
             </Button>
           )}
           <LastUpdatedDisplay lastUpdated={lastUpdated} isFetching={isFetching} />

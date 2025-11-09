@@ -59,6 +59,7 @@ export const DataSection = ({
   // Extract metadata if available
   const metadata = data?._metadata
   const lastUpdated = metadata?.lastUpdated
+  const isHistorical = metadata?.isHistorical
 
   // Wrap onRetry to return a Promise
   const handleRefresh = async () => {
@@ -78,6 +79,14 @@ export const DataSection = ({
           >
             <Icon className="text-2xl text-accent" aria-hidden="true" />
             {title}
+            {isHistorical && (
+              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800">
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Historical
+              </span>
+            )}
           </h2>
 
           {/* Data Freshness Indicator */}
