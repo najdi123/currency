@@ -15,7 +15,7 @@ const cn = (...classes: (string | boolean | undefined | null)[]) => {
   return classes.filter((c) => typeof c === 'string' && c.length > 0).join(' ')
 }
 
-interface FormData {
+interface UserFormData {
   email: string
   password: string
   confirmPassword: string
@@ -41,7 +41,7 @@ export default function RegisterUserPage() {
   const [register, { isLoading, error, isSuccess }] = useRegisterMutation()
   const capsLockOn = useCapsLock()
 
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<UserFormData>({
     email: '',
     password: '',
     confirmPassword: '',

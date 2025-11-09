@@ -151,9 +151,9 @@ export default function Home() {
           )}
         >
           <SearchBar
-            currencies={marketData.currencies}
-            crypto={marketData.crypto}
-            gold={marketData.gold}
+            currencies={marketData.currencies ?? null}
+            crypto={marketData.crypto ?? null}
+            gold={marketData.gold ?? null}
             onItemClick={handleItemClick}
           />
         </ErrorBoundary>

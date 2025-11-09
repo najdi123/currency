@@ -16,16 +16,18 @@ interface MarketDataItem {
   date?: string
 }
 
-interface MarketData {
-  [key: string]: MarketDataItem
-  _metadata?: {
-    isFresh?: boolean
-    isStale?: boolean
-    dataAge?: number
-    lastUpdated?: string | Date
-    source?: 'cache' | 'api' | 'fallback'
-    warning?: string
-  }
+interface ApiResponseMetadata {
+  isFresh?: boolean
+  isStale?: boolean
+  dataAge?: number
+  lastUpdated?: string | Date
+  source?: 'cache' | 'api' | 'fallback'
+  warning?: string
+}
+
+// Use Record<> with intersection to allow _metadata property
+type MarketData = Record<string, MarketDataItem> & {
+  _metadata?: ApiResponseMetadata
 }
 
 interface SearchResult {
@@ -233,7 +235,7 @@ export function SearchBar({
     setSelectedIndex(-1)
   }
 
-  const showResults = isFocused && debouncedQuery.trim() && searchResults.length > 0
+  const showResults = Boolean(isFocused && debouncedQuery.trim() && searchResults.length > 0)
 
   return (
     <div className="relative w-full max-w-2xl mx-auto px-3 sm:px-6 lg:px-8 mb-6">
