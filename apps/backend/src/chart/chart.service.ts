@@ -7,6 +7,7 @@ import { TimeRange, ItemType } from './dto/chart-query.dto';
 import { ChartDataPoint, ChartResponse } from './interfaces/chart.interface';
 import { Cache, CacheDocument } from '../navasan/schemas/cache.schema';
 import { OhlcSnapshot, OhlcSnapshotDocument } from '../navasan/schemas/ohlc-snapshot.schema';
+import { PriceSnapshot, PriceSnapshotDocument } from '../navasan/schemas/price-snapshot.schema';
 import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
 import { MetricsService } from '../metrics/metrics.service';
 import { NavasanOHLCDataPoint } from '../navasan/interfaces/navasan-response.interface';
@@ -23,6 +24,7 @@ export class ChartService {
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
     @InjectModel(OhlcSnapshot.name) private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
+    @InjectModel(PriceSnapshot.name) private priceSnapshotModel: Model<PriceSnapshotDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
   ) {
@@ -273,8 +275,26 @@ export class ChartService {
           return staleCache as NavasanOHLCDataPoint[];
         }
 
-        // No stale cache available
-        this.logger.error(`❌ No stale OHLC cache available for ${itemCode}`);
+        // Step 4: Try to build chart from price snapshots as last resort
+        this.logger.warn(`📸 Attempting price snapshot fallback for ${itemCode}`);
+        const snapshotData = await this.buildChartFromPriceSnapshots(
+          itemCode,
+          startTimestamp,
+          endTimestamp,
+          timeRange,
+        );
+
+        if (snapshotData) {
+          this.logger.warn(
+            `⚠️  Serving chart data built from PRICE SNAPSHOTS for ${itemCode} (${timeRange})`,
+          );
+          return snapshotData;
+        }
+
+        // No fallback options available
+        this.logger.error(
+          `❌ No stale OHLC cache or price snapshots available for ${itemCode}`,
+        );
         throw apiError;
       }
     } catch (error) {
@@ -755,6 +775,183 @@ export class ChartService {
       // Track failure
       this.metricsService.trackSnapshotFailure('ohlc', `${itemCode}_${timeRange}`, errorMessage);
       // Don't fail the request if snapshot saving fails
+    }
+  }
+
+  /**
+   * ==========================================
+   * PRICE SNAPSHOT FALLBACK METHODS
+   * ==========================================
+   */
+
+  /**
+   * Map item code to price snapshot category
+   * @param itemCode - Navasan item code (e.g., 'usd_sell', 'btc', 'sekkeh')
+   * @returns Category name ('currencies', 'crypto', or 'gold')
+   */
+  private mapItemCodeToCategory(itemCode: string): string {
+    const currencies = ['usd_sell', 'eur', 'gbp', 'cad', 'aud'];
+    const crypto = ['usdt', 'btc', 'eth'];
+    const gold = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar'];
+
+    if (currencies.includes(itemCode)) return 'currencies';
+    if (crypto.includes(itemCode)) return 'crypto';
+    if (gold.includes(itemCode)) return 'gold';
+
+    throw new Error(`Unknown item code: ${itemCode}`);
+  }
+
+  /**
+   * Extract price value from a price snapshot for a specific item code
+   * Handles gold price multiplication (most gold items stored as thousands)
+   * @param snapshot - Price snapshot document
+   * @param itemCode - Item code to extract (e.g., 'usd_sell', 'btc')
+   * @returns Price as number, or null if not found/invalid
+   */
+  private extractPriceFromSnapshot(
+    snapshot: PriceSnapshotDocument,
+    itemCode: string,
+  ): number | null {
+    try {
+      // Type guard: check if data is an object
+      if (!snapshot.data || typeof snapshot.data !== 'object') {
+        return null;
+      }
+
+      // Extract item data
+      const itemData = snapshot.data[itemCode] as any;
+      if (!itemData || typeof itemData !== 'object') {
+        return null;
+      }
+
+      // Extract value field
+      const valueStr = itemData.value;
+      if (typeof valueStr !== 'string') {
+        return null;
+      }
+
+      // Parse to number
+      let price = parseFloat(valueStr);
+      if (isNaN(price)) {
+        return null;
+      }
+
+      // Gold items (except 18ayar) are stored in thousands - multiply by 1000
+      const goldItemsToMultiply = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami'];
+      if (goldItemsToMultiply.includes(itemCode)) {
+        price = price * 1000;
+      }
+
+      return price;
+    } catch (error) {
+      this.logger.error(
+        `Error extracting price from snapshot for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Build chart data from price snapshots as fallback when OHLC API is unavailable
+   * Creates synthetic OHLC data where open=high=low=close=snapshot price
+   * @param itemCode - Item code (e.g., 'usd_sell', 'btc')
+   * @param startTimestamp - Start time (Unix timestamp)
+   * @param endTimestamp - End time (Unix timestamp)
+   * @param timeRange - Time range enum (for logging)
+   * @returns Array of OHLC data points, or null if insufficient data
+   */
+  private async buildChartFromPriceSnapshots(
+    itemCode: string,
+    startTimestamp: number,
+    endTimestamp: number,
+    timeRange: TimeRange,
+  ): Promise<NavasanOHLCDataPoint[] | null> {
+    try {
+      // Map item code to category for querying snapshots
+      const category = this.mapItemCodeToCategory(itemCode);
+
+      this.logger.log(
+        `📸 Attempting to build chart from price snapshots for ${itemCode} (category: ${category})`,
+      );
+
+      // Query price snapshots for the time range
+      const snapshots = await safeDbRead(
+        () =>
+          this.priceSnapshotModel
+            .find({
+              category,
+              timestamp: {
+                $gte: new Date(startTimestamp * 1000),
+                $lte: new Date(endTimestamp * 1000),
+              },
+            })
+            .sort({ timestamp: 1 })
+            .exec(),
+        'buildChartFromPriceSnapshots',
+        this.logger,
+        { itemCode, category, timeRange },
+      );
+
+      if (!snapshots || snapshots.length === 0) {
+        this.logger.warn(`No price snapshots found for ${itemCode} in requested time range`);
+        return null;
+      }
+
+      // Calculate expected number of hourly snapshots
+      const hoursDiff = Math.floor((endTimestamp - startTimestamp) / 3600);
+      const expectedSnapshots = hoursDiff;
+      const coverage = (snapshots.length / expectedSnapshots) * 100;
+
+      this.logger.log(
+        `Found ${snapshots.length} snapshots (expected ~${expectedSnapshots}, coverage: ${coverage.toFixed(1)}%)`,
+      );
+
+      // Require at least 50% coverage to serve snapshot-based charts
+      if (coverage < 50) {
+        this.logger.warn(
+          `Insufficient snapshot coverage (${coverage.toFixed(1)}%) for ${itemCode}. Need at least 50%.`,
+        );
+        return null;
+      }
+
+      // Transform snapshots to synthetic OHLC data
+      const ohlcData: NavasanOHLCDataPoint[] = [];
+
+      for (const snapshot of snapshots) {
+        const price = this.extractPriceFromSnapshot(snapshot, itemCode);
+
+        if (price === null) {
+          // Skip snapshots where we can't extract the price
+          continue;
+        }
+
+        // Create synthetic OHLC point (open=high=low=close=price)
+        const unixTimestamp = Math.floor(snapshot.timestamp.getTime() / 1000);
+        ohlcData.push({
+          timestamp: unixTimestamp,
+          date: snapshot.timestamp.toISOString().split('T')[0], // YYYY-MM-DD
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+        });
+      }
+
+      if (ohlcData.length === 0) {
+        this.logger.warn(`Could not extract any valid prices from snapshots for ${itemCode}`);
+        return null;
+      }
+
+      this.logger.log(
+        `✅ Successfully built ${ohlcData.length} OHLC points from price snapshots for ${itemCode}`,
+      );
+
+      return ohlcData;
+    } catch (error) {
+      this.logger.error(
+        `Failed to build chart from price snapshots for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
     }
   }
 }
