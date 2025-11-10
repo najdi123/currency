@@ -60,6 +60,7 @@ export const DataSection = ({
   const metadata = data?._metadata
   const lastUpdated = metadata?.lastUpdated
   const isHistorical = metadata?.isHistorical
+  const dataSource = metadata?.source
 
   // Wrap onRetry to return a Promise
   const handleRefresh = async () => {
@@ -95,6 +96,8 @@ export const DataSection = ({
               lastUpdated={lastUpdated}
               onRefresh={handleRefresh}
               isRefreshing={isRefreshing}
+              dataSource={dataSource}
+              isHistorical={isHistorical}
             />
           )}
         </div>
@@ -107,54 +110,93 @@ export const DataSection = ({
         )}
 
         {data && (
-          <ErrorBoundary
-            boundaryName={boundaryName}
-            fallback={(_error, reset) => (
+          <div className="relative">
+            {/* Loading overlay for data transitions (e.g., today ↔ yesterday) */}
+            {isRefreshing && (
               <div
-                className="p-4 text-center text-text-secondary"
-                role="alert"
-                aria-live="assertive"
+                className="absolute inset-0 bg-background-base/40 dark:bg-background-base/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg transition-opacity duration-200"
+                role="status"
+                aria-live="polite"
+                aria-label={t('loadingNewData')}
               >
-                <p className="mb-2">{t('errorDisplay', { title: title })}</p>
-                <button
-                  onClick={reset}
-                  className={`${
-                    accentColor === 'blue'
-                      ? 'bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800'
-                      : accentColor === 'purple'
-                      ? 'bg-purple-600 dark:bg-purple-700 hover:bg-purple-700 dark:hover:bg-purple-800'
-                      : 'bg-gold-400 dark:bg-gold-700 hover:bg-gold-700 dark:hover:bg-gold-800'
-                  } text-white px-4 py-2 rounded transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${accentColor}-400`}
-                >
-                  {t('retryButton')}
-                </button>
+                <div className="bg-surface/90 dark:bg-surface/80 backdrop-blur-md rounded-xl px-5 py-3 shadow-lg border border-border-light flex items-center gap-3">
+                  <svg
+                    className="animate-spin h-5 w-5 text-accent"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium text-text-primary">
+                    {t('loadingText')}
+                  </span>
+                </div>
               </div>
             )}
-          >
-            <ExpandableSection
-              mainContent={
-                <ItemCardGrid
-                  items={mainItems}
-                  data={data}
-                  itemType={itemType}
-                  accentColor={accentColor}
-                  viewMode={viewMode}
-                  onItemClick={onItemClick}
-                />
-              }
-              additionalContent={
-                <ItemCardGrid
-                  items={additionalItems}
-                  data={data}
-                  itemType={itemType}
-                  accentColor={accentColor}
-                  viewMode={viewMode}
-                  onItemClick={onItemClick}
-                />
-              }
-              additionalItemCount={additionalItems.length}
-            />
-          </ErrorBoundary>
+
+            <ErrorBoundary
+              boundaryName={boundaryName}
+              fallback={(_error, reset) => (
+                <div
+                  className="p-4 text-center text-text-secondary"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  <p className="mb-2">{t('errorDisplay', { title: title })}</p>
+                  <button
+                    onClick={reset}
+                    className={`${
+                      accentColor === 'blue'
+                        ? 'bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800'
+                        : accentColor === 'purple'
+                        ? 'bg-purple-600 dark:bg-purple-700 hover:bg-purple-700 dark:hover:bg-purple-800'
+                        : 'bg-gold-400 dark:bg-gold-700 hover:bg-gold-700 dark:hover:bg-gold-800'
+                    } text-white px-4 py-2 rounded transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${accentColor}-400`}
+                  >
+                    {t('retryButton')}
+                  </button>
+                </div>
+              )}
+            >
+              <ExpandableSection
+                mainContent={
+                  <ItemCardGrid
+                    items={mainItems}
+                    data={data}
+                    itemType={itemType}
+                    accentColor={accentColor}
+                    viewMode={viewMode}
+                    onItemClick={onItemClick}
+                  />
+                }
+                additionalContent={
+                  <ItemCardGrid
+                    items={additionalItems}
+                    data={data}
+                    itemType={itemType}
+                    accentColor={accentColor}
+                    viewMode={viewMode}
+                    onItemClick={onItemClick}
+                  />
+                }
+                additionalItemCount={additionalItems.length}
+              />
+            </ErrorBoundary>
+          </div>
         )}
       </div>
     </section>

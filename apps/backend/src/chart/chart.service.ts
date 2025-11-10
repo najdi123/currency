@@ -107,7 +107,7 @@ export class ChartService {
     USD_SHERKAT: 'usd_sherkat',
     USD_PP: 'usd_pp',
     USD_MASHAD_SELL: 'dolar_mashad_sell',
-    USD_DESTAN_SELL: 'dolar_destan_sell',
+    USD_KORDESTAN_SELL: 'dolar_kordestan_sell',
     USD_SOLEIMANIE_SELL: 'dolar_soleimanie_sell',
     AED_SELL: 'aed_sell',
     DIRHAM_DUBAI: 'dirham_dubai',
@@ -197,7 +197,7 @@ export class ChartService {
     usd_sherkat: 'currencies',
     usd_pp: 'currencies',
     dolar_mashad_sell: 'currencies',
-    dolar_destan_sell: 'currencies',
+    dolar_kordestan_sell: 'currencies',
     dolar_soleimanie_sell: 'currencies',
     aed_sell: 'currencies',
     dirham_dubai: 'currencies',
@@ -328,7 +328,7 @@ export class ChartService {
         // Currency variants
         'USD_BUY', 'USD_HARAT_SELL', 'USD_HARAT_CASH_SELL', 'USD_HARAT_CASH_BUY',
         'USD_FARDA_SELL', 'USD_FARDA_BUY', 'USD_SHAKHS', 'USD_SHERKAT', 'USD_PP',
-        'USD_MASHAD_SELL', 'USD_DESTAN_SELL', 'USD_SOLEIMANIE_SELL',
+        'USD_MASHAD_SELL', 'USD_KORDESTAN_SELL', 'USD_SOLEIMANIE_SELL',
         'AED_SELL', 'DIRHAM_DUBAI',
         'EUR_HAV', 'GBP_HAV', 'GBP_WHT', 'CAD_HAV', 'CAD_CASH', 'AUD_HAV', 'AUD_WHT'
       ],
@@ -403,11 +403,28 @@ export class ChartService {
       const freshCache = await this.getFreshCachedOHLCData(cacheKey);
       if (freshCache) {
         this.logger.log(`✅ Returning fresh cached OHLC data for ${itemCode} (${timeRange})`);
+        this.metricsService.trackCacheHit('ohlc', 'fresh_cache');
         return freshCache as NavasanOHLCDataPoint[];
+      }
+
+      // Step 1.5: Check OHLC Snapshot database (persisted data with longer TTL)
+      const snapshotData = await this.getOhlcSnapshotData(itemCode, timeRange);
+      if (snapshotData) {
+        const dataAge = this.getDataAge(snapshotData.timestamp);
+        this.logger.log(`📦 Returning OHLC snapshot data for ${itemCode} (${timeRange}) - ${dataAge} old`);
+        this.metricsService.trackCacheHit('ohlc', 'snapshot_db');
+
+        // Refresh fresh cache for faster subsequent requests (fire-and-forget)
+        this.saveOHLCToFreshCacheWithRetry(cacheKey, snapshotData.data, snapshotData.metadata).catch(err => {
+          this.logger.warn(`Failed to refresh fresh cache from snapshot: ${err.message}`);
+        });
+
+        return snapshotData.data;
       }
 
       // Step 2: Try to fetch from API
       this.logger.log(`📡 Fetching OHLC data from Navasan API for ${itemCode} (${timeRange})`);
+      this.metricsService.trackCacheMiss('ohlc', 'api_fetch');
       try {
         const apiResponse = await this.fetchOHLCFromApi(itemCode, startTimestamp, endTimestamp);
 
@@ -948,6 +965,110 @@ export class ChartService {
       // Track failure
       this.metricsService.trackSnapshotFailure('ohlc', `${itemCode}_${timeRange}`, errorMessage);
       // Don't fail the request if snapshot saving fails
+    }
+  }
+
+  /**
+   * Get OHLC snapshot from database with smart TTL based on time range
+   * Returns data if found and not expired according to retention policy
+   */
+  private async getOhlcSnapshotData(
+    itemCode: string,
+    timeRange: TimeRange,
+  ): Promise<{ data: NavasanOHLCDataPoint[]; timestamp: Date; metadata?: Record<string, unknown> } | null> {
+    try {
+      // Get expiry date based on time range retention policy
+      const expiryDate = this.getSnapshotExpiryDate(timeRange);
+
+      const snapshot = await safeDbRead(
+        () => this.ohlcSnapshotModel
+          .findOne({
+            itemCode,
+            timeRange,
+            timestamp: { $gte: expiryDate },
+          })
+          .sort({ timestamp: -1 }) // Get most recent
+          .exec(),
+        'getOhlcSnapshot',
+        this.logger,
+      );
+
+      if (!snapshot) {
+        this.metricsService.trackCacheMiss('ohlc', 'snapshot_db');
+        return null;
+      }
+
+      // Validate data structure
+      if (!snapshot.data || !Array.isArray(snapshot.data) || snapshot.data.length === 0) {
+        this.logger.warn(`Invalid OHLC snapshot data for ${itemCode} (${timeRange})`);
+        return null;
+      }
+
+      return {
+        data: snapshot.data as NavasanOHLCDataPoint[],
+        timestamp: snapshot.timestamp,
+        metadata: snapshot.metadata,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to get OHLC snapshot for ${itemCode}: ${errorMessage}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get expiry date for OHLC snapshots based on time range
+   * Different time ranges have different retention policies:
+   * - 1d: Keep for 1 hour (same as fresh cache)
+   * - 1w: Keep for 6 hours
+   * - 1m: Keep for 1 day
+   * - 3m: Keep for 7 days
+   * - 1y/all: Keep for 30 days
+   */
+  private getSnapshotExpiryDate(timeRange: TimeRange): Date {
+    const now = new Date();
+    const expiryDate = new Date(now);
+
+    switch (timeRange) {
+      case TimeRange.ONE_DAY:
+        expiryDate.setHours(now.getHours() - 1); // 1 hour
+        break;
+      case TimeRange.ONE_WEEK:
+        expiryDate.setHours(now.getHours() - 6); // 6 hours
+        break;
+      case TimeRange.ONE_MONTH:
+        expiryDate.setDate(now.getDate() - 1); // 1 day
+        break;
+      case TimeRange.THREE_MONTHS:
+        expiryDate.setDate(now.getDate() - 7); // 7 days
+        break;
+      case TimeRange.ONE_YEAR:
+      case TimeRange.ALL:
+        expiryDate.setDate(now.getDate() - 30); // 30 days
+        break;
+      default:
+        expiryDate.setHours(now.getHours() - 1); // Default: 1 hour
+    }
+
+    return expiryDate;
+  }
+
+  /**
+   * Get human-readable data age string
+   */
+  private getDataAge(timestamp: Date): string {
+    const now = new Date();
+    const ageMs = now.getTime() - timestamp.getTime();
+    const ageMinutes = Math.floor(ageMs / 60000);
+    const ageHours = Math.floor(ageMinutes / 60);
+    const ageDays = Math.floor(ageHours / 24);
+
+    if (ageDays > 0) {
+      return `${ageDays} day${ageDays > 1 ? 's' : ''}`;
+    } else if (ageHours > 0) {
+      return `${ageHours} hour${ageHours > 1 ? 's' : ''}`;
+    } else {
+      return `${ageMinutes} minute${ageMinutes > 1 ? 's' : ''}`;
     }
   }
 

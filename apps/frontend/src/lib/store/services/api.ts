@@ -25,8 +25,9 @@ export interface ApiResponseMetadata {
   isStale: boolean
   dataAge?: number // Age in minutes
   lastUpdated: Date | string
-  source: 'cache' | 'api' | 'fallback'
+  source: 'cache' | 'api' | 'fallback' | 'snapshot'
   warning?: string
+  isHistorical?: boolean // True when data is from historical queries
   historicalDate?: Date | string // Date for historical data queries
 }
 

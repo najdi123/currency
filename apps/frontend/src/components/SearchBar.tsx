@@ -21,8 +21,9 @@ interface ApiResponseMetadata {
   isStale?: boolean
   dataAge?: number
   lastUpdated?: string | Date
-  source?: 'cache' | 'api' | 'fallback'
+  source?: 'cache' | 'api' | 'fallback' | 'snapshot'
   warning?: string
+  isHistorical?: boolean
   historicalDate?: Date | string
 }
 

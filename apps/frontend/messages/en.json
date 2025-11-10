@@ -21,7 +21,9 @@
     "retryButton": "Try again",
     "errorCurrencies": "Error loading currency data",
     "errorCrypto": "Error loading cryptocurrency data",
-    "errorGold": "Error loading gold and coins data"
+    "errorGold": "Error loading gold and coins data",
+    "loadingNewData": "Loading new data",
+    "loadingText": "Loading..."
   },
   "SettingsModal": {
     "title": "Settings",
@@ -333,6 +335,18 @@
       "lastUpdate": "Last update: {time}",
       "retry": "Try updating again"
     },
+    "dataFreshness": {
+      "staleData": "Stale data",
+      "refreshButton": "Refresh",
+      "refreshError": "Refresh error"
+    },
+    "dataSource": {
+      "cache": "Cache",
+      "live": "Live",
+      "snapshot": "Snapshot",
+      "historical": "Historical",
+      "fallback": "Fallback"
+    },
     "Time": {
       "now": "Just now",
       "minutesAgo": "{count} {count, plural, one {minute} other {minutes}} ago",
@@ -485,7 +499,7 @@
       "usd_company": "Dollar Company",
       "usd_paypal": "Dollar PayPal",
       "usd_mashad_sell": "Dollar Mashhad - Sell",
-      "usd_destan_sell": "Dollar Kurdistan - Sell",
+      "usd_kordestan_sell": "Dollar Kurdistan - Sell",
       "usd_soleimanie_sell": "Dollar Sulaymaniyah - Sell",
       "aed_sell": "Dirham Dubai - Sell",
       "dirham_dubai": "Dirham Dubai",

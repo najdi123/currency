@@ -21,7 +21,9 @@
     "retryButton": "تلاش مجدد",
     "errorCurrencies": "خطا در دریافت اطلاعات ارزها",
     "errorCrypto": "خطا در دریافت اطلاعات ارزهای دیجیتال",
-    "errorGold": "خطا در دریافت اطلاعات طلا و سکه"
+    "errorGold": "خطا در دریافت اطلاعات طلا و سکه",
+    "loadingNewData": "در حال بارگذاری داده‌های جدید",
+    "loadingText": "در حال بارگذاری..."
   },
   "SettingsModal": {
     "title": "تنظیمات",
@@ -333,6 +335,18 @@
       "lastUpdate": "آخرین بروزرسانی: {time}",
       "retry": "تلاش مجدد برای بروزرسانی"
     },
+    "dataFreshness": {
+      "staleData": "داده قدیمی",
+      "refreshButton": "بروزرسانی",
+      "refreshError": "خطا در بروزرسانی"
+    },
+    "dataSource": {
+      "cache": "کش",
+      "live": "زنده",
+      "snapshot": "اسنپ‌شات",
+      "historical": "تاریخی",
+      "fallback": "جایگزین"
+    },
     "Time": {
       "now": "همین الان",
       "minutesAgo": "{count} دقیقه پیش",
@@ -485,7 +499,7 @@
       "usd_company": "دلار شرکت",
       "usd_paypal": "دلار پی‌پال",
       "usd_mashad_sell": "دلار مشهد - فروش",
-      "usd_destan_sell": "دلار کردستان - فروش",
+      "usd_kordestan_sell": "دلار کردستان - فروش",
       "usd_soleimanie_sell": "دلار سلیمانیه - فروش",
       "aed_sell": "درهم دبی - فروش",
       "dirham_dubai": "درهم دبی",

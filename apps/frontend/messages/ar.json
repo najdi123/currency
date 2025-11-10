@@ -21,7 +21,9 @@
     "retryButton": "حاول مرة أخرى",
     "errorCurrencies": "خطأ في تحميل بيانات العملات",
     "errorCrypto": "خطأ في تحميل بيانات العملات الرقمية",
-    "errorGold": "خطأ في تحميل بيانات الذهب والعملات"
+    "errorGold": "خطأ في تحميل بيانات الذهب والعملات",
+    "loadingNewData": "جارٍ تحميل البيانات الجديدة",
+    "loadingText": "جارٍ التحميل..."
   },
   "SettingsModal": {
     "title": "الإعدادات",
@@ -333,6 +335,18 @@
       "lastUpdate": "آخر تحديث: {time}",
       "retry": "حاول التحديث مرة أخرى"
     },
+    "dataFreshness": {
+      "staleData": "بيانات قديمة",
+      "refreshButton": "تحديث",
+      "refreshError": "خطأ في التحديث"
+    },
+    "dataSource": {
+      "cache": "ذاكرة التخزين المؤقت",
+      "live": "مباشر",
+      "snapshot": "لقطة",
+      "historical": "تاريخي",
+      "fallback": "احتياطي"
+    },
     "Time": {
       "now": "الآن",
       "minutesAgo": "منذ {count} {count, plural, one {دقيقة} other {دقائق}}",
@@ -485,7 +499,7 @@
       "usd_company": "دولار الشركة",
       "usd_paypal": "دولار باي بال",
       "usd_mashad_sell": "دولار مشهد - بيع",
-      "usd_destan_sell": "دولار كردستان - بيع",
+      "usd_kordestan_sell": "دولار كردستان - بيع",
       "usd_soleimanie_sell": "دولار سليمانية - بيع",
       "aed_sell": "درهم دبي - بيع",
       "dirham_dubai": "درهم دبي",

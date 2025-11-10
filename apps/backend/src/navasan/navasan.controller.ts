@@ -56,6 +56,35 @@ export class NavasanController {
    * GET /api/navasan/currencies/yesterday
    * Returns yesterday's currency rates from price snapshots or OHLC API
    * IMPORTANT: This must come BEFORE the /currencies route for proper route matching
+   *
+   * @returns Currency rates from yesterday with metadata
+   * @throws {NotFoundException} When no historical data is available for the requested date
+   *
+   * @example
+   * Response body:
+   * {
+   *   "usd_sell": { "value": "123456", "change": 1500, "utc": "...", "date": "..." },
+   *   "eur": { "value": "134567", "change": -500, "utc": "...", "date": "..." },
+   *   "_metadata": {
+   *     "isFresh": false,
+   *     "isStale": true,
+   *     "source": "snapshot",
+   *     "isHistorical": true,
+   *     "historicalDate": "2025-01-09T12:00:00Z"
+   *   }
+   * }
+   *
+   * Response headers:
+   * - X-Data-Source: 'snapshot' | 'fallback'
+   * - X-Is-Historical: 'true'
+   * - X-Historical-Date: ISO timestamp of actual data date
+   * - X-Data-Warning: Optional warning about data quality
+   *
+   * Data retrieval logic:
+   * 1. Searches database for snapshot within ±6 hours of yesterday
+   * 2. Validates snapshot data (checks for corruption, empty data)
+   * 3. Falls back to OHLC API if no valid snapshot found
+   * 4. Returns 404 if neither source has data
    */
   @Get('currencies/yesterday')
   async getCurrenciesYesterday(@Res() res: Response) {

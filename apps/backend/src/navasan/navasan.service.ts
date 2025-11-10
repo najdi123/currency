@@ -36,11 +36,16 @@ export class NavasanService {
 
   // Define items to fetch from Navasan API
   private readonly items = {
-    all: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_destan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht,usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc,sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
-    currencies: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_destan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht',
+    all: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_kordestan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht,usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc,sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
+    currencies: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_kordestan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht',
     crypto: 'usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc',
     gold: 'sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
   };
+
+  // PERFORMANCE OPTIMIZATIONS
+  private ohlcCache = new Map<string, { data: NavasanResponse; expiry: number }>();
+  private pendingRequests = new Map<string, Promise<ApiResponse<NavasanResponse>>>();
+  private readonly ohlcCacheDuration = 3600000; // 1 hour in milliseconds
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
@@ -52,6 +57,28 @@ export class NavasanService {
     if (!this.apiKey) {
       this.logger.error('NAVASAN_API_KEY is not set in environment variables');
       throw new Error('NAVASAN_API_KEY is required. Please set it in your .env file.');
+    }
+
+    // Clear expired cache entries every 10 minutes
+    setInterval(() => this.cleanExpiredCache(), 600000);
+  }
+
+  /**
+   * Clean expired entries from OHLC cache
+   */
+  private cleanExpiredCache(): void {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [key, value] of this.ohlcCache.entries()) {
+      if (now > value.expiry) {
+        this.ohlcCache.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      this.logger.log(`🧹 Cleaned ${cleaned} expired OHLC cache entries`);
     }
   }
 
@@ -871,11 +898,21 @@ export class NavasanService {
   /**
    * Fetch yesterday's data from OHLC API as fallback
    * Gets the latest OHLC point (close price) from yesterday
+   * Results are cached for 1 hour to improve performance
    */
   private async fetchFromOHLCForYesterday(
     category: string,
   ): Promise<NavasanResponse | null> {
     try {
+      // Check cache first
+      const cacheKey = `ohlc-${category}-${new Date().toDateString()}`;
+      const cached = this.ohlcCache.get(cacheKey);
+
+      if (cached && Date.now() < cached.expiry) {
+        this.logger.log(`📦 Using cached OHLC data for ${category}`);
+        return cached.data;
+      }
+
       // Calculate yesterday's date range
       const now = new Date();
       const yesterday = new Date(now);
@@ -958,7 +995,16 @@ export class NavasanService {
       }
 
       this.logger.log(`✅ Successfully fetched ${Object.keys(result).length} items from OHLC for ${category}`);
-      return result as NavasanResponse;
+
+      // Cache the result for 1 hour
+      const finalResult = result as NavasanResponse;
+      this.ohlcCache.set(cacheKey, {
+        data: finalResult,
+        expiry: Date.now() + this.ohlcCacheDuration,
+      });
+      this.logger.log(`📦 Cached OHLC data for ${category} (expires in 1 hour)`);
+
+      return finalResult;
 
     } catch (error) {
       this.logger.error(
@@ -972,11 +1018,39 @@ export class NavasanService {
    * Get historical data for yesterday
    * First tries to find data in price_snapshots database
    * Falls back to OHLC API if not found
+   * Implements request deduplication to prevent multiple simultaneous requests
    */
   async getHistoricalData(category: string): Promise<ApiResponse<NavasanResponse>> {
     // Validate category to prevent NoSQL injection
     this.validateCategory(category);
 
+    // Request deduplication - check if there's already a pending request
+    const requestKey = `historical-${category}`;
+    const existingRequest = this.pendingRequests.get(requestKey);
+
+    if (existingRequest) {
+      this.logger.log(`⏳ Waiting for existing historical data request: ${category}`);
+      return existingRequest;
+    }
+
+    // Create new request and store it
+    const requestPromise = this._getHistoricalDataInternal(category);
+    this.pendingRequests.set(requestKey, requestPromise);
+
+    try {
+      const result = await requestPromise;
+      return result;
+    } finally {
+      // Clean up pending request
+      this.pendingRequests.delete(requestKey);
+    }
+  }
+
+  /**
+   * Internal method to fetch historical data
+   * This is separated to allow request deduplication wrapping
+   */
+  private async _getHistoricalDataInternal(category: string): Promise<ApiResponse<NavasanResponse>> {
     this.logger.log(`📅 Fetching historical data for category: ${category} (yesterday)`);
 
     try {
@@ -989,25 +1063,49 @@ export class NavasanService {
       const snapshot = await this.findClosestSnapshot(category, yesterday);
 
       if (snapshot) {
-        const dataAgeMinutes = this.getDataAgeMinutes(snapshot.timestamp);
-        const timeDifferenceHours = Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) / (1000 * 60 * 60);
+        // Validate snapshot data before using
+        try {
+          if (!snapshot.data || typeof snapshot.data !== 'object') {
+            this.logger.warn(`⚠️ Corrupted snapshot found for ${category} - invalid data structure, skipping to fallback`);
+            throw new Error('Invalid snapshot data structure');
+          }
 
-        this.logger.log(
-          `✅ Found historical snapshot for ${category} from ${snapshot.timestamp.toISOString()} (${timeDifferenceHours.toFixed(1)}h difference)`,
-        );
+          const itemCount = Object.keys(snapshot.data).length;
+          if (itemCount === 0) {
+            this.logger.warn(`⚠️ Empty snapshot found for ${category} - no items, skipping to fallback`);
+            throw new Error('Empty snapshot data');
+          }
 
-        return {
-          data: snapshot.data as NavasanResponse,
-          metadata: {
-            isFresh: false,
-            isStale: true,
-            dataAge: dataAgeMinutes,
-            lastUpdated: snapshot.timestamp,
-            source: 'snapshot',
-            isHistorical: true,
-            historicalDate: snapshot.timestamp,
-          },
-        };
+          // Check if this is weekend/holiday data (timestamp is more than 2 days old from yesterday)
+          const daysDifference = Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysDifference > 2) {
+            this.logger.warn(`⚠️ Snapshot for ${category} is ${daysDifference.toFixed(1)} days old - may be weekend/holiday data`);
+          }
+
+          const dataAgeMinutes = this.getDataAgeMinutes(snapshot.timestamp);
+          const timeDifferenceHours = Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) / (1000 * 60 * 60);
+
+          this.logger.log(
+            `✅ Found valid historical snapshot for ${category} from ${snapshot.timestamp.toISOString()} (${timeDifferenceHours.toFixed(1)}h difference, ${itemCount} items)`,
+          );
+
+          return {
+            data: snapshot.data as NavasanResponse,
+            metadata: {
+              isFresh: false,
+              isStale: true,
+              dataAge: dataAgeMinutes,
+              lastUpdated: snapshot.timestamp,
+              source: 'snapshot',
+              isHistorical: true,
+              historicalDate: snapshot.timestamp,
+              warning: daysDifference > 2 ? `Data is ${Math.floor(daysDifference)} days old (possible weekend/holiday)` : undefined,
+            },
+          };
+        } catch (validationError) {
+          this.logger.error(`❌ Snapshot validation failed for ${category}: ${validationError instanceof Error ? validationError.message : String(validationError)}`);
+          // Continue to OHLC fallback
+        }
       }
 
       // Step 2: Snapshot not found, try OHLC API fallback

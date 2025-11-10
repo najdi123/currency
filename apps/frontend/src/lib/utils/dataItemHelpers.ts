@@ -142,8 +142,8 @@ export const currencyVariants: CurrencyVariant[] = [
     displayOrder: 10,
   },
   {
-    code: 'usd_destan_sell',
-    apiCode: 'dolar_destan_sell',
+    code: 'usd_kordestan_sell',
+    apiCode: 'dolar_kordestan_sell',
     parentCode: 'usd_sell',
     variantType: 'special',
     displayOrder: 11,
