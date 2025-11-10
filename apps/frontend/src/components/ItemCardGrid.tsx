@@ -130,11 +130,23 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
 
         // Check if this currency has variants and extract variant data
         const itemHasVariants = itemType === 'currency' && hasVariants(item.key)
+        const variantDefinitions = itemHasVariants ? getVariantsForCurrency(item.key) : []
         const variants = itemHasVariants
-          ? getVariantsForCurrency(item.key)
+          ? variantDefinitions
               .map((v) => getVariantData(v, data))
               .filter((v): v is NonNullable<typeof v> => v !== null)
           : []
+
+        // Debug logging for variants
+        if (itemHasVariants && item.key === 'usd_sell') {
+          console.log(`[ItemCardGrid] USD Variants:`, {
+            hasVariants: itemHasVariants,
+            definedVariants: variantDefinitions.length,
+            foundVariants: variants.length,
+            variantCodes: variantDefinitions.map(v => v.apiCode),
+            dataKeys: Object.keys(data).filter(k => k.includes('dolar') || k.includes('harat')),
+          })
+        }
 
         return (
           <ItemCard
