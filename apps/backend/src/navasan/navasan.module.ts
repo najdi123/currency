@@ -18,6 +18,9 @@ import { MetricsModule } from '../metrics/metrics.module';
   ],
   controllers: [NavasanController],
   providers: [NavasanService],
-  exports: [NavasanService],
+  exports: [
+    NavasanService,
+    MongooseModule, // Export MongooseModule to make the models available to other modules
+  ],
 })
 export class NavasanModule {}
