@@ -17,6 +17,7 @@ import { WalletsModule } from './wallets/wallets.module';
 import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { OHLCModule } from './ohlc/ohlc.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
      WalletsModule,
      AuthModule,
      SchedulerModule,
+     OHLCModule,
   ],
   controllers: [AppController],
   providers: [

@@ -17,6 +17,7 @@
     // Enable strict mode for better type safety
     // Note: "strict": true enables all strict options below automatically
     "strict": true,
+    "strictPropertyInitialization": false, // Disabled for Mongoose schemas
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true
   }
