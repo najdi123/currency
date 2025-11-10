@@ -234,6 +234,20 @@ export class MetricsService {
   }
 
   /**
+   * Track a cache hit
+   */
+  trackCacheHit(category: string, source: string): void {
+    this.logger.debug(`Cache hit: ${category} from ${source}`);
+  }
+
+  /**
+   * Track a cache miss
+   */
+  trackCacheMiss(category: string, source: string): void {
+    this.logger.debug(`Cache miss: ${category} from ${source}`);
+  }
+
+  /**
    * Clear all metrics (useful for testing or reset)
    */
   clearAllMetrics(): void {
