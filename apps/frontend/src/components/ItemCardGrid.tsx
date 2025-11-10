@@ -138,14 +138,47 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
           : []
 
         // Debug logging for variants
-        if (itemHasVariants && item.key === 'usd_sell') {
-          console.log(`[ItemCardGrid] USD Variants:`, {
-            hasVariants: itemHasVariants,
-            definedVariants: variantDefinitions.length,
-            foundVariants: variants.length,
-            variantCodes: variantDefinitions.map(v => v.apiCode),
-            dataKeys: Object.keys(data).filter(k => k.includes('dolar') || k.includes('harat')),
-          })
+        if (itemHasVariants) {
+          if (item.key === 'usd_sell') {
+            const allUSDVariants = variantDefinitions.map(v => ({
+              code: v.code,
+              apiCode: v.apiCode,
+              hasData: !!data[v.apiCode],
+              type: v.variantType,
+            }))
+            const foundVariantCodes = variants.map(v => v.apiCode)
+            console.log(`[ItemCardGrid] USD Variants Summary:`, {
+              total: variantDefinitions.length,
+              found: variants.length,
+              missing: variantDefinitions.filter(v => !data[v.apiCode]).map(v => v.apiCode),
+              specificVariants: {
+                soleimanie: !!data['dolar_soleimanie_sell'],
+                kordestan: !!data['dolar_kordestan_sell'],
+                mashad: !!data['dolar_mashad_sell'],
+                harat: !!data['dolar_harat_sell'],
+                haratCash: !!data['harat_naghdi_sell'],
+              },
+              allVariants: allUSDVariants,
+            })
+          }
+          if (item.key === 'aed') {
+            const allAEDVariants = variantDefinitions.map(v => ({
+              code: v.code,
+              apiCode: v.apiCode,
+              hasData: !!data[v.apiCode],
+              type: v.variantType,
+            }))
+            console.log(`[ItemCardGrid] AED Variants Summary:`, {
+              total: variantDefinitions.length,
+              found: variants.length,
+              missing: variantDefinitions.filter(v => !data[v.apiCode]).map(v => v.apiCode),
+              specificVariants: {
+                dubai: !!data['dirham_dubai'],
+                tehran: !!data['aed_sell'],
+              },
+              allVariants: allAEDVariants,
+            })
+          }
         }
 
         return (
