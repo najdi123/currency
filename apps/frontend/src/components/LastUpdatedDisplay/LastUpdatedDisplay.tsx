@@ -20,7 +20,7 @@ export const LastUpdatedDisplay = ({
   const locale = useLocale()
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-4" role="region" aria-label={t('lastUpdated')}>
       {/* Left Navigation Button - Previous Day / Yesterday */}
    {historicalNav && (
   <button
@@ -29,6 +29,7 @@ export const LastUpdatedDisplay = ({
     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
     aria-label={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
     title={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
+    aria-disabled={!historicalNav.canGoBack || isFetching}
   >
     {/* Conditional Arrow: Flip in Farsi */}
     {locale === 'fa' || locale === 'ar' ? (
@@ -44,8 +45,8 @@ export const LastUpdatedDisplay = ({
 )}
 
       {/* Last Updated Time Display */}
-      <div className="flex items-center gap-3 text-text-secondary">
-      <span className="relative flex h-3 w-3" aria-hidden="true">
+      <div className="flex items-center gap-3 text-text-secondary" aria-busy={isFetching}>
+      <span className="relative flex h-3 w-3" aria-hidden="true" role="status" aria-label={isFetching ? t('loading') || 'Loading' : t('dataReady') || 'Data ready'}>
         {isFetching ? (
           <>
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
@@ -141,6 +142,7 @@ export const LastUpdatedDisplay = ({
     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
     aria-label={historicalNav.canGoForward ? t('nextDay') : t('today')}
     title={historicalNav.canGoForward ? t('nextDay') : t('today')}
+    aria-disabled={historicalNav.isToday || isFetching}
   >
     <span className="hidden sm:inline">
       {historicalNav.canGoForward ? t('nextDay') : t('today')}

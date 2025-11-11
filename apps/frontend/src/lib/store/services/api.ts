@@ -292,7 +292,10 @@ export const api = createApi({
     // Historical data endpoints with date parameter (90 days back)
     getCurrenciesHistorical: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, string>({
       query: (date) => `/navasan/currencies/historical?date=${date}`,
-      providesTags: ['Rates', 'Currencies'],
+      providesTags: (_result, _error, date) => [
+        { type: 'Currencies' as const, id: `historical-${date}` },
+        'Rates'
+      ],
       keepUnusedDataFor: 1200,
       transformResponse: (response: any) => {
         console.log('[RTK Query] Currencies Historical response has _metadata:', '_metadata' in response)
@@ -304,7 +307,10 @@ export const api = createApi({
     }),
     getCryptoHistorical: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, string>({
       query: (date) => `/navasan/crypto/historical?date=${date}`,
-      providesTags: ['Rates', 'DigitalCurrencies'],
+      providesTags: (_result, _error, date) => [
+        { type: 'DigitalCurrencies' as const, id: `historical-${date}` },
+        'Rates'
+      ],
       keepUnusedDataFor: 1200,
       transformResponse: (response: any) => {
         console.log('[RTK Query] Crypto Historical response has _metadata:', '_metadata' in response)
@@ -316,7 +322,10 @@ export const api = createApi({
     }),
     getGoldHistorical: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, string>({
       query: (date) => `/navasan/gold/historical?date=${date}`,
-      providesTags: ['Rates', 'Gold'],
+      providesTags: (_result, _error, date) => [
+        { type: 'Gold' as const, id: `historical-${date}` },
+        'Rates'
+      ],
       keepUnusedDataFor: 1200,
       transformResponse: (response: any) => {
         console.log('[RTK Query] Gold Historical response has _metadata:', '_metadata' in response)
