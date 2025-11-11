@@ -18,7 +18,9 @@
     "nextDay": "روز بعد",
     "today": "امروز",
     "goToYesterday": "دیروز",
-    "viewingDate": "مشاهده تاریخ: {date}"
+    "viewingDate": "مشاهده تاریخ: {date}",
+    "loading": "در حال بارگذاری",
+    "dataReady": "داده‌ها آماده"
   },
   "DataSection": {
     "currencies": "ارزها",

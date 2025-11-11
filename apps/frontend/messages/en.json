@@ -18,7 +18,9 @@
     "nextDay": "Next Day",
     "today": "Today",
     "goToYesterday": "Yesterday",
-    "viewingDate": "Viewing: {date}"
+    "viewingDate": "Viewing: {date}",
+    "loading": "Loading",
+    "dataReady": "Data ready"
   },
   "DataSection": {
     "currencies": "Currencies",

@@ -18,7 +18,9 @@
     "nextDay": "اليوم التالي",
     "today": "اليوم",
     "goToYesterday": "أمس",
-    "viewingDate": "عرض: {date}"
+    "viewingDate": "عرض: {date}",
+    "loading": "جارٍ التحميل",
+    "dataReady": "البيانات جاهزة"
   },
   "DataSection": {
     "currencies": "العملات",
