@@ -1,5 +1,6 @@
 import React from 'react'
 import { MiniSparkline } from '../MiniSparkline'
+import { useTranslations } from 'next-intl'
 
 interface ItemCardSparklineProps {
   /**
@@ -52,7 +53,7 @@ export const ItemCardSparkline: React.FC<ItemCardSparklineProps> = ({
 }) => {
   // Don't render if show is false
   if (!show) return null
-
+  const t = useTranslations('Chart')
   return (
     <div className="flex-shrink-0 self-center">
       {/* Screen reader description for sparkline */}
@@ -68,6 +69,10 @@ export const ItemCardSparkline: React.FC<ItemCardSparklineProps> = ({
         className="opacity-70"
         aria-hidden="true"
       />
+      <div className='flex w-full justify-center'>
+        {/* <p className='text-xs'>1 week</p>//todo replace with t('week') */}
+        <p className='text-xs'>{t('1w')}</p>
+      </div>
     </div>
   )
 }

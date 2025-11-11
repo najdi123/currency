@@ -22,20 +22,26 @@ export const LastUpdatedDisplay = ({
   return (
     <div className="flex items-center gap-4">
       {/* Left Navigation Button - Previous Day / Yesterday */}
-      {historicalNav && (
-        <button
-          onClick={historicalNav.goToPreviousDay}
-          disabled={!historicalNav.canGoBack || isFetching}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          aria-label={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
-          title={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
-        >
-          <FiChevronLeft className="text-base" aria-hidden="true" />
-          <span className="hidden sm:inline">
-            {historicalNav.isToday ? t('goToYesterday') || 'Yesterday' : t('previousDay')}
-          </span>
-        </button>
-      )}
+   {historicalNav && (
+  <button
+    onClick={historicalNav.goToPreviousDay}
+    disabled={!historicalNav.canGoBack || isFetching}
+    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+    aria-label={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
+    title={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
+  >
+    {/* Conditional Arrow: Flip in Farsi */}
+    {locale === 'fa' || locale === 'ar' ? (
+      <FiChevronRight className="text-base" aria-hidden="true" />
+    ) : (
+      <FiChevronLeft className="text-base" aria-hidden="true" />
+    )}
+
+    <span className="hidden sm:inline">
+      {historicalNav.isToday ? t('goToYesterday') || 'Yesterday' : t('previousDay')}
+    </span>
+  </button>
+)}
 
       {/* Last Updated Time Display */}
       <div className="flex items-center gap-3 text-text-secondary">
@@ -77,13 +83,32 @@ export const LastUpdatedDisplay = ({
             </div>
             <div className="flex flex-col gap-0.5 text-apple-caption text-text-tertiary">
               <div>
-                {new Intl.DateTimeFormat('fa-IR', {
-                  timeZone: 'Asia/Tehran',
-                  calendar: 'persian',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                }).format(historicalNav && historicalNav.selectedDate ? historicalNav.selectedDate : lastUpdated)}
+          <div dir="rtl" className="text-right">
+  {(() => {
+    const date = historicalNav?.selectedDate ?? lastUpdated
+    if (!date) return '--'
+
+    const usePersianLocale = locale === 'fa'
+
+    const formatter = new Intl.DateTimeFormat(
+      usePersianLocale ? 'fa-IR' : 'en-u-nu-latn-ca-persian', // Latin digits, Persian calendar
+      {
+        timeZone: 'Asia/Tehran',
+        calendar: 'persian',
+        year: 'numeric',
+        month: usePersianLocale ? 'long' : 'numeric',
+        day: 'numeric',
+      }
+    )
+
+    const parts = formatter.formatToParts(date)
+    const year = parts.find(p => p.type === 'year')?.value
+    const month = parts.find(p => p.type === 'month')?.value
+    const day = parts.find(p => p.type === 'day')?.value
+
+    return `${day} ${month} ${year}`
+  })()}
+</div>
               </div>
               <div>
                 {new Intl.DateTimeFormat('en-US', {
@@ -109,24 +134,30 @@ export const LastUpdatedDisplay = ({
       </div>
 
       {/* Right Navigation Button - Today / Next Day */}
-      {historicalNav && (
-        <button
-          onClick={historicalNav.canGoForward ? historicalNav.goToNextDay : historicalNav.goToToday}
-          disabled={historicalNav.isToday || isFetching}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-          aria-label={historicalNav.canGoForward ? t('nextDay') : t('today')}
-          title={historicalNav.canGoForward ? t('nextDay') : t('today')}
-        >
-          <span className="hidden sm:inline">
-            {historicalNav.canGoForward ? t('nextDay') : t('today')}
-          </span>
-          {historicalNav.canGoForward ? (
-            <FiChevronRight className="text-base" aria-hidden="true" />
-          ) : (
-            <HiCalendar className="text-base" aria-hidden="true" />
-          )}
-        </button>
-      )}
+     {historicalNav && (
+  <button
+    onClick={historicalNav.canGoForward ? historicalNav.goToNextDay : historicalNav.goToToday}
+    disabled={historicalNav.isToday || isFetching}
+    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+    aria-label={historicalNav.canGoForward ? t('nextDay') : t('today')}
+    title={historicalNav.canGoForward ? t('nextDay') : t('today')}
+  >
+    <span className="hidden sm:inline">
+      {historicalNav.canGoForward ? t('nextDay') : t('today')}
+    </span>
+
+    {/* Arrow flips in Farsi: Next Day = left arrow in RTL */}
+    {historicalNav.canGoForward ? (
+      locale === 'fa' || locale === 'ar' ? (
+        <FiChevronLeft className="text-base" aria-hidden="true" />
+      ) : (
+        <FiChevronRight className="text-base" aria-hidden="true" />
+      )
+    ) : (
+      <HiCalendar className="text-base" aria-hidden="true" />
+    )}
+  </button>
+)}
     </div>
   )
 }

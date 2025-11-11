@@ -47,6 +47,7 @@ const ChartBottomSheet = lazy<
 
 export default function Home() {
   const t = useTranslations('Home')
+  const t2 = useTranslations('Chart')
   const tHistorical = useTranslations('Historical')
 
   // Custom hooks for state management
@@ -379,7 +380,7 @@ export default function Home() {
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                         <p className="text-text-primary text-sm">
-                          {t('chart.loading')}
+                          {t2('loading')}
                         </p>
                       </div>
                     </div>
