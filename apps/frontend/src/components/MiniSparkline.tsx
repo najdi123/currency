@@ -140,7 +140,6 @@ const MiniSparklineComponent: React.FC<MiniSparklineProps> = ({
       role="presentation"
       aria-hidden="true"
       preserveAspectRatio="none"
-      dir="ltr"
       style={{ direction: 'ltr' }}
     >
       <path
