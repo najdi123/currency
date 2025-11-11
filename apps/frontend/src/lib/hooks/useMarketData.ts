@@ -3,11 +3,12 @@ import {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
-  useGetCurrenciesYesterdayQuery,
-  useGetCryptoYesterdayQuery,
-  useGetGoldYesterdayQuery,
+  useGetCurrenciesHistoricalQuery,
+  useGetCryptoHistoricalQuery,
+  useGetGoldHistoricalQuery,
 } from '@/lib/store/services/api'
 import { computeMarketState } from '@/lib/utils/marketDataUtils'
+import { formatDateForApi } from '@/lib/utils/dateUtils'
 
 // Disable polling to prevent hitting rate limits
 // Users can manually refresh using the refresh button
@@ -20,19 +21,57 @@ const POLLING_INTERVAL = 0 // Disabled - was 5 minutes (300000)
  * Note: Polling is disabled to prevent 429 rate limit errors.
  * Users can manually refresh data using the refresh button.
  *
- * @param showYesterday - If true, fetches yesterday's historical data instead of today's
+ * @param selectedDate - Date to fetch data for (null = today/current)
  */
-export const useMarketData = (showYesterday = false) => {
-  // Use yesterday's endpoints when showYesterday is true
+export const useMarketData = (selectedDate: Date | null = null) => {
+  // Determine if we're fetching historical data
+  const isHistorical = selectedDate !== null
+  const dateParam = isHistorical ? formatDateForApi(selectedDate) : ''
+
+  // Current data queries (always enabled when not historical)
+  const currenciesCurrentQuery = useGetCurrenciesQuery(undefined, {
+    pollingInterval: POLLING_INTERVAL,
+    skip: isHistorical,
+  })
+
+  const cryptoCurrentQuery = useGetCryptoQuery(undefined, {
+    pollingInterval: POLLING_INTERVAL,
+    skip: isHistorical,
+  })
+
+  const goldCurrentQuery = useGetGoldQuery(undefined, {
+    pollingInterval: POLLING_INTERVAL,
+    skip: isHistorical,
+  })
+
+  // Historical data queries (enabled when historical date selected)
+  const currenciesHistoricalQuery = useGetCurrenciesHistoricalQuery(dateParam || '', {
+    pollingInterval: POLLING_INTERVAL,
+    skip: !isHistorical || !dateParam,
+  })
+
+  const cryptoHistoricalQuery = useGetCryptoHistoricalQuery(dateParam || '', {
+    pollingInterval: POLLING_INTERVAL,
+    skip: !isHistorical || !dateParam,
+  })
+
+  const goldHistoricalQuery = useGetGoldHistoricalQuery(dateParam || '', {
+    pollingInterval: POLLING_INTERVAL,
+    skip: !isHistorical || !dateParam,
+  })
+
+  // Select the appropriate query result based on mode
+  const currenciesQuery = isHistorical ? currenciesHistoricalQuery : currenciesCurrentQuery
+  const cryptoQuery = isHistorical ? cryptoHistoricalQuery : cryptoCurrentQuery
+  const goldQuery = isHistorical ? goldHistoricalQuery : goldCurrentQuery
+
   const {
     data: currencies,
     isLoading: currenciesLoading,
     isFetching: currenciesFetching,
     error: currenciesError,
     refetch: refetchCurrencies,
-  } = (showYesterday ? useGetCurrenciesYesterdayQuery : useGetCurrenciesQuery)(undefined, {
-    pollingInterval: POLLING_INTERVAL,
-  })
+  } = currenciesQuery
 
   const {
     data: crypto,
@@ -40,9 +79,7 @@ export const useMarketData = (showYesterday = false) => {
     isFetching: cryptoFetching,
     error: cryptoError,
     refetch: refetchCrypto,
-  } = (showYesterday ? useGetCryptoYesterdayQuery : useGetCryptoQuery)(undefined, {
-    pollingInterval: POLLING_INTERVAL,
-  })
+  } = cryptoQuery
 
   const {
     data: gold,
@@ -50,9 +87,7 @@ export const useMarketData = (showYesterday = false) => {
     isFetching: goldFetching,
     error: goldError,
     refetch: refetchGold,
-  } = (showYesterday ? useGetGoldYesterdayQuery : useGetGoldQuery)(undefined, {
-    pollingInterval: POLLING_INTERVAL,
-  })
+  } = goldQuery
 
   // Memoize computed state to prevent unnecessary re-renders
   const computedState = useMemo(

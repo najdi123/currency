@@ -59,15 +59,16 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
   // If icon is invalid, render a placeholder circle
   if (!isValidIconComponent(Icon)) {
     return (
-      <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
+      <div className="flex justify-between items-start gap-2 mb-auto">
         <div
           className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 xl:w-14 xl:h-14 bg-bg-tertiary rounded-full flex-shrink-0"
           aria-hidden="true"
+          dir="ltr"
         />
         <h3
           className={`${
             compact ? 'text-xs sm:text-xs md:text-sm' : 'text-sm sm:text-base'
-          } font-semibold text-text-secondary truncate text-right flex-1`}
+          } font-semibold text-text-secondary truncate text-right [dir=ltr]:text-left flex-1`}
         >
           {name}
         </h3>
@@ -77,22 +78,28 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
   }
 
   return (
-    <div className="flex justify-between items-start gap-2 mb-auto" dir="ltr">
-      <Icon
-        className={`${
-          compact
-            ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
-            : 'text-2xl sm:text-3xl lg:text-4xl xl:text-5xl'
-        } flex-shrink-0 ${iconColor}`}
-        aria-hidden="true"
-      />
+    <div className="flex justify-between items-start gap-2 mb-auto">
+      {/* Icon - force LTR to prevent flipping */}
+      <div dir="ltr" className="flex-shrink-0">
+        <Icon
+          className={`${
+            compact
+              ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl'
+              : 'text-2xl sm:text-3xl lg:text-4xl xl:text-5xl'
+          } ${iconColor}`}
+          aria-hidden="true"
+        />
+      </div>
+
+      {/* Name - respect document direction */}
       <h3
         className={`${
           compact ? 'text-xs sm:text-xs md:text-sm' : 'text-sm sm:text-base'
-        } font-semibold text-text-secondary truncate text-right flex-1 min-w-0`}
+        } font-semibold text-text-secondary truncate flex-1 min-w-0 text-right [dir=ltr]:text-left`}
       >
         {name}
       </h3>
+
       {variantsDropdown && <div className="flex-shrink-0">{variantsDropdown}</div>}
     </div>
   )

@@ -1,38 +1,55 @@
 /**
+ * Convert Western (Arabic) numerals to Persian/Farsi numerals
+ * Maps 0-9 to ۰-۹
+ */
+export function toPersianDigits(str: string): string {
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']
+  return str.replace(/\d/g, (digit) => persianDigits[parseInt(digit)])
+}
+
+/**
  * Format a number or string as Toman currency with comma separators
  * @param value - The value to format (number or string)
- * @returns Formatted string with commas (e.g., "106,850")
+ * @param locale - Locale for number formatting (default: 'en-US')
+ * @returns Formatted string with commas (e.g., "106,850" or "۱۰۶,۸۵۰" for Persian)
  */
-export function formatToman(value: string | number | undefined | null): string {
-  if (value === undefined || value === null) return '0'
+export function formatToman(value: string | number | undefined | null, locale?: string): string {
+  if (value === undefined || value === null) return locale === 'fa' ? '۰' : '0'
 
   const num = typeof value === 'string' ? parseFloat(value) : value
 
-  if (isNaN(num)) return '0'
+  if (isNaN(num)) return locale === 'fa' ? '۰' : '0'
 
-  return new Intl.NumberFormat('en-US').format(Math.round(num))
+  const formatted = new Intl.NumberFormat('en-US').format(Math.round(num))
+
+  return locale === 'fa' ? toPersianDigits(formatted) : formatted
 }
 
 /**
  * Format a change amount in Toman with Persian scale units
  * @param change - The change amount in Toman
+ * @param locale - Locale for number formatting (default: 'fa')
  * @returns Formatted string with +/- sign and scale (e.g., "+2.5 میلیون تومان", "-800 هزار تومان")
  *
  * Formatting rules (Persian convention):
- * - Under 1,000: Exact number (e.g., "+850 تومان")
- * - 1,000 - 999,999: "هزار تومان" with up to 1 decimal (e.g., "+12.5 هزار تومان")
- * - 1,000,000 - 999,999,999: "میلیون تومان" with up to 2 decimals (e.g., "+2.31 میلیون تومان")
- * - 1 billion+: "میلیارد تومان" with up to 2 decimals (e.g., "+12.13 میلیارد تومان")
+ * - Under 1,000: Exact number (e.g., "+850 تومان" or "+۸۵۰ تومان" for Persian)
+ * - 1,000 - 999,999: "هزار تومان" with up to 1 decimal (e.g., "+12.5 هزار تومان" or "+۱۲.۵ هزار تومان")
+ * - 1,000,000 - 999,999,999: "میلیون تومان" with up to 2 decimals (e.g., "+2.31 میلیون تومان" or "+۲.۳۱ میلیون تومان")
+ * - 1 billion+: "میلیارد تومان" with up to 2 decimals (e.g., "+12.13 میلیارد تومان" or "+۱۲.۱۳ میلیارد تومان")
  */
-export function formatChange(change: number | undefined | null): string {
-  if (change === undefined || change === null || change === 0) return '0 تومان'
+export function formatChange(change: number | undefined | null, locale?: string): string {
+  if (change === undefined || change === null || change === 0) {
+    return locale === 'fa' ? '۰ تومان' : '0 تومان'
+  }
 
   const sign = change > 0 ? '+' : '-'
   const absNum = Math.abs(change)
 
   // Under 1,000: show exact number
   if (absNum < 1000) {
-    return `${sign}${new Intl.NumberFormat('en-US').format(Math.round(absNum))} تومان`
+    const formatted = new Intl.NumberFormat('en-US').format(Math.round(absNum))
+    const number = locale === 'fa' ? toPersianDigits(formatted) : formatted
+    return `${sign}${number} تومان`
   }
 
   // 1,000 - 999,999: use "هزار تومان" (thousand)
@@ -41,7 +58,9 @@ export function formatChange(change: number | undefined | null): string {
     const formatted = thousands % 1 === 0
       ? thousands.toFixed(0)
       : thousands.toFixed(1)
-    return `${sign}${new Intl.NumberFormat('en-US').format(parseFloat(formatted))} هزار تومان`
+    const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
+    const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
+    return `${sign}${finalNumber} هزار تومان`
   }
 
   // 1,000,000 - 999,999,999: use "میلیون تومان" (million)
@@ -52,7 +71,9 @@ export function formatChange(change: number | undefined | null): string {
       : millions < 10
         ? millions.toFixed(2) // More precision for single-digit millions
         : millions.toFixed(1) // Less precision for larger numbers
-    return `${sign}${new Intl.NumberFormat('en-US').format(parseFloat(formatted))} میلیون تومان`
+    const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
+    const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
+    return `${sign}${finalNumber} میلیون تومان`
   }
 
   // 1 billion+: use "میلیارد تومان" (billion)
@@ -62,20 +83,23 @@ export function formatChange(change: number | undefined | null): string {
     : billions < 10
       ? billions.toFixed(2)
       : billions.toFixed(1)
-  return `${sign}${new Intl.NumberFormat('en-US').format(parseFloat(formatted))} میلیارد تومان`
+  const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
+  const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
+  return `${sign}${finalNumber} میلیارد تومان`
 }
 
 /**
  * Format a change amount as separate parts for custom layout
  * @param change - The change amount in Toman
+ * @param locale - Locale for number formatting (default: 'fa')
  * @returns Object with label (Persian text), sign, and formatted number
  */
-export function formatChangeParts(change: number | undefined | null): {
+export function formatChangeParts(change: number | undefined | null, locale?: string): {
   label: string
   signedNumber: string
 } {
   if (change === undefined || change === null || change === 0) {
-    return { label: 'تومان', signedNumber: '0' }
+    return { label: 'تومان', signedNumber: locale === 'fa' ? '۰' : '0' }
   }
 
   const sign = change > 0 ? '+' : '-'
@@ -83,9 +107,11 @@ export function formatChangeParts(change: number | undefined | null): {
 
   // Under 1,000: show exact number
   if (absNum < 1000) {
+    const formatted = new Intl.NumberFormat('en-US').format(Math.round(absNum))
+    const number = locale === 'fa' ? toPersianDigits(formatted) : formatted
     return {
       label: 'تومان',
-      signedNumber: `${sign}${new Intl.NumberFormat('en-US').format(Math.round(absNum))}`
+      signedNumber: `${sign}${number}`
     }
   }
 
@@ -95,9 +121,11 @@ export function formatChangeParts(change: number | undefined | null): {
     const formatted = thousands % 1 === 0
       ? thousands.toFixed(0)
       : thousands.toFixed(1)
+    const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
+    const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
     return {
       label: 'هزار تومان',
-      signedNumber: `${sign}${new Intl.NumberFormat('en-US').format(parseFloat(formatted))}`
+      signedNumber: `${sign}${finalNumber}`
     }
   }
 
@@ -109,9 +137,11 @@ export function formatChangeParts(change: number | undefined | null): {
       : millions < 10
         ? millions.toFixed(2)
         : millions.toFixed(1)
+    const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
+    const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
     return {
       label: 'میلیون تومان',
-      signedNumber: `${sign}${new Intl.NumberFormat('en-US').format(parseFloat(formatted))}`
+      signedNumber: `${sign}${finalNumber}`
     }
   }
 
@@ -122,9 +152,11 @@ export function formatChangeParts(change: number | undefined | null): {
     : billions < 10
       ? billions.toFixed(2)
       : billions.toFixed(1)
+  const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
+  const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
   return {
     label: 'میلیارد تومان',
-    signedNumber: `${sign}${new Intl.NumberFormat('en-US').format(parseFloat(formatted))}`
+    signedNumber: `${sign}${finalNumber}`
   }
 }
 

@@ -16,7 +16,7 @@ import { useMarketData } from '@/lib/hooks/useMarketData'
 import { useRefreshNotification } from '@/lib/hooks/useRefreshNotification'
 import { useChartPreload } from '@/lib/hooks/useChartPreload'
 import { useLastUpdatedTimestamp } from '@/lib/hooks/useLastUpdatedTimestamp'
-import { useHistoricalToggle } from '@/hooks/useHistoricalToggle'
+import { useHistoricalNavigation } from '@/hooks/useHistoricalNavigation'
 import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
 import {
   currencyItems,
@@ -51,23 +51,31 @@ export default function Home() {
 
   // Custom hooks for state management
   const { mobileViewMode, setMobileViewMode } = useViewModePreference()
-  const { showYesterday, toggleHistorical } = useHistoricalToggle()
-  const marketData = useMarketData(showYesterday)
+
+  // First render: get initial market data without historical nav
+  const initialMarketData = useMarketData(null)
+
+  // Calculate lastUpdated from initial data (server's actual Tehran time)
+  const lastUpdated = useLastUpdatedTimestamp(
+    initialMarketData.currencies,
+    initialMarketData.crypto,
+    initialMarketData.gold,
+    initialMarketData.currenciesError,
+    initialMarketData.cryptoError,
+    initialMarketData.goldError
+  )
+
+  // Initialize historical navigation with server time to avoid system clock issues
+  const historicalNav = useHistoricalNavigation(lastUpdated)
+
+  // Get market data for the selected date (or today if none selected)
+  const marketData = useMarketData(historicalNav.selectedDate)
   const chartSheet = useChartBottomSheet()
 
   // Debug: Log metadata to verify stale data detection
   console.log('[Page] Currencies metadata:', marketData.currencies?._metadata)
   console.log('[Page] Crypto metadata:', marketData.crypto?._metadata)
   console.log('[Page] Gold metadata:', marketData.gold?._metadata)
-
-  const lastUpdated = useLastUpdatedTimestamp(
-    marketData.currencies,
-    marketData.crypto,
-    marketData.gold,
-    marketData.currenciesError,
-    marketData.cryptoError,
-    marketData.goldError
-  )
 
   const { showSuccess, isStaleData, staleDataTime, handleRefresh } = useRefreshNotification(
     marketData.currenciesFetching,
@@ -126,9 +134,7 @@ export default function Home() {
           isLoading={
             marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading
           }
-          showYesterday={showYesterday}
-          onToggleHistorical={toggleHistorical}
-          historicalDate={showYesterday ? new Date(Date.now() - 24 * 60 * 60 * 1000) : null}
+          historicalNav={historicalNav}
         />
 
         {/* Search Bar */}
@@ -180,8 +186,8 @@ export default function Home() {
 
         {/* Content Container */}
         <div id="main-content" className="px-3 xl:px-4 sm:px-6 lg:px-8">
-          {/* Historical Data Error Banner - Show when yesterday's data unavailable */}
-          {showYesterday && (marketData.currenciesError || marketData.cryptoError || marketData.goldError) &&
+          {/* Historical Data Error Banner - Show when historical data unavailable */}
+          {!historicalNav.isToday && (marketData.currenciesError || marketData.cryptoError || marketData.goldError) &&
            !marketData.currencies && !marketData.crypto && !marketData.gold && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-red-800 dark:text-red-200">
@@ -192,10 +198,7 @@ export default function Home() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    // Use the toggleHistorical to go back to today
-                    toggleHistorical()
-                  }}
+                  onClick={historicalNav.goToToday}
                   className="px-4 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-900/60 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
                   {tHistorical('backToToday')}
@@ -204,40 +207,31 @@ export default function Home() {
             </div>
           )}
 
-          {/* Historical Data Banner - Show when viewing yesterday's data successfully */}
-          {showYesterday && (marketData.currencies || marketData.crypto || marketData.gold) && (
+          {/* Historical Data Banner - Show when viewing historical data successfully */}
+          {!historicalNav.isToday && (marketData.currencies || marketData.crypto || marketData.gold) && (
             <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="flex items-center justify-center gap-2 text-blue-800 dark:text-blue-200">
                 <FiInfo className="text-lg flex-shrink-0" />
                 <div className="text-sm font-medium text-center">
-                  <p>{tHistorical('viewingYesterdayData')}</p>
+                  <p>{tHistorical('viewingHistoricalData', {
+                    date: historicalNav.selectedDate?.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }) || ''
+                  })}</p>
                   {(marketData.currencies?._metadata?.historicalDate ||
                     marketData.crypto?._metadata?.historicalDate ||
                     marketData.gold?._metadata?.historicalDate) && (
                     <p className="text-xs mt-1 opacity-80">
-                      {tHistorical('yesterdayDataFrom', {
-                        date: new Date(
-                          marketData.currencies?._metadata?.historicalDate ||
-                          marketData.crypto?._metadata?.historicalDate ||
-                          marketData.gold?._metadata?.historicalDate || new Date()
-                        ).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })
-                      })}
+                      {historicalNav.daysAgo === 1
+                        ? tHistorical('viewingYesterdayData')
+                        : tHistorical('daysAgoLabel', { count: historicalNav.daysAgo })}
                     </p>
                   )}
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Stale Data Warning Banner - Check if any data is marked as stale by backend */}
-          {(marketData.currencies?._metadata?.isStale ||
-            marketData.crypto?._metadata?.isStale ||
-            marketData.gold?._metadata?.isStale) && (
-            <StaleDataWarning lastUpdated={lastUpdated} onRetry={handleRefresh} />
           )}
 
           {/* Rate Limit Banner - Show when API returns 429 but we have cached data */}
@@ -313,6 +307,13 @@ export default function Home() {
               category="gold"
             />
           </div>
+
+          {/* Stale Data Warning Banner - Check if any data is marked as stale by backend */}
+          {(marketData.currencies?._metadata?.isStale ||
+            marketData.crypto?._metadata?.isStale ||
+            marketData.gold?._metadata?.isStale) && (
+            <StaleDataWarning lastUpdated={lastUpdated} onRetry={handleRefresh} />
+          )}
 
           {/* Footer */}
           <div

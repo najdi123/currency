@@ -5,13 +5,20 @@
     "refreshing": "در حال بروزرسانی...",
     "fetching": "در حال دریافت...",
     "lastUpdated": "آخرین بروزرسانی:",
+    "historicalDataTime": "داده‌های تاریخی:",
+    "tehranTime": "وقت تهران",
     "viewModeSingle": "تبدیل به نمای دو ستونی",
     "viewModeDual": "تبدیل به نمای تک ستونی",
     "viewModeSingleTitle": "دو ستونه",
     "viewModeDualTitle": "یک ستونه",
     "settings": "تنظیمات",
     "refreshingPrices": "در حال بروزرسانی قیمت‌ها",
-    "refreshPrices": "بروزرسانی قیمت‌ها"
+    "refreshPrices": "بروزرسانی قیمت‌ها",
+    "previousDay": "روز قبل",
+    "nextDay": "روز بعد",
+    "today": "امروز",
+    "goToYesterday": "دیروز",
+    "viewingDate": "مشاهده تاریخ: {date}"
   },
   "DataSection": {
     "currencies": "ارزها",
@@ -537,8 +544,10 @@
     "viewYesterday": "دیروز",
     "viewToday": "امروز",
     "viewingYesterdayData": "مشاهده داده‌های دیروز",
+    "viewingHistoricalData": "مشاهده داده‌های تاریخی: {date}",
     "yesterdayDataFrom": "داده‌ها از تاریخ {date}",
     "backToToday": "بازگشت به امروز",
-    "noDataAvailable": "داده تاریخی برای این تاریخ موجود نیست"
+    "noDataAvailable": "داده تاریخی برای این تاریخ موجود نیست",
+    "daysAgoLabel": "{count} روز قبل"
   }
 }

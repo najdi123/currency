@@ -45,7 +45,7 @@ export const CurrencyVariantsDropdown: React.FC<CurrencyVariantsDropdownProps> =
   const t = useTranslations('Home')
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
+  const buttonRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -101,12 +101,20 @@ export const CurrencyVariantsDropdown: React.FC<CurrencyVariantsDropdownProps> =
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
-      {/* 3-dot button */}
-      <button
+      {/* 3-dot button - Using div instead of button to avoid nesting inside ItemCard's button */}
+      <div
         ref={buttonRef}
-        type="button"
+        role="button"
+        tabIndex={0}
         onClick={handleToggle}
-        className="p-2 rounded-lg hover:bg-background-hover dark:hover:bg-gray-700/50 transition-colors focus:outline-none focus:ring-2 focus:ring-accent-primary/40 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            e.stopPropagation()
+            setIsOpen(!isOpen)
+          }
+        }}
+        className="p-2 rounded-lg hover:bg-background-hover dark:hover:bg-gray-700/50 transition-colors focus:outline-none focus:ring-2 focus:ring-accent-primary/40 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
         aria-label={t('ui.variants')}
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -115,7 +123,7 @@ export const CurrencyVariantsDropdown: React.FC<CurrencyVariantsDropdownProps> =
           className="text-xl text-text-secondary hover:text-text-primary transition-colors"
           aria-hidden="true"
         />
-      </button>
+      </div>
 
       {/* Dropdown menu */}
       {isOpen && (

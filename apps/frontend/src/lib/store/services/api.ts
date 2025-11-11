@@ -289,6 +289,43 @@ export const api = createApi({
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
       },
     }),
+    // Historical data endpoints with date parameter (90 days back)
+    getCurrenciesHistorical: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, string>({
+      query: (date) => `/navasan/currencies/historical?date=${date}`,
+      providesTags: ['Rates', 'Currencies'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        console.log('[RTK Query] Currencies Historical response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Historical Metadata:', response._metadata)
+        }
+        return response as CurrenciesResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
+    getCryptoHistorical: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, string>({
+      query: (date) => `/navasan/crypto/historical?date=${date}`,
+      providesTags: ['Rates', 'DigitalCurrencies'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        console.log('[RTK Query] Crypto Historical response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Historical Metadata:', response._metadata)
+        }
+        return response as CryptoResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
+    getGoldHistorical: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, string>({
+      query: (date) => `/navasan/gold/historical?date=${date}`,
+      providesTags: ['Rates', 'Gold'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: any) => {
+        console.log('[RTK Query] Gold Historical response has _metadata:', '_metadata' in response)
+        if ('_metadata' in response) {
+          console.log('[RTK Query] Historical Metadata:', response._metadata)
+        }
+        return response as GoldResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
     getChartData: builder.query<ChartResponse, ChartQueryParams>({
       query: ({ itemCode, timeRange, itemType }) => ({
         url: `/chart/${itemCode}`,
@@ -353,6 +390,9 @@ export const {
   useGetCurrenciesYesterdayQuery,
   useGetCryptoYesterdayQuery,
   useGetGoldYesterdayQuery,
+  useGetCurrenciesHistoricalQuery,
+  useGetCryptoHistoricalQuery,
+  useGetGoldHistoricalQuery,
   useGetChartDataQuery,
   useGetCurrencyHistoryQuery,
   useGetDigitalCurrencyHistoryQuery,

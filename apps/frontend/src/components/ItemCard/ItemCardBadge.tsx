@@ -1,4 +1,5 @@
 import React from 'react'
+import { useLocale } from 'next-intl'
 import { FiArrowUp, FiArrowDown } from 'react-icons/fi'
 import { formatChangeParts } from '@/lib/utils/formatters'
 
@@ -27,6 +28,7 @@ interface ItemCardBadgeProps {
  * - Includes directional arrow icon (up/down)
  * - Formatted change text with sign and suffix
  * - Responsive sizing for compact mode
+ * - Persian/Farsi digits when locale is 'fa'
  *
  * Accessibility:
  * - ARIA label describes the change direction in Persian
@@ -38,7 +40,8 @@ export const ItemCardBadge: React.FC<ItemCardBadgeProps> = ({
   isPositive,
   compact = false,
 }) => {
-  const { label, signedNumber } = formatChangeParts(change)
+  const locale = useLocale()
+  const { label, signedNumber } = formatChangeParts(change, locale)
 
   return (
     <div

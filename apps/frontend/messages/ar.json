@@ -5,13 +5,20 @@
     "refreshing": "جارٍ التحديث...",
     "fetching": "جارٍ التحميل...",
     "lastUpdated": "آخر تحديث:",
+    "historicalDataTime": "البيانات التاريخية:",
+    "tehranTime": "توقيت طهران",
     "viewModeSingle": "التبديل إلى عرض العمودين",
     "viewModeDual": "التبديل إلى عرض العمود الواحد",
     "viewModeSingleTitle": "عمودان",
     "viewModeDualTitle": "عمود واحد",
     "settings": "الإعدادات",
     "refreshingPrices": "جارٍ تحديث الأسعار",
-    "refreshPrices": "تحديث الأسعار"
+    "refreshPrices": "تحديث الأسعار",
+    "previousDay": "اليوم السابق",
+    "nextDay": "اليوم التالي",
+    "today": "اليوم",
+    "goToYesterday": "أمس",
+    "viewingDate": "عرض: {date}"
   },
   "DataSection": {
     "currencies": "العملات",
@@ -537,8 +544,10 @@
     "viewYesterday": "الأمس",
     "viewToday": "اليوم",
     "viewingYesterdayData": "عرض بيانات الأمس",
+    "viewingHistoricalData": "عرض البيانات التاريخية: {date}",
     "yesterdayDataFrom": "البيانات من {date}",
     "backToToday": "العودة إلى اليوم",
-    "noDataAvailable": "لا تتوفر بيانات تاريخية لهذا التاريخ"
+    "noDataAvailable": "لا تتوفر بيانات تاريخية لهذا التاريخ",
+    "daysAgoLabel": "منذ {count} {count, plural, one {يوم} other {أيام}}"
   }
 }

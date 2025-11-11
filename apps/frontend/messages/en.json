@@ -5,13 +5,20 @@
     "refreshing": "Refreshing...",
     "fetching": "Fetching...",
     "lastUpdated": "Last updated:",
+    "historicalDataTime": "Historical data:",
+    "tehranTime": "Tehran Time",
     "viewModeSingle": "Switch to dual column view",
     "viewModeDual": "Switch to single column view",
     "viewModeSingleTitle": "Dual column",
     "viewModeDualTitle": "Single column",
     "settings": "Settings",
     "refreshingPrices": "Refreshing prices",
-    "refreshPrices": "Refresh prices"
+    "refreshPrices": "Refresh prices",
+    "previousDay": "Previous Day",
+    "nextDay": "Next Day",
+    "today": "Today",
+    "goToYesterday": "Yesterday",
+    "viewingDate": "Viewing: {date}"
   },
   "DataSection": {
     "currencies": "Currencies",
@@ -537,8 +544,10 @@
     "viewYesterday": "Yesterday",
     "viewToday": "Today",
     "viewingYesterdayData": "Viewing yesterday's data",
+    "viewingHistoricalData": "Viewing historical data: {date}",
     "yesterdayDataFrom": "Data from {date}",
     "backToToday": "Back to Today",
-    "noDataAvailable": "No historical data available for this date"
+    "noDataAvailable": "No historical data available for this date",
+    "daysAgoLabel": "{count} {count, plural, one {day} other {days}} ago"
   }
 }

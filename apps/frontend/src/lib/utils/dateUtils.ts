@@ -3,6 +3,56 @@
  * Provides age calculations and relative time formatting with i18n support
  */
 
+/**
+ * Tehran timezone identifier
+ */
+export const TEHRAN_TIMEZONE = 'Asia/Tehran';
+
+/**
+ * Format a date as YYYY-MM-DD for API calls
+ * Uses Tehran timezone to match backend expectations
+ * @param date - Date to format
+ * @returns Formatted date string in YYYY-MM-DD format
+ */
+export function formatDateForApi(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TEHRAN_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+}
+
+/**
+ * Get current date in Tehran timezone
+ * @returns Date object representing today in Tehran
+ */
+export function getTehranToday(): Date {
+  const now = new Date();
+  const tehranDateStr = formatDateForApi(now);
+
+  // Parse as YYYY-MM-DD and create Date at midnight UTC
+  const [year, month, day] = tehranDateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+}
+
+/**
+ * Check if a date is today in Tehran timezone
+ * @param date - Date to check
+ * @returns True if the date is today in Tehran timezone
+ */
+export function isTehranToday(date: Date): boolean {
+  const today = getTehranToday();
+  const compareDate = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
+
+  return today.getTime() === compareDate.getTime();
+}
+
 export interface DataAge {
   isFresh: boolean;
   isStale: boolean;

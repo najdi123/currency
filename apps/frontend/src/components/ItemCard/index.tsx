@@ -122,7 +122,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         />
 
         {/* Bottom Section: Badge + Price only (no sparkline) */}
-        <div className="flex flex-col items-start gap-1.5 mt-auto">
+        <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 mt-auto">
           <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
           <ItemCardPrice value={value} compact={compact} />
         </div>
@@ -157,7 +157,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {/* Bottom Section: Left side (Change badge and Price) + Right side (Sparkline) */}
       <div className="flex items-end justify-between gap-2.5 mt-auto">
         {/* Left side: Change badge and Price */}
-        <div className="flex flex-col items-start gap-1.5 flex-1 min-w-0">
+        <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 flex-1 min-w-0">
           <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
           <ItemCardPrice value={value} compact={compact} />
         </div>

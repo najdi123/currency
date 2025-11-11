@@ -12,11 +12,13 @@ import { Model } from 'mongoose';
 import axios from 'axios';
 import { Cache, CacheDocument } from './schemas/cache.schema';
 import { PriceSnapshot, PriceSnapshotDocument } from './schemas/price-snapshot.schema';
+import { OhlcSnapshot, OhlcSnapshotDocument } from './schemas/ohlc-snapshot.schema';
 import { ApiResponse } from './interfaces/api-response.interface';
 import { NavasanResponse, NavasanPriceItem } from './interfaces/navasan-response.interface';
 import { isCurrencyResponse, isCryptoResponse, isGoldResponse } from './utils/type-guards';
 import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
 import { sanitizeUrl, sanitizeErrorMessage } from '../common/utils/sanitize-url';
+import { getTehranDayBoundaries, formatTehranDate } from '../common/utils/date-utils';
 import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
@@ -50,6 +52,7 @@ export class NavasanService {
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
     @InjectModel(PriceSnapshot.name) private priceSnapshotModel: Model<PriceSnapshotDocument>,
+    @InjectModel(OhlcSnapshot.name) private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
   ) {
@@ -373,15 +376,26 @@ export class NavasanService {
       'chf', 'jpy', 'rub', 'inr', 'pkr', 'iqd', 'kwd', 'sar', 'qar', 'omr', 'bhd',
       'usd_buy', 'dolar_harat_sell', 'harat_naghdi_sell', 'harat_naghdi_buy',
       'usd_farda_sell', 'usd_farda_buy', 'usd_shakhs', 'usd_sherkat', 'usd_pp',
+      'aed_sell', 'dirham_dubai',
       'eur_hav', 'gbp_hav', 'gbp_wht', 'cad_hav', 'cad_cash',
       'hav_cad_my', 'hav_cad_cheque', 'hav_cad_cash', 'aud_hav', 'aud_wht'
     ];
     const cryptoFields = ['usdt', 'btc', 'eth', 'bnb', 'xrp', 'ada', 'doge', 'sol', 'matic', 'dot', 'ltc'];
     const goldFields = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar', 'abshodeh'];
 
+    // Optional fields that may not be returned by the API (regional variants, etc.)
+    const optionalFields = [
+      'dolar_mashad_sell', 'dolar_kordestan_sell', 'dolar_soleimanie_sell'
+    ];
+
     // Check each requested item exists in the response
     for (const item of requestedItems) {
       if (!(item in responseData)) {
+        // Skip validation for optional fields that may not exist
+        if (optionalFields.includes(item)) {
+          this.logger.warn(`Optional field not returned by Navasan API: ${item}`);
+          continue;
+        }
         this.logger.error(`Missing expected field in Navasan API response: ${item}`);
         throw new Error(`Invalid API response: missing required field "${item}"`);
       }
@@ -1159,4 +1173,265 @@ export class NavasanService {
       );
     }
   }
+
+  /**
+   * Get historical data from OHLC snapshots for a specific date
+   * This method queries the OHLC snapshots stored in MongoDB
+   * No external API calls are made - all data comes from our database
+   *
+   * @param category - The data category (currencies, crypto, gold)
+   * @param targetDate - The date to fetch data for
+   * @returns Price data for the specified date extracted from OHLC snapshots
+   */
+  async getHistoricalDataFromOHLC(
+    category: string,
+    targetDate: Date
+  ): Promise<ApiResponse<NavasanResponse>> {
+    // Validate category
+    this.validateCategory(category);
+
+    const formattedDate = formatTehranDate(targetDate);
+    this.logger.log(`📊 Fetching OHLC historical data for ${category} on ${formattedDate}`);
+
+    try {
+      // Get Tehran day boundaries for proper timezone handling
+      const { startOfDay, endOfDay } = getTehranDayBoundaries(targetDate);
+
+      // Map category to item codes
+      const itemCodes = this.getCategoryItemCodes(category);
+
+      // Query OHLC snapshots for the specified date
+      // We look for 1d (daily) timeRange snapshots
+      const snapshots = await safeDbRead(
+        () => this.ohlcSnapshotModel.find({
+          itemCode: { $in: itemCodes },
+          timeRange: '1d',
+          timestamp: {
+            $gte: startOfDay,
+            $lte: endOfDay
+          }
+        }).sort({ timestamp: -1 }).exec(),
+        'getHistoricalDataFromOHLC',
+        this.logger,
+        { category, targetDate }
+      );
+
+      if (!snapshots || snapshots.length === 0) {
+        this.logger.warn(`No OHLC snapshots found for ${category} on ${targetDate.toISOString().split('T')[0]}`);
+        throw new NotFoundException(
+          `No historical data available for ${targetDate.toISOString().split('T')[0]}`
+        );
+      }
+
+      // Query previous day's data for calculating day-over-day change
+      const previousDate = new Date(targetDate);
+      previousDate.setDate(previousDate.getDate() - 1);
+      const { startOfDay: prevStartOfDay, endOfDay: prevEndOfDay } = getTehranDayBoundaries(previousDate);
+
+      const previousSnapshots = await safeDbRead(
+        () => this.ohlcSnapshotModel.find({
+          itemCode: { $in: itemCodes },
+          timeRange: '1d',
+          timestamp: {
+            $gte: prevStartOfDay,
+            $lte: prevEndOfDay
+          }
+        }).sort({ timestamp: -1 }).exec(),
+        'getHistoricalDataFromOHLC - previous day',
+        this.logger,
+        { category, previousDate }
+      );
+
+      // Helper function to validate OHLC data point
+      const isValidOHLCDataPoint = (point: any): boolean => {
+        if (!point || typeof point !== 'object') return false;
+
+        // Check all required fields exist and are valid numbers
+        const requiredFields = ['timestamp', 'open', 'high', 'low', 'close'];
+        for (const field of requiredFields) {
+          if (!(field in point)) return false;
+          const value = point[field];
+          if (typeof value !== 'number' || isNaN(value) || value < 0) return false;
+        }
+
+        // OHLC relationship validation: low <= open,close <= high
+        if (point.low > point.open || point.low > point.close || point.low > point.high) return false;
+        if (point.high < point.open || point.high < point.close || point.high < point.low) return false;
+
+        // Timestamp should be reasonable (not too far in past/future)
+        const now = Date.now();
+        const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000);
+        const oneDayFuture = now + (24 * 60 * 60 * 1000);
+        if (point.timestamp < oneYearAgo || point.timestamp > oneDayFuture) return false;
+
+        return true;
+      };
+
+      // Create a map of previous day's closing prices for quick lookup
+      const previousClosePrices = new Map<string, number>();
+      if (previousSnapshots) {
+        for (const snapshot of previousSnapshots) {
+          if (!snapshot.data || !Array.isArray(snapshot.data)) {
+            this.logger.warn(`Invalid or missing data array for snapshot ${snapshot.itemCode}`);
+            continue;
+          }
+          const dataPoints = snapshot.data as Array<{
+            timestamp: number;
+            date: string;
+            open: number;
+            high: number;
+            low: number;
+            close: number;
+          }>;
+
+          if (dataPoints.length > 0) {
+            // Get the last data point (most recent) for the previous day
+            const lastPoint = dataPoints[dataPoints.length - 1];
+
+            // Validate the data point before using it
+            if (!isValidOHLCDataPoint(lastPoint)) {
+              this.logger.warn(`Invalid OHLC data point for ${snapshot.itemCode} on previous day`);
+              continue;
+            }
+
+            previousClosePrices.set(snapshot.itemCode, lastPoint.close);
+          }
+        }
+      }
+
+      // Convert OHLC snapshots to price response format
+      // Use Record type to allow dynamic property assignment
+      const priceData: Record<string, NavasanPriceItem> = {};
+
+      for (const snapshot of snapshots) {
+        if (!snapshot.data || !Array.isArray(snapshot.data)) {
+          this.logger.warn(`Invalid or missing data array for snapshot ${snapshot.itemCode}`);
+          continue;
+        }
+
+        // Find the data point closest to the target date
+        const dataPoints = snapshot.data as Array<{
+          timestamp: number;
+          date: string;
+          open: number;
+          high: number;
+          low: number;
+          close: number;
+        }>;
+
+        if (dataPoints.length === 0) {
+          this.logger.warn(`Empty data points array for snapshot ${snapshot.itemCode}`);
+          continue;
+        }
+
+        // Filter out invalid data points
+        const validDataPoints = dataPoints.filter(point => isValidOHLCDataPoint(point));
+
+        if (validDataPoints.length === 0) {
+          this.logger.warn(`No valid OHLC data points for ${snapshot.itemCode} on ${formattedDate}`);
+          continue;
+        }
+
+        // Get the last (most recent) data point for the day
+        // OHLC data points are usually sorted by timestamp
+        const targetTimestamp = targetDate.getTime();
+        let closestPoint = validDataPoints[0];
+        let minDiff = Math.abs(validDataPoints[0].timestamp - targetTimestamp);
+
+        for (const point of validDataPoints) {
+          const diff = Math.abs(point.timestamp - targetTimestamp);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestPoint = point;
+          }
+        }
+
+        // Use the close price as the value
+        // Calculate day-over-day change (current close - previous close)
+        // If previous day data is not available, fall back to intraday change
+        const previousClose = previousClosePrices.get(snapshot.itemCode);
+        const change = previousClose !== undefined
+          ? closestPoint.close - previousClose  // Day-over-day change
+          : closestPoint.close - closestPoint.open;  // Fallback to intraday change
+
+        priceData[snapshot.itemCode] = {
+          value: String(closestPoint.close),
+          change: change,
+          // Use the actual timestamp from the data point
+          utc: new Date(closestPoint.timestamp).toISOString(),
+          date: closestPoint.date,
+          dt: new Date(closestPoint.timestamp).toTimeString().split(' ')[0] // Extract time in HH:MM:SS format
+        };
+      }
+
+      // Check if we have any valid data
+      if (Object.keys(priceData).length === 0) {
+        throw new NotFoundException(
+          `No valid price data found for ${targetDate.toISOString().split('T')[0]}`
+        );
+      }
+
+      // Return the response in the expected format
+      return {
+        data: priceData,
+        metadata: {
+          isFresh: false, // Historical data is never "fresh"
+          isStale: false, // But it's not stale either - it's historical
+          dataAge: Math.round((Date.now() - targetDate.getTime()) / 60000), // Age in minutes
+          source: 'ohlc-snapshot',
+          lastUpdated: targetDate,
+          isHistorical: true,
+          historicalDate: targetDate,
+        },
+      };
+
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      this.logger.error(
+        `❌ Error fetching OHLC historical data for ${category}: ${sanitizedMessage}`
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to retrieve historical data from OHLC snapshots'
+      );
+    }
+  }
+
+  /**
+   * Get item codes for a category
+   * Maps category names to the item codes used in OHLC snapshots
+   */
+  private getCategoryItemCodes(category: string): string[] {
+    switch (category.toLowerCase()) {
+      case 'currencies':
+        return [
+          'usd_sell', 'usd_buy',
+          'eur', 'gbp', 'cad', 'aud',
+          'aed', 'aed_sell', 'dirham_dubai',
+          'cny_hav', 'try_hav', 'chf', 'jpy_hav',
+          'rub', 'inr', 'pkr', 'iqd', 'kwd',
+          'sar', 'qar', 'omr', 'bhd'
+        ];
+
+      case 'crypto':
+        return [
+          'usdt', 'btc', 'eth', 'bnb', 'xrp',
+          'ada', 'doge', 'sol', 'matic', 'dot', 'ltc'
+        ];
+
+      case 'gold':
+        return [
+          'sekkeh', 'bahar', 'nim', 'rob', 'gerami',
+          '18ayar', 'abshodeh'
+        ];
+
+      default:
+        throw new BadRequestException(`Invalid category: ${category}`);
+    }
+  }
 }
+

@@ -1,5 +1,5 @@
 import React from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { formatToman } from '@/lib/utils/formatters'
 
 interface ItemCardPriceProps {
@@ -22,6 +22,7 @@ interface ItemCardPriceProps {
  * - Formatted with comma separators
  * - Localized "Toman" suffix in smaller text
  * - Responsive sizing for compact mode
+ * - Persian/Farsi digits when locale is 'fa'
  *
  * Accessibility:
  * - Uses semantic paragraph element
@@ -33,6 +34,7 @@ export const ItemCardPrice: React.FC<ItemCardPriceProps> = ({
   compact = false,
 }) => {
   const t = useTranslations('Chart')
+  const locale = useLocale()
 
   return (
     <p
@@ -40,7 +42,7 @@ export const ItemCardPrice: React.FC<ItemCardPriceProps> = ({
         compact ? 'text-lg sm:text-xl' : 'text-[1.6rem] sm:text-[1.75rem]'
       } leading-tight font-bold font-mono text-text-primary truncate max-w-full`}
     >
-      {formatToman(value)}{' '}
+      {formatToman(value, locale)}{' '}
       <span
         className={`${
           compact ? 'text-[11px] sm:text-xs' : 'text-xs sm:text-sm'

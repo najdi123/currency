@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslations } from 'next-intl'
 
 export interface ItemCardSkeletonProps {
   /**
@@ -29,10 +30,12 @@ export interface ItemCardSkeletonProps {
 export const ItemCardSkeleton: React.FC<ItemCardSkeletonProps> = ({
   count = 4,
 }) => {
+  const t = useTranslations('Common')
+
   return (
     <div
       className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5"
-      aria-label="در حال بارگذاری..."
+      aria-label={t('loading')}
       aria-busy="true"
     >
       {Array.from({ length: count }).map((_, idx) => (
