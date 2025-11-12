@@ -5,7 +5,9 @@ import {
   BadRequestException,
   RequestTimeoutException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import pLimit from 'p-limit';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
@@ -20,6 +22,22 @@ import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
 import { sanitizeUrl, sanitizeErrorMessage } from '../common/utils/sanitize-url';
 import { getTehranDayBoundaries, formatTehranDate } from '../common/utils/date-utils';
 import { MetricsService } from '../metrics/metrics.service';
+
+/**
+ * FIX #5: TYPE SAFETY - Define proper interfaces instead of using 'any'
+ * These interfaces provide compile-time type checking for historical data
+ */
+interface HistoryDataPoint {
+  date: string;
+  price: number;
+  timestamp: number;
+}
+
+interface HistoryApiResponse {
+  success: boolean;
+  data: HistoryDataPoint[];
+  code: string;
+}
 
 @Injectable()
 export class NavasanService {
@@ -50,6 +68,25 @@ export class NavasanService {
   private pendingRequests = new Map<string, Promise<ApiResponse<NavasanResponse>>>();
   private readonly ohlcCacheDuration = 3600000; // 1 hour in milliseconds
 
+  // FIX #1: RATE LIMITING - Prevent API overload by limiting concurrent requests
+  private readonly requestLimit = pLimit(5); // Max 5 concurrent requests
+
+  // FIX #2: HISTORICAL DATA CACHING - Cache immutable historical data for 24 hours
+  private historicalCache = new Map<string, {
+    data: any;
+    timestamp: number;
+  }>();
+  private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+  // FIX #4: CIRCUIT BREAKER - Fast failure recovery pattern
+  private circuitBreaker = {
+    failures: 0,
+    lastFailureTime: 0,
+    isOpen: false,
+    threshold: 10, // Open circuit after 10 failures
+    resetTimeout: 60000 // Reset after 1 minute
+  };
+
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
     @InjectModel(PriceSnapshot.name) private priceSnapshotModel: Model<PriceSnapshotDocument>,
@@ -65,6 +102,10 @@ export class NavasanService {
 
     // Get internal API base URL from config or fallback to localhost
     this.internalApiBaseUrl = this.configService.get<string>('INTERNAL_API_URL') || 'http://localhost:4000';
+
+    // FIX #3: URL VALIDATION - Validate internal API URL for security (SSRF prevention)
+    this.validateInternalApiUrl(this.internalApiBaseUrl);
+
     this.logger.log(`Using internal API base URL: ${this.internalApiBaseUrl}`);
 
     // Clear expired cache entries every 10 minutes
@@ -87,6 +128,32 @@ export class NavasanService {
 
     if (cleaned > 0) {
       this.logger.log(`🧹 Cleaned ${cleaned} expired OHLC cache entries`);
+    }
+  }
+
+  /**
+   * FIX #3: URL VALIDATION - Validate internal API URL to prevent SSRF attacks
+   * Only allows localhost URLs with http/https protocols
+   */
+  private validateInternalApiUrl(url: string): void {
+    try {
+      const parsed = new URL(url);
+
+      // Only allow localhost for security
+      const allowedHosts = ['localhost', '127.0.0.1', '::1'];
+      if (!allowedHosts.includes(parsed.hostname)) {
+        throw new Error(`INTERNAL_API_URL must point to localhost, got: ${parsed.hostname}`);
+      }
+
+      // Only allow http/https protocols
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(`INTERNAL_API_URL must use http or https protocol, got: ${parsed.protocol}`);
+      }
+
+      this.logger.log(`✅ Internal API URL validated: ${url}`);
+    } catch (error) {
+      this.logger.error(`❌ Invalid INTERNAL_API_URL: ${url} - ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
@@ -1180,6 +1247,47 @@ export class NavasanService {
   }
 
   /**
+   * FIX #4: CIRCUIT BREAKER - Check if circuit breaker allows requests
+   * Throws ServiceUnavailableException if circuit is open
+   */
+  private checkCircuitBreaker(): void {
+    if (this.circuitBreaker.isOpen) {
+      const timeSinceFailure = Date.now() - this.circuitBreaker.lastFailureTime;
+      if (timeSinceFailure > this.circuitBreaker.resetTimeout) {
+        this.circuitBreaker.isOpen = false;
+        this.circuitBreaker.failures = 0;
+        this.logger.log('🔓 Circuit breaker reset - accepting requests again');
+      } else {
+        throw new ServiceUnavailableException(
+          `Historical API temporarily unavailable. Retry after ${Math.ceil((this.circuitBreaker.resetTimeout - timeSinceFailure) / 1000)}s`
+        );
+      }
+    }
+  }
+
+  /**
+   * FIX #4: CIRCUIT BREAKER - Record a failure and potentially open circuit
+   */
+  private recordCircuitBreakerFailure(): void {
+    this.circuitBreaker.failures++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+
+    if (this.circuitBreaker.failures >= this.circuitBreaker.threshold) {
+      this.circuitBreaker.isOpen = true;
+      this.logger.error(`🔒 Circuit breaker opened after ${this.circuitBreaker.failures} failures`);
+    }
+  }
+
+  /**
+   * FIX #4: CIRCUIT BREAKER - Record a success and gradually reset failure count
+   */
+  private recordCircuitBreakerSuccess(): void {
+    if (this.circuitBreaker.failures > 0) {
+      this.circuitBreaker.failures = Math.max(0, this.circuitBreaker.failures - 1);
+    }
+  }
+
+  /**
    * Get historical data from internal history API for a specific date
    * This method fetches data from the existing /history endpoint in parallel
    * for optimal performance, then filters to the target date.
@@ -1198,8 +1306,20 @@ export class NavasanService {
     // Validate category
     this.validateCategory(category);
 
+    // FIX #4: CIRCUIT BREAKER - Check if circuit breaker allows requests
+    this.checkCircuitBreaker();
+
     const formattedDate = formatTehranDate(targetDate);
     this.logger.log(`📊 Fetching historical data for ${category} on ${formattedDate}`);
+
+    // FIX #2: RESPONSE CACHING - Check cache for historical data (immutable, can cache for 24h)
+    const cacheKey = `${category}-${targetDate.toISOString().split('T')[0]}`;
+    const cached = this.historicalCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+      this.logger.log(`📦 Cache hit for ${cacheKey}`);
+      return cached.data;
+    }
 
     try {
       // INPUT VALIDATION: Validate date parameters
@@ -1225,28 +1345,31 @@ export class NavasanService {
       // Cap daysToFetch at 92 (target day + 2 buffer days) as per specification
       const daysToFetch = Math.min(Math.max(daysDiff + 2, 7), 92);
 
-      this.logger.log(`🔍 Fetching ${daysToFetch} days of history for ${itemCodes.length} items in parallel`);
+      this.logger.log(`🔍 Fetching ${daysToFetch} days of history for ${itemCodes.length} items in parallel (max 5 concurrent)`);
 
-      // PARALLEL FETCHING: Use Promise.allSettled for concurrent requests
-      const fetchPromises = itemCodes.map(async (itemCode) => {
-        try {
-          // URL encode itemCode to handle special characters safely
-          const encodedItemCode = encodeURIComponent(itemCode);
-          const url = `${this.internalApiBaseUrl}/api/currencies/code/${encodedItemCode}/history?days=${daysToFetch}`;
+      // FIX #1: RATE LIMITING - Wrap parallel fetching in rate limiter to prevent API overload
+      // This limits concurrent requests to 5, preventing server overload from 22+ simultaneous requests
+      const fetchPromises = itemCodes.map((itemCode) =>
+        this.requestLimit(async () => {
+          try {
+            // URL encode itemCode to handle special characters safely
+            const encodedItemCode = encodeURIComponent(itemCode);
+            const url = `${this.internalApiBaseUrl}/api/currencies/code/${encodedItemCode}/history?days=${daysToFetch}`;
 
-          const response = await axios.get(url, {
-            timeout: 10000,
-          });
+            const response = await axios.get(url, {
+              timeout: 10000,
+            });
 
-          return { itemCode, success: true, data: response.data };
-        } catch (error) {
-          return {
-            itemCode,
-            success: false,
-            error: error instanceof Error ? error.message : String(error)
-          };
-        }
-      });
+            return { itemCode, success: true, data: response.data };
+          } catch (error) {
+            return {
+              itemCode,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            };
+          }
+        })
+      );
 
       // Wait for all requests to complete
       const results = await Promise.allSettled(fetchPromises);
@@ -1262,15 +1385,16 @@ export class NavasanService {
           const { itemCode, success, data, error } = result.value;
 
           if (success && data?.success && data?.data) {
+            // FIX #5: TYPE SAFETY - Use proper type instead of 'any'
             // SORT DATA: Sort by date to ensure correct ordering for change calculation
-            const sortedData = [...data.data].sort((a: any, b: any) => {
+            const sortedData = [...(data.data as HistoryDataPoint[])].sort((a, b) => {
               const dateA = new Date(a.date).getTime();
               const dateB = new Date(b.date).getTime();
               return dateA - dateB;
             });
 
             // Find the data point for the target date
-            const pointIndex = sortedData.findIndex((point: any) => point.date === targetDateStr);
+            const pointIndex = sortedData.findIndex((point) => point.date === targetDateStr);
 
             if (pointIndex !== -1) {
               const dataPoint = sortedData[pointIndex];
@@ -1352,10 +1476,14 @@ export class NavasanService {
 
       if (failureRate > 0.5) {
         this.logger.error(`📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`);
+        // FIX #4: CIRCUIT BREAKER - Record failure for high failure rates
+        this.recordCircuitBreakerFailure();
       } else if (failureRate > 0.1) {
         this.logger.warn(`📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`);
       } else {
         this.logger.log(`📊 History fetch complete: ${successCount}/${totalItems} success, ${errorCount} errors`);
+        // FIX #4: CIRCUIT BREAKER - Record success for low failure rates
+        this.recordCircuitBreakerSuccess();
       }
 
       // If we have no data at all, throw 404
@@ -1370,14 +1498,14 @@ export class NavasanService {
       const completenessPercentage = Math.round((successCount / totalItems) * 100);
       const hasWarning = failureRate > 0.1;
 
-      // Return the response in the expected format with enhanced metadata
-      return {
+      // Build response object
+      const response: ApiResponse<NavasanResponse> = {
         data: priceData,
         metadata: {
           isFresh: false, // Historical data is never "fresh"
           isStale: false, // But it's not stale either - it's historical
           dataAge: Math.round((Date.now() - targetDate.getTime()) / 60000), // Age in minutes
-          source: 'api',
+          source: 'api' as const,
           lastUpdated: targetDate,
           isHistorical: true,
           historicalDate: targetDate,
@@ -1390,6 +1518,16 @@ export class NavasanService {
           warning: hasWarning ? `Only ${completenessPercentage}% of items retrieved successfully` : undefined,
         },
       };
+
+      // FIX #2: RESPONSE CACHING - Store response in cache for 24 hours (historical data is immutable)
+      this.historicalCache.set(cacheKey, {
+        data: response,
+        timestamp: Date.now()
+      });
+      this.logger.log(`💾 Cached ${cacheKey} for 24 hours`);
+
+      // Return the response in the expected format with enhanced metadata
+      return response;
 
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
