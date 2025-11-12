@@ -7,6 +7,12 @@ export interface ApiResponseMetadata {
   warning?: string;
   isHistorical?: boolean;
   historicalDate?: Date | string;
+  completeness?: {
+    successCount: number;
+    totalCount: number;
+    percentage: number;
+    failedItems?: string[];
+  };
 }
 
 export interface ApiResponse<T> {

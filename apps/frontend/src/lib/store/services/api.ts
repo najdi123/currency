@@ -31,6 +31,11 @@ export interface ApiResponseMetadata {
   historicalDate?: Date | string // Date for historical data queries
 }
 
+export interface ApiRawResponse {
+  _metadata?: ApiResponseMetadata
+  [key: string]: any
+}
+
 export interface ApiResponse<T> {
   data: T
   metadata: ApiResponseMetadata
@@ -220,10 +225,12 @@ export const api = createApi({
       query: () => '/navasan/currencies',
       providesTags: ['Rates', 'Currencies'],
       keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Currencies response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Metadata:', response._metadata)
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Currencies response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Metadata:', response._metadata)
+          }
         }
         return response as CurrenciesResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -232,10 +239,12 @@ export const api = createApi({
       query: () => '/navasan/crypto',
       providesTags: ['Rates', 'DigitalCurrencies'],
       keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Crypto response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Metadata:', response._metadata)
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Crypto response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Metadata:', response._metadata)
+          }
         }
         return response as CryptoResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -244,10 +253,12 @@ export const api = createApi({
       query: () => '/navasan/gold',
       providesTags: ['Rates', 'Gold'],
       keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Gold response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Metadata:', response._metadata)
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Gold response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Metadata:', response._metadata)
+          }
         }
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -257,10 +268,12 @@ export const api = createApi({
       query: () => '/navasan/currencies/yesterday',
       providesTags: ['Rates', 'Currencies'],
       keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Currencies Yesterday response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Currencies Yesterday response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+          }
         }
         return response as CurrenciesResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -269,10 +282,12 @@ export const api = createApi({
       query: () => '/navasan/crypto/yesterday',
       providesTags: ['Rates', 'DigitalCurrencies'],
       keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Crypto Yesterday response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Crypto Yesterday response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+          }
         }
         return response as CryptoResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -281,26 +296,30 @@ export const api = createApi({
       query: () => '/navasan/gold/yesterday',
       providesTags: ['Rates', 'Gold'],
       keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Gold Yesterday response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Gold Yesterday response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+          }
         }
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
       },
     }),
     // Historical data endpoints with date parameter (90 days back)
+    // Historical data doesn't change, so cache for much longer (24 hours = 86400s)
     getCurrenciesHistorical: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, string>({
       query: (date) => `/navasan/currencies/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
-        { type: 'Currencies' as const, id: `historical-${date}` },
-        'Rates'
+        { type: 'Currencies' as const, id: `historical-${date}` }
       ],
-      keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Currencies Historical response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Historical Metadata:', response._metadata)
+      keepUnusedDataFor: 86400, // 24 hours - historical data doesn't change
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Currencies Historical response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Historical Metadata:', response._metadata)
+          }
         }
         return response as CurrenciesResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -308,14 +327,15 @@ export const api = createApi({
     getCryptoHistorical: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, string>({
       query: (date) => `/navasan/crypto/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
-        { type: 'DigitalCurrencies' as const, id: `historical-${date}` },
-        'Rates'
+        { type: 'DigitalCurrencies' as const, id: `historical-${date}` }
       ],
-      keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Crypto Historical response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Historical Metadata:', response._metadata)
+      keepUnusedDataFor: 86400, // 24 hours - historical data doesn't change
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Crypto Historical response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Historical Metadata:', response._metadata)
+          }
         }
         return response as CryptoResponse & { _metadata?: ApiResponseMetadata }
       },
@@ -323,14 +343,15 @@ export const api = createApi({
     getGoldHistorical: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, string>({
       query: (date) => `/navasan/gold/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
-        { type: 'Gold' as const, id: `historical-${date}` },
-        'Rates'
+        { type: 'Gold' as const, id: `historical-${date}` }
       ],
-      keepUnusedDataFor: 1200,
-      transformResponse: (response: any) => {
-        console.log('[RTK Query] Gold Historical response has _metadata:', '_metadata' in response)
-        if ('_metadata' in response) {
-          console.log('[RTK Query] Historical Metadata:', response._metadata)
+      keepUnusedDataFor: 86400, // 24 hours - historical data doesn't change
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Gold Historical response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Historical Metadata:', response._metadata)
+          }
         }
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
       },

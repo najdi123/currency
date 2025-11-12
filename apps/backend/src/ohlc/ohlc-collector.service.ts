@@ -127,12 +127,14 @@ export class OHLCCollectorService implements OnModuleInit {
 
     try {
       // Get current prices from Navasan
-      const latestRates = await this.navasanService.getLatestRates();
+      const response = await this.navasanService.getLatestRates();
 
-      if (!latestRates) {
+      if (!response || !response.data) {
         this.logger.warn('No data received from Navasan');
         return;
       }
+
+      const latestRates = response.data;
 
       const timestamp = new Date();
       timestamp.setSeconds(0, 0); // Round to minute

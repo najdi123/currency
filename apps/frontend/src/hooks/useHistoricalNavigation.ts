@@ -4,8 +4,9 @@
  * Manages multi-day historical date navigation with support for up to 90 days back
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { formatDateForApi, getTehranToday } from '@/lib/utils/dateUtils'
+import { getTehranDateFromApi } from '@/lib/utils/timeApi'
 
 const MAX_DAYS_BACK = 90
 
@@ -42,22 +43,26 @@ const getDaysDifference = (date1: Date, date2: Date): number => {
 
 /**
  * Hook to manage multi-day historical navigation
- * Uses Tehran timezone for date calculations to match backend
- * @param serverTime - Optional server time from API (actual Tehran time)
+ * Fetches actual Tehran time from external API to avoid system clock issues
  */
-export function useHistoricalNavigation(serverTime?: Date | null): HistoricalNavigationState {
+export function useHistoricalNavigation(): HistoricalNavigationState {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [actualTehranToday, setActualTehranToday] = useState<Date>(getTehranToday())
 
-  // Use server time if available (actual Tehran time), otherwise fall back to system calculation
-  // This prevents issues when system clock is incorrect
-  const today = useMemo(() => {
-    if (serverTime) {
-      const tehranDateStr = formatDateForApi(serverTime)
-      const [year, month, day] = tehranDateStr.split('-').map(Number)
-      return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
-    }
-    return getTehranToday()
-  }, [serverTime])
+  // Fetch actual Tehran time from API on mount
+  useEffect(() => {
+    getTehranDateFromApi()
+      .then((date) => {
+        setActualTehranToday(date)
+      })
+      .catch((error) => {
+        console.error('Failed to fetch Tehran time:', error)
+        // Keep using fallback
+      })
+  }, [])
+
+  // Use fetched Tehran time
+  const today = actualTehranToday
 
   // Calculate if we're viewing today
   const isToday = useMemo(() => {

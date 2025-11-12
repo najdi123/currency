@@ -53,24 +53,22 @@ export default function Home() {
   // Custom hooks for state management
   const { mobileViewMode, setMobileViewMode } = useViewModePreference()
 
-  // First render: get initial market data without historical nav
-  const initialMarketData = useMarketData(null)
-
-  // Calculate lastUpdated from initial data (server's actual Tehran time)
-  const lastUpdated = useLastUpdatedTimestamp(
-    initialMarketData.currencies,
-    initialMarketData.crypto,
-    initialMarketData.gold,
-    initialMarketData.currenciesError,
-    initialMarketData.cryptoError,
-    initialMarketData.goldError
-  )
-
-  // Initialize historical navigation with server time to avoid system clock issues
-  const historicalNav = useHistoricalNavigation(lastUpdated)
+  // Initialize historical navigation using browser's Tehran timezone calculation
+  // This is independent of backend's system clock
+  const historicalNav = useHistoricalNavigation()
 
   // Get market data for the selected date (or today if none selected)
   const marketData = useMarketData(historicalNav.selectedDate)
+
+  // Calculate lastUpdated from market data
+  const lastUpdated = useLastUpdatedTimestamp(
+    marketData.currencies,
+    marketData.crypto,
+    marketData.gold,
+    marketData.currenciesError,
+    marketData.cryptoError,
+    marketData.goldError
+  )
   const chartSheet = useChartBottomSheet()
 
   // Debug: Log metadata to verify stale data detection

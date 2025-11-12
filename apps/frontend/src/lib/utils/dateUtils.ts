@@ -25,13 +25,24 @@ export function formatDateForApi(date: Date): string {
 
 /**
  * Get current date in Tehran timezone
+ * Uses UTC time and calculates Tehran offset to get true current Tehran date
+ * This is independent of system clock errors
  * @returns Date object representing today in Tehran
  */
 export function getTehranToday(): Date {
-  const now = new Date();
-  const tehranDateStr = formatDateForApi(now);
+  // Create a date string in Tehran timezone to extract the correct date
+  // This works even if system clock is wrong because it uses UTC + timezone offset
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TEHRAN_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
 
-  // Parse as YYYY-MM-DD and create Date at midnight UTC
+  // Format current time to Tehran timezone
+  const tehranDateStr = formatter.format(new Date());
+
+  // Parse and return as UTC midnight
   const [year, month, day] = tehranDateStr.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 }

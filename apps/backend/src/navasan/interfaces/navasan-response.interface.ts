@@ -11,7 +11,7 @@
  */
 export interface NavasanPriceItem {
   value: string; // Price value as string (e.g., "50000")
-  change: number; // Price change amount
+  change: number | null; // Price change amount (null when no previous data available)
   utc: string; // UTC timestamp (e.g., "2024-01-15T10:30:00.000Z")
   date: string; // Persian date (e.g., "1402/10/25")
   dt: string; // Time string (e.g., "10:30:00")
