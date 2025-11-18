@@ -8,6 +8,7 @@ import { useAppSelector } from '@/lib/hooks'
 import { selectUser, selectIsAuthenticated } from '@/lib/store/slices/authSlice'
 import { SegmentedControl } from '@/components/ui'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { RateLimitMeter } from '@/components/RateLimit/RateLimitMeter'
 import { FiX, FiSun, FiMoon, FiMonitor, FiUser, FiLogIn, FiUserPlus, FiArrowRight, FiDollarSign, FiUsers, FiGlobe } from 'react-icons/fi'
 
 interface SettingsModalProps {
@@ -264,6 +265,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     {t('language')}
                   </h3>
                   <LanguageSwitcher />
+                </section>
+
+                <Divider />
+
+                {/* API Usage Section */}
+                <section>
+                  <h3 className={cn("text-apple-caption text-text-secondary font-medium uppercase tracking-wide", MODAL_SPACING.sectionTitleMargin)}>
+                    {t('apiUsage')}
+                  </h3>
+                  <RateLimitMeter />
                 </section>
 
                 <Divider />

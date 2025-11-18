@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { Drawer } from 'vaul'
 import type { SelectedChartItem, TimeRange } from '@/types/chart'
@@ -22,25 +22,43 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
 }) => {
   const t = useTranslations('Chart')
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('1w')
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   // Reset time range when item changes
   useEffect(() => {
     setSelectedTimeRange('1w')
   }, [item?.code])
 
-  // Handle Escape key
+  // Focus management
+  useEffect(() => {
+    if (isOpen) {
+      // Store the previously focused element
+      previousFocusRef.current = document.activeElement as HTMLElement
+
+      // Focus the close button after a short delay to ensure the sheet is rendered
+      setTimeout(() => {
+        closeButtonRef.current?.focus()
+      }, 100)
+    } else if (previousFocusRef.current) {
+      // Restore focus when closing
+      previousFocusRef.current.focus()
+    }
+  }, [isOpen])
+
+  // Handle Escape key - memoized to prevent recreation
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+    }
+  }, [onClose])
+
   useEffect(() => {
     if (!isOpen) return
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
+  }, [isOpen, handleEscape])
 
   if (!item) return null
 
@@ -72,11 +90,13 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
 
           {/* Close Button */}
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className="absolute top-4 left-4 p-2 rounded-full bg-accent-primary-subtle text-accent transition-apple-fast active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-10"
             aria-label={t('closeChart')}
+            type="button"
           >
-            <HiX className="text-xl" />
+            <HiX className="text-xl" aria-hidden="true" />
           </button>
 
           {/* Header */}
@@ -93,7 +113,12 @@ export const ChartBottomSheet: React.FC<ChartBottomSheetProps> = ({
           />
 
           {/* Chart */}
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-4">
+          <div
+            id="chart-panel"
+            role="tabpanel"
+            aria-label={t('priceChart')}
+            className="flex-1 overflow-auto px-4 pb-4 pt-4"
+          >
             <PriceChart
               itemCode={item.code}
               itemType={item.type}

@@ -1,13 +1,19 @@
-import { Controller, Get, Logger, Res, Query, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Logger, Res, Query, Param, NotFoundException, InternalServerErrorException, BadRequestException, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { NavasanService } from './navasan.service';
+import { IntradayOhlcService } from './services/intraday-ohlc.service';
 import { parseTehranDate, getTehranToday, validateDateAge, formatTehranDate } from '../common/utils/date-utils';
+import { RateLimitGuard } from '../rate-limit/rate-limit.guard';
 
 @Controller('navasan')
+@UseGuards(RateLimitGuard) // Apply rate limiting to all endpoints
 export class NavasanController {
   private readonly logger = new Logger(NavasanController.name);
 
-  constructor(private readonly navasanService: NavasanService) {}
+  constructor(
+    private readonly navasanService: NavasanService,
+    private readonly intradayOhlcService: IntradayOhlcService,
+  ) {}
 
   /**
    * Sanitize header value to prevent HTTP header injection
@@ -412,6 +418,84 @@ export class NavasanController {
       });
     } catch (error) {
       throw error;
+    }
+  }
+
+  /**
+   * GET /api/navasan/ohlc/today/:itemCode
+   * Returns today's OHLC (Open, High, Low, Close) data and daily change for a specific item
+   */
+  @Get('ohlc/today/:itemCode')
+  async getTodayOhlc(@Param('itemCode') itemCode: string, @Res() res: Response) {
+    try {
+      this.logger.log(`GET /api/navasan/ohlc/today/${itemCode} - Fetching today's OHLC data`);
+
+      const ohlc = await this.intradayOhlcService.getTodayOhlc(itemCode);
+
+      if (!ohlc) {
+        throw new NotFoundException(`No OHLC data found for item: ${itemCode}`);
+      }
+
+      const changePercent = await this.intradayOhlcService.getDailyChangePercent(itemCode);
+
+      return res.json({
+        itemCode: ohlc.itemCode,
+        date: ohlc.date,
+        dateJalali: ohlc.dateJalali,
+        open: ohlc.open,
+        high: ohlc.high,
+        low: ohlc.low,
+        close: ohlc.close,
+        change: changePercent,
+        dataPoints: ohlc.dataPoints, // For mini-chart
+        updateCount: ohlc.updateCount,
+        firstUpdate: ohlc.firstUpdate,
+        lastUpdate: ohlc.lastUpdate,
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      const err = error as Error;
+      this.logger.error(`Error fetching OHLC for ${itemCode}: ${err.message}`, err.stack);
+      throw new InternalServerErrorException('Failed to fetch OHLC data');
+    }
+  }
+
+  /**
+   * GET /api/navasan/ohlc/all
+   * Returns today's OHLC data for all items
+   */
+  @Get('ohlc/all')
+  async getAllTodayOhlc(@Res() res: Response) {
+    try {
+      this.logger.log('GET /api/navasan/ohlc/all - Fetching all today\'s OHLC data');
+
+      const allOhlc = await this.intradayOhlcService.getAllTodayOhlc();
+
+      // Calculate change percentages for each item
+      const ohlcWithChanges = allOhlc.map(ohlc => ({
+        itemCode: ohlc.itemCode,
+        date: ohlc.date,
+        dateJalali: ohlc.dateJalali,
+        open: ohlc.open,
+        high: ohlc.high,
+        low: ohlc.low,
+        close: ohlc.close,
+        change: ((ohlc.close - ohlc.open) / ohlc.open * 100).toFixed(2),
+        dataPoints: ohlc.dataPoints,
+        updateCount: ohlc.updateCount,
+        lastUpdate: ohlc.lastUpdate,
+      }));
+
+      return res.json({
+        count: ohlcWithChanges.length,
+        data: ohlcWithChanges,
+      });
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Error fetching all OHLC: ${err.message}`, err.stack);
+      throw new InternalServerErrorException('Failed to fetch OHLC data');
     }
   }
 }

@@ -14,6 +14,7 @@ export interface SegmentedControlProps {
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   className?: string;
+  'aria-label'?: string;
 }
 
 const cn = (...classes: (string | boolean | undefined | null)[]) => {
@@ -27,7 +28,7 @@ const sizeClasses = {
 };
 
 export const SegmentedControl = forwardRef<HTMLDivElement, SegmentedControlProps>(
-  ({ value, onChange, options, size = 'md', fullWidth = false, className }, ref) => {
+  ({ value, onChange, options, size = 'md', fullWidth = false, className, 'aria-label': ariaLabel }, ref) => {
     return (
       <div
         ref={ref}
@@ -38,7 +39,7 @@ export const SegmentedControl = forwardRef<HTMLDivElement, SegmentedControlProps
           className
         )}
         role="radiogroup"
-        
+        aria-label={ariaLabel}
       >
         {options.map((option) => {
           const isSelected = value === option.value;

@@ -18,6 +18,8 @@ import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { OHLCModule } from './ohlc/ohlc.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { RateLimitGuard } from './rate-limit/rate-limit.guard';
 
 @Module({
   imports: [
@@ -110,6 +112,7 @@ import { OHLCModule } from './ohlc/ohlc.module';
      AuthModule,
      SchedulerModule,
      OHLCModule,
+     RateLimitModule,
   ],
   controllers: [AppController],
   providers: [
@@ -117,6 +120,10 @@ import { OHLCModule } from './ohlc/ohlc.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard, // Apply rate limiting to all routes
     },
   ],
 })

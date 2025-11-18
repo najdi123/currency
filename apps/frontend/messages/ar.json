@@ -34,6 +34,10 @@
     "loadingNewData": "جارٍ تحميل البيانات الجديدة",
     "loadingText": "جارٍ التحميل..."
   },
+  "ItemCard": {
+    "priceIncrease": "ارتفاع السعر",
+    "priceDecrease": "انخفاض السعر"
+  },
   "SettingsModal": {
     "title": "الإعدادات",
     "close": "إغلاق",
@@ -42,6 +46,7 @@
     "dark": "داكن",
     "system": "النظام",
     "language": "اللغة",
+    "apiUsage": "استخدام API",
     "account": "الحساب",
     "userInfo": "معلومات المستخدم",
     "manageAccount": "إدارة الحساب",
@@ -551,5 +556,37 @@
     "backToToday": "العودة إلى اليوم",
     "noDataAvailable": "لا تتوفر بيانات تاريخية لهذا التاريخ",
     "daysAgoLabel": "منذ {count} {count, plural, one {يوم} other {أيام}}"
+  },
+  "rateLimit": {
+    "apiUsage": "استخدام API",
+    "plan": "الخطة",
+    "requests": "طلبات",
+    "request": "طلب",
+    "remaining": "المتبقي",
+    "resetsIn": "يعاد تعيين في",
+    "hours": "ساعات",
+    "hour": "ساعة",
+    "day": "يوم",
+    "days": "أيام",
+    "minutes": "دقائق",
+    "minute": "دقيقة",
+    "lessThanHour": "أقل من ساعة",
+    "lessThanMinute": "أقل من دقيقة",
+    "upgradePlan": "ترقية الخطة",
+    "upgradeForMore": "قم بالترقية للحصول على طلبات غير محدودة",
+    "nearLimitWarning": "أنت تقترب من حدك اليومي",
+    "lowUsageMessage": "استخدامك للـ API منخفض. لا تزال لديك الكثير من الطلبات المتبقية.",
+    "criticalWarning": "نفدت الطلبات تقريبًا!",
+    "criticalMessage": "فكر في الترقية لتجنب انقطاع الخدمة",
+    "rateLimitExceeded": "تم تجاوز حد المعدل",
+    "rateLimitMessage": "لقد وصلت إلى حد API اليومي. ستتم إعادة تعيين حصتك قريبًا.",
+    "tryAgainIn": "يمكنك المحاولة مرة أخرى في",
+    "tryAgain": "حاول مرة أخرى",
+    "pleaseWait": "يرجى الانتظار",
+    "canRetryNow": "يمكنك إعادة المحاولة الآن",
+    "quotaResetsAt": "إعادة تعيين الحصة في",
+    "timeRemaining": "الوقت المتبقي حتى إعادة التعيين:",
+    "errorLoading": "فشل تحميل حالة حد المعدل",
+    "loading": "جاري التحميل..."
   }
 }

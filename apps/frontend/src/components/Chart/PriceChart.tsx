@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, lazy } from 'react'
+import { useMemo, lazy, memo, useCallback } from 'react'
 import { useTheme } from 'next-themes'
 import { useGetChartDataQuery } from '@/lib/store/services/api'
 import type { TimeRange, ItemType } from '@/types/chart'
@@ -19,7 +19,7 @@ interface PriceChartProps {
   itemName: string
 }
 
-export const PriceChart: React.FC<PriceChartProps> = ({
+const PriceChartComponent: React.FC<PriceChartProps> = ({
   itemCode,
   itemType,
   timeRange,
@@ -52,6 +52,11 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     return <ChartLoadingState />
   }
 
+  // Memoize retry handler to prevent recreation on every render
+  const handleRetry = useCallback(() => {
+    refetch()
+  }, [refetch])
+
   if (error) {
     // Provide user-friendly error messages in Persian
     const errorMessage = error && 'status' in error && error.status === 404
@@ -63,7 +68,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     return (
       <ChartErrorState
         message={errorMessage}
-        onRetry={refetch}
+        onRetry={handleRetry}
       />
     )
   }
@@ -78,7 +83,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   }
 
   return (
-    <div className="w-full h-[400px] min-h-[400px]" dir="ltr">
+    <div className="w-full h-[400px] min-h-[400px]" dir="ltr" role="img" aria-label={`نمودار قیمت ${itemName}`}>
       <ReactECharts
         option={chartOption}
         style={{ height: '100%', width: '100%' }}
@@ -87,3 +92,14 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     </div>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+// Only re-render when props actually change
+export const PriceChart = memo(PriceChartComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.itemCode === nextProps.itemCode &&
+    prevProps.itemType === nextProps.itemType &&
+    prevProps.timeRange === nextProps.timeRange &&
+    prevProps.itemName === nextProps.itemName
+  )
+})

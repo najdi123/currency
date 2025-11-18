@@ -6,6 +6,7 @@ export const ChartLoadingState = () => {
       className="w-full space-y-4 animate-fade-in"
       role="status"
       aria-live="polite"
+      aria-busy="true"
       aria-label="در حال بارگذاری نمودار"
     >
       {/* Shimmer skeleton that matches chart layout */}

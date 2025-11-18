@@ -2,6 +2,7 @@
 
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
+import { useCallback } from 'react';
 import { locales } from '@/i18n/request';
 import { FiCheck } from 'react-icons/fi';
 
@@ -21,19 +22,24 @@ export function LanguageSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const handleChange = (newLocale: string) => {
+  // Memoize the handler to prevent recreation on every render
+  const handleChange = useCallback((newLocale: string) => {
     const pathWithoutLocale = pathname.replace(`/${locale}`, '');
     const newPath = `/${newLocale}${pathWithoutLocale}`;
     router.push(newPath);
     router.refresh();
-  };
+  }, [locale, pathname, router]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="radiogroup" aria-label="Select Language">
       {locales.map((loc) => (
         <button
           key={loc}
           onClick={() => handleChange(loc)}
+          type="button"
+          role="radio"
+          aria-checked={locale === loc}
+          aria-label={`Switch to ${languageNames[loc]}`}
           className={cn(
             "w-full flex items-center justify-between px-4 py-3.5 rounded-lg border transition-colors",
             "active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
@@ -41,7 +47,6 @@ export function LanguageSwitcher() {
               ? 'bg-accent text-white border-accent'
               : 'bg-bg-base hover:bg-bg-secondary border-border-light text-text-primary'
           )}
-          aria-current={locale === loc ? 'true' : undefined}
         >
           <span className="font-medium text-apple-body">{languageNames[loc]}</span>
           {locale === loc && <FiCheck className="w-5 h-5" aria-hidden="true" />}

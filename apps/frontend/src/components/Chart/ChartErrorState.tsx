@@ -23,6 +23,7 @@ export const ChartErrorState: React.FC<ChartErrorStateProps> = ({ message, onRet
       </div>
       <button
         onClick={onRetry}
+        type="button"
         className="btn-apple-tinted active-scale-apple focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900"
         aria-label={t('retryLoading')}
       >

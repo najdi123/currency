@@ -1,5 +1,5 @@
 import React from 'react'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { FiArrowUp, FiArrowDown } from 'react-icons/fi'
 import { formatChangeParts } from '@/lib/utils/formatters'
 
@@ -41,6 +41,7 @@ export const ItemCardBadge: React.FC<ItemCardBadgeProps> = ({
   compact = false,
 }) => {
   const locale = useLocale()
+  const t = useTranslations('ItemCard')
   const { label, signedNumber } = formatChangeParts(change, locale)
 
   return (
@@ -55,7 +56,7 @@ export const ItemCardBadge: React.FC<ItemCardBadgeProps> = ({
           : 'badge-pill-error'
       }
       dir="ltr"
-      aria-label={isPositive ? 'افزایش قیمت' : 'کاهش قیمت'}
+      aria-label={isPositive ? t('priceIncrease') : t('priceDecrease')}
     >
       <span>{label}</span>
       <span>{signedNumber}</span>

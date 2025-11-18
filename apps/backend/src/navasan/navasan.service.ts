@@ -22,6 +22,9 @@ import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
 import { sanitizeUrl, sanitizeErrorMessage } from '../common/utils/sanitize-url';
 import { getTehranDayBoundaries, formatTehranDate } from '../common/utils/date-utils';
 import { MetricsService } from '../metrics/metrics.service';
+import { ApiProviderFactory } from '../api-providers/api-provider.factory';
+import { CurrencyData, CryptoData, GoldData } from '../api-providers/api-provider.interface';
+import { IntradayOhlcService } from './services/intraday-ohlc.service';
 
 /**
  * FIX #5: TYPE SAFETY - Define proper interfaces instead of using 'any'
@@ -93,11 +96,12 @@ export class NavasanService {
     @InjectModel(OhlcSnapshot.name) private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
+    private apiProviderFactory: ApiProviderFactory, // Inject PersianAPI provider
+    private intradayOhlcService: IntradayOhlcService, // Inject Intraday OHLC service
   ) {
     this.apiKey = this.configService.get<string>('NAVASAN_API_KEY') || '';
     if (!this.apiKey) {
-      this.logger.error('NAVASAN_API_KEY is not set in environment variables');
-      throw new Error('NAVASAN_API_KEY is required. Please set it in your .env file.');
+      this.logger.warn('NAVASAN_API_KEY is not set - using PersianAPI instead');
     }
 
     // Get internal API base URL from config or fallback to localhost
@@ -254,6 +258,9 @@ export class NavasanService {
       await this.saveToStaleCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
       await this.savePriceSnapshot(category, apiResponse.data, apiResponse.metadata);
 
+      // 📊 Record intraday OHLC data points
+      await this.recordIntradayOhlc(category, apiResponse.data as Record<string, unknown>);
+
       this.logger.log(`✅ Force fetch successful for ${category}`);
       return { success: true };
 
@@ -273,6 +280,83 @@ export class NavasanService {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Record intraday OHLC data from fetched API data
+   * Transforms Navasan format to standard format and records data points
+   */
+  private async recordIntradayOhlc(
+    category: 'currencies' | 'crypto' | 'gold',
+    navasanData: Record<string, unknown>
+  ): Promise<void> {
+    try {
+      const transformedData = this.transformNavasanToStandardFormat(category, navasanData);
+      await this.intradayOhlcService.recordDataPoints(transformedData);
+    } catch (error) {
+      // Log error but don't fail the entire fetch operation
+      const err = error as Error;
+      this.logger.warn(
+        `Failed to record intraday OHLC for ${category}: ${err.message}`
+      );
+    }
+  }
+
+  /**
+   * Transform Navasan API format to standard CurrencyData/CryptoData/GoldData format
+   */
+  private transformNavasanToStandardFormat(
+    category: 'currencies' | 'crypto' | 'gold',
+    navasanData: Record<string, unknown>
+  ): { currencies: CurrencyData[]; crypto: CryptoData[]; gold: GoldData[] } {
+    const result: { currencies: CurrencyData[]; crypto: CryptoData[]; gold: GoldData[] } = {
+      currencies: [],
+      crypto: [],
+      gold: [],
+    };
+
+    // Iterate through the response and transform each item
+    for (const [code, itemData] of Object.entries(navasanData)) {
+      if (!itemData || typeof itemData !== 'object') continue;
+
+      const item = itemData as NavasanPriceItem;
+      const price = parseFloat(item.value);
+
+      if (isNaN(price)) {
+        this.logger.warn(`Invalid price for ${code}: ${item.value}`);
+        continue;
+      }
+
+      const baseData = {
+        code,
+        price,
+        updatedAt: new Date(item.utc),
+      };
+
+      // Categorize based on category
+      if (category === 'currencies') {
+        result.currencies.push({
+          ...baseData,
+          name: code, // Use code as name for now
+          change: item.change || undefined,
+        } as CurrencyData);
+      } else if (category === 'crypto') {
+        result.crypto.push({
+          ...baseData,
+          name: code,
+          symbol: code.toUpperCase(),
+          priceIrt: price,
+          change24h: item.change || undefined,
+        } as CryptoData);
+      } else if (category === 'gold') {
+        result.gold.push({
+          ...baseData,
+          name: code,
+        } as GoldData);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -491,166 +575,181 @@ export class NavasanService {
   }
 
   /**
-   * Fetch data from Navasan API with timeout and type validation
-   * SECURITY: API key sent in header instead of URL to prevent exposure in logs
+   * Convert Date object to Jalali date string (YYYY/MM/DD format)
+   * This is a simplified conversion that calculates Persian calendar date
+   */
+  private toJalaliDateString(date: Date): string {
+    // Use a library function or API to convert Gregorian to Jalali
+    // For now, we'll format the date as ISO and note it needs proper Jalali conversion
+    // TODO: Install moment-jalaali or use proper Jalali conversion library
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    // Approximate Jalali year (Gregorian year - 621 or 622)
+    // This is a placeholder - proper conversion requires a library
+    const jalaliYear = year - 621;
+
+    return `${jalaliYear}/${month}/${day}`;
+  }
+
+  /**
+   * Convert Date object to time string (HH:mm:ss format)
+   */
+  private toTimeString(date: Date): string {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
+  /**
+   * Map PersianAPI response array to NavasanResponse object format
+   * PersianAPI returns: [{ code: 'usd_sell', price: 42500, ... }]
+   * Navasan format: { usd_sell: { value: "42500", ... } }
+   */
+  private mapPersianApiToNavasan(
+    data: (CurrencyData | CryptoData | GoldData)[],
+  ): NavasanResponse {
+    const result: Record<string, NavasanPriceItem> = {};
+
+    for (const item of data) {
+      const key = item.code;
+      const timestamp = item.updatedAt || new Date();
+
+      // Map to Navasan format with calculated date/dt fields
+      result[key] = {
+        value: String(item.price || 0),
+        change: ('change' in item && item.change) ? item.change : 0,
+        utc: timestamp.toISOString(),
+        date: this.toJalaliDateString(timestamp),
+        dt: this.toTimeString(timestamp),
+      };
+    }
+
+    return result as NavasanResponse;
+  }
+
+  /**
+   * Determine category from items string using exact matching first, then fallback to contains check
+   * More robust and maintainable than fragile string.includes() checks
+   */
+  private determineCategoryFromItemsString(items: string): 'currencies' | 'crypto' | 'gold' | 'all' {
+    // Exact match first (most reliable)
+    if (items === this.items.all) {
+      return 'all';
+    }
+    if (items === this.items.currencies) {
+      return 'currencies';
+    }
+    if (items === this.items.crypto) {
+      return 'crypto';
+    }
+    if (items === this.items.gold) {
+      return 'gold';
+    }
+
+    // Fallback to contains check for partial matches
+    // Check for crypto first (most specific keywords)
+    if (items.includes('btc') || items.includes('eth') || items.includes('usdt')) {
+      this.logger.debug('Category detected via contains check: crypto');
+      return 'crypto';
+    }
+
+    // Check for gold
+    if (items.includes('sekkeh') || items.includes('bahar') || items.includes('18ayar')) {
+      this.logger.debug('Category detected via contains check: gold');
+      return 'gold';
+    }
+
+    // Check for currencies (least specific, so last)
+    if (items.includes('usd') || items.includes('eur') || items.includes('gbp')) {
+      this.logger.debug('Category detected via contains check: currencies');
+      return 'currencies';
+    }
+
+    // Default to currencies if no match found
+    this.logger.warn(`Could not determine category for items: ${items.substring(0, 50)}..., defaulting to currencies`);
+    return 'currencies';
+  }
+
+  /**
+   * Fetch data from PersianAPI with timeout and type validation
+   * Replaces old Navasan API integration
    * TYPE SAFETY: Returns properly typed NavasanResponse
    */
   private async fetchFromApiWithTimeout(
     items: string,
   ): Promise<{ data: NavasanResponse; metadata?: Record<string, unknown> }> {
-    // NOTE: Navasan API requires the API key as a query parameter (not in headers)
-    // This is not ideal from a security perspective, but it's how their API works
-    const url = `${this.baseUrl}?api_key=${this.apiKey}&item=${items}`;
-
-    // DEBUG LOGGING: Log request details for troubleshooting (with sanitized API key)
-    const sanitizedUrl = `${this.baseUrl}?api_key=[REDACTED]&item=${items}`;
-    this.logger.debug(`📤 Making API request to: ${sanitizedUrl}`);
-    this.logger.debug(`📤 Timeout: ${this.apiTimeoutMs}ms`);
+    this.logger.debug(`📤 Fetching data from PersianAPI for items: ${items.substring(0, 50)}...`);
 
     try {
-      const response = await axios.get(url, {
-        timeout: this.apiTimeoutMs,
-        validateStatus: (status) => status < 500, // Don't throw on 4xx errors
-      });
+      const provider = this.apiProviderFactory.getActiveProvider();
+      let responseData: (CurrencyData | CryptoData | GoldData)[] = [];
 
-      // DEBUG LOGGING: Log API response details for troubleshooting
-      this.logger.debug(`📥 Navasan API Response - Status: ${response.status}, Items: ${items}`);
-      this.logger.debug(`📥 Response Headers: ${JSON.stringify({
-        'content-type': response.headers['content-type'],
-        'x-ratelimit-remaining': response.headers['x-ratelimit-remaining'],
-        'retry-after': response.headers['retry-after'],
-      })}`);
+      // Use proper category mapping instead of fragile string detection
+      const category = this.determineCategoryFromItemsString(items);
 
-      // Handle authentication errors - throw error to trigger stale fallback
-      if (response.status === 401 || response.status === 403) {
-        // Log detailed error for debugging
-        this.logger.error(`🔐 Authentication failed - Status: ${response.status}`);
-        this.logger.error(`🔐 Response body: ${JSON.stringify(response.data)}`);
-
-        // Throw regular Error (not UnauthorizedException) so it gets caught by try-catch
-        // This triggers the stale cache fallback instead of failing the request
-        throw new Error(
-          'Navasan API authentication failed. API key may be expired or invalid.',
-        );
+      if (category === 'all') {
+        // Fetch all data
+        this.logger.debug('🌍 Fetching all data from PersianAPI');
+        const allData = await provider.fetchAll({ limit: 100 });
+        responseData = [
+          ...allData.currencies,
+          ...allData.crypto,
+          ...allData.gold,
+        ];
+      } else if (category === 'currencies') {
+        // Fetch currencies
+        this.logger.debug('📊 Fetching currencies from PersianAPI');
+        responseData = await provider.fetchCurrencies({ limit: 100 });
+      } else if (category === 'crypto') {
+        // Fetch crypto
+        this.logger.debug('💰 Fetching crypto from PersianAPI');
+        responseData = await provider.fetchCrypto({ limit: 100 });
+      } else if (category === 'gold') {
+        // Fetch gold
+        this.logger.debug('🪙 Fetching gold from PersianAPI');
+        try {
+          responseData = await provider.fetchGold({ limit: 100 });
+        } catch (error: any) {
+          // Gold endpoint may be unavailable - log warning but don't fail
+          this.logger.warn(`⚠️ Gold endpoint unavailable: ${error.message}`);
+          this.logger.warn('📦 Returning empty gold data - will fallback to cache');
+          responseData = [];
+        }
       }
 
-      // Handle rate limiting - throw error to trigger stale fallback
-      if (response.status === 429) {
-        const retryAfter = response.headers['retry-after'];
-        this.logger.warn(`⏱️  Rate limit exceeded - Retry after: ${retryAfter || 'unknown'}`);
+      // Map PersianAPI response to NavasanResponse format
+      const navasanData = this.mapPersianApiToNavasan(responseData);
 
-        // Throw regular Error (not HttpException) so it gets caught by try-catch
-        // This triggers the stale cache fallback instead of failing the request
-        throw new Error(
-          `Navasan API rate limit exceeded. Retry after ${retryAfter || 'some time'}.`,
-        );
-      }
+      // Validate the mapped response
+      this.validateNavasanResponse(navasanData, items);
 
-      // Handle other client errors
-      if (response.status >= 400 && response.status < 500) {
-        // Log detailed error for internal debugging
-        this.logger.error(`❌ Client error - Status: ${response.status}`);
-        this.logger.error(`❌ Response body: ${JSON.stringify(response.data)}`);
-        this.logger.error(`❌ Request URL (sanitized): ${this.baseUrl}?item=${items}`);
+      this.logger.debug(`✅ Successfully fetched ${responseData.length} items from PersianAPI`);
 
-        // SECURITY FIX: Don't expose API error details to clients to prevent information leakage
-        throw new BadRequestException(
-          'External API request failed. Please check your request parameters.',
-        );
-      }
-
-      // Handle server errors
-      if (response.status >= 500) {
-        // Log detailed error for internal debugging
-        this.logger.error(`🔥 Server error - Status: ${response.status}`);
-        this.logger.error(`🔥 Response body: ${JSON.stringify(response.data)}`);
-
-        // SECURITY FIX: Don't expose specific status codes to prevent information leakage
-        throw new InternalServerErrorException('External API service temporarily unavailable. Please try again later.');
-      }
-
-      // Success
-      if (response.status !== 200) {
-        // Log unexpected status code
-        this.logger.warn(`⚠️  Unexpected status code: ${response.status}`);
-        this.logger.warn(`⚠️  Response body: ${JSON.stringify(response.data)}`);
-
-        // SECURITY FIX: Don't expose specific status codes to prevent information leakage
-        throw new Error('External API returned unexpected response. Please try again later.');
-      }
-
-      // VALIDATION FIX: Validate API response structure before caching
-      // This prevents invalid/malformed data from being cached and served to users
-      this.validateNavasanResponse(response.data, items);
-
-      // Capture rate limit metadata for monitoring
-      const apiMetadata: Record<string, unknown> = {
-        statusCode: response.status,
+      return {
+        data: navasanData,
+        metadata: {
+          provider: 'PersianAPI',
+          itemCount: responseData.length,
+          timestamp: new Date(),
+        },
       };
+    } catch (error: any) {
+      this.logger.error(`❌ PersianAPI fetch failed: ${error.message}`);
 
-      // Extract rate limit headers if present
-      if (response.headers['x-ratelimit-remaining']) {
-        apiMetadata.rateLimitRemaining = parseInt(response.headers['x-ratelimit-remaining'], 10);
-      }
-      if (response.headers['x-ratelimit-reset']) {
-        const resetTimestamp = parseInt(response.headers['x-ratelimit-reset'], 10);
-        apiMetadata.rateLimitReset = new Date(resetTimestamp * 1000);
+      // Re-throw to trigger stale cache fallback
+      if (error.statusCode === 401 || error.statusCode === 403) {
+        throw new Error('PersianAPI authentication failed. API key may be expired or invalid.');
       }
 
-      return { data: response.data, metadata: apiMetadata };
-    } catch (error) {
-      // Log all errors with detailed information for debugging (with sanitization)
-      if (axios.isAxiosError(error)) {
-        // Sanitize error message to prevent API key leakage
-        const sanitizedMessage = sanitizeErrorMessage(error);
-        this.logger.error(`🌐 Axios Error - Code: ${error.code}, Message: ${sanitizedMessage}`);
-
-        if (error.response) {
-          // The request was made and the server responded with a status code
-          // that falls out of the range of 2xx
-          this.logger.error(`🌐 Error Response - Status: ${error.response.status}`);
-          this.logger.error(`🌐 Error Response Body: ${JSON.stringify(error.response.data)}`);
-          this.logger.error(`🌐 Error Response Headers: ${JSON.stringify(error.response.headers)}`);
-        } else if (error.request) {
-          // The request was made but no response was received
-          this.logger.error(`🌐 No response received from API`);
-          this.logger.error(`🌐 Request details: ${JSON.stringify({
-            method: error.request.method,
-            path: error.request.path,
-            host: error.request.host,
-          })}`);
-        } else {
-          // Something happened in setting up the request that triggered an Error
-          this.logger.error(`🌐 Request setup error: ${sanitizedMessage}`);
-        }
-
-        // Handle timeout
-        if (error.code === 'ECONNABORTED') {
-          this.logger.error(`⏱️  Request timed out after ${this.apiTimeoutMs}ms`);
-          throw new RequestTimeoutException(
-            `Navasan API request timed out after ${this.apiTimeoutMs}ms`,
-          );
-        }
-
-        // Handle network errors (sanitize error message)
-        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-          this.logger.error(`🌐 Network error: ${error.code} - Cannot reach API server`);
-          throw new Error(`Cannot reach Navasan API server: ${sanitizeErrorMessage(error)}`);
-        }
-      } else {
-        // Non-axios error - sanitize before logging
-        const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
-        const sanitizedStack = error instanceof Error && error.stack
-          ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
-          : undefined;
-
-        this.logger.error(`❌ Unexpected error type: ${sanitizedMessage}`);
-        if (sanitizedStack) {
-          this.logger.error(`❌ Stack trace: ${sanitizedStack}`);
-        }
+      if (error.statusCode === 429) {
+        throw new Error('PersianAPI rate limit exceeded.');
       }
 
-      // Re-throw other errors
+      // For other errors, re-throw
       throw error;
     }
   }
@@ -1354,7 +1453,18 @@ export class NavasanService {
           try {
             // URL encode itemCode to handle special characters safely
             const encodedItemCode = encodeURIComponent(itemCode);
-            const url = `${this.internalApiBaseUrl}/api/currencies/code/${encodedItemCode}/history?days=${daysToFetch}`;
+
+            // Build the correct endpoint URL based on category
+            let url: string;
+            if (category === 'currencies') {
+              url = `${this.internalApiBaseUrl}/api/currencies/code/${encodedItemCode}/history?days=${daysToFetch}`;
+            } else if (category === 'crypto') {
+              url = `${this.internalApiBaseUrl}/api/digital-currencies/symbol/${encodedItemCode}/history?days=${daysToFetch}`;
+            } else if (category === 'gold') {
+              url = `${this.internalApiBaseUrl}/api/gold/code/${encodedItemCode}/history?days=${daysToFetch}`;
+            } else {
+              throw new Error(`Unknown category: ${category}`);
+            }
 
             const response = await axios.get(url, {
               timeout: 10000,

@@ -9,6 +9,7 @@ import { useLogoutMutation } from '@/lib/store/services/authApi'
 import { FiArrowRight, FiUser, FiLock, FiLogOut, FiShield } from 'react-icons/fi'
 import { ProfileEdit } from '@/components/ProfileEdit'
 import { ChangePassword } from '@/components/ChangePassword'
+import { RateLimitMeter } from '@/components/RateLimit'
 
 type SettingsView = 'main' | 'profile' | 'password'
 
@@ -184,6 +185,9 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+
+            {/* API Usage Section */}
+            <RateLimitMeter />
           </div>
         )}
 

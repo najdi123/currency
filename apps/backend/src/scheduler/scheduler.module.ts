@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { NavasanSchedulerService } from './navasan-scheduler.service';
 import { OhlcCleanupSchedulerService } from './ohlc-cleanup-scheduler.service';
+import { ScheduleConfigService } from './schedule-config.service';
 import { SchedulerController } from './scheduler.controller';
 import { NavasanModule } from '../navasan/navasan.module';
 
@@ -11,7 +12,15 @@ import { NavasanModule } from '../navasan/navasan.module';
     NavasanModule, // Import to use NavasanService and OhlcSnapshot model
   ],
   controllers: [SchedulerController],
-  providers: [NavasanSchedulerService, OhlcCleanupSchedulerService],
-  exports: [NavasanSchedulerService, OhlcCleanupSchedulerService], // Export for potential use in other modules
+  providers: [
+    ScheduleConfigService, // Dynamic scheduling configuration
+    NavasanSchedulerService,
+    OhlcCleanupSchedulerService,
+  ],
+  exports: [
+    ScheduleConfigService,
+    NavasanSchedulerService,
+    OhlcCleanupSchedulerService,
+  ], // Export for potential use in other modules
 })
 export class SchedulerModule {}

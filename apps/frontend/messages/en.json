@@ -34,6 +34,10 @@
     "loadingNewData": "Loading new data",
     "loadingText": "Loading..."
   },
+  "ItemCard": {
+    "priceIncrease": "Price increase",
+    "priceDecrease": "Price decrease"
+  },
   "SettingsModal": {
     "title": "Settings",
     "close": "Close",
@@ -42,6 +46,7 @@
     "dark": "Dark",
     "system": "System",
     "language": "Language",
+    "apiUsage": "API Usage",
     "account": "Account",
     "userInfo": "User Information",
     "manageAccount": "Manage Account",
@@ -551,5 +556,37 @@
     "backToToday": "Back to Today",
     "noDataAvailable": "No historical data available for this date",
     "daysAgoLabel": "{count} {count, plural, one {day} other {days}} ago"
+  },
+  "rateLimit": {
+    "apiUsage": "API Usage",
+    "plan": "Plan",
+    "requests": "requests",
+    "request": "request",
+    "remaining": "remaining",
+    "resetsIn": "Resets in",
+    "hours": "hours",
+    "hour": "hour",
+    "day": "day",
+    "days": "days",
+    "minutes": "minutes",
+    "minute": "minute",
+    "lessThanHour": "less than 1 hour",
+    "lessThanMinute": "less than a minute",
+    "upgradePlan": "Upgrade Plan",
+    "upgradeForMore": "Upgrade for unlimited requests",
+    "nearLimitWarning": "You're approaching your daily limit",
+    "lowUsageMessage": "Your API usage is low. You have plenty of requests remaining.",
+    "criticalWarning": "Almost out of requests!",
+    "criticalMessage": "Consider upgrading to avoid service interruption",
+    "rateLimitExceeded": "Rate Limit Exceeded",
+    "rateLimitMessage": "You've reached your daily API limit. Your quota will reset soon.",
+    "tryAgainIn": "You can try again in",
+    "tryAgain": "Try Again",
+    "pleaseWait": "Please Wait",
+    "canRetryNow": "You can retry now",
+    "quotaResetsAt": "Quota resets at",
+    "timeRemaining": "Time remaining until reset:",
+    "errorLoading": "Failed to load rate limit status",
+    "loading": "Loading..."
   }
 }

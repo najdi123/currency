@@ -35,9 +35,12 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
             key={range.value}
             onClick={() => onRangeChange(range.value)}
             disabled={disabled}
+            type="button"
             role="tab"
             aria-selected={isActive}
             aria-label={range.labelFa}
+            aria-controls="chart-panel"
+            tabIndex={isActive ? 0 : -1}
             className={`
               px-4 py-2 rounded-xs text-sm font-medium transition-apple-fast active-scale-apple
               focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900

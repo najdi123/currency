@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/Button'
 import { SettingsModal } from '@/components/SettingsModal'
 import { LastUpdatedDisplay } from '@/components/LastUpdatedDisplay'
+import { RateLimitBadge } from '@/components/RateLimitBadge'
 import { HiRefresh, HiViewList } from 'react-icons/hi'
 import { FiGrid, FiSettings } from 'react-icons/fi'
 import type { ViewMode } from '@/lib/hooks/useViewModePreference'
@@ -97,6 +98,8 @@ export const PageHeader = ({
             isFetching={isFetching}
             historicalNav={historicalNav}
           />
+          {/* Rate Limit Badge - Shows API usage status */}
+          <RateLimitBadge />
         </div>
       </div>
 

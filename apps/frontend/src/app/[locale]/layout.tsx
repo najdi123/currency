@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { locales } from '@/i18n/request';
 import StoreProvider from "@/lib/StoreProvider";
 import { OfflineBannerWrapper } from "@/components/OfflineBannerWrapper";
+import { RateLimitWrapper } from "@/components/RateLimitWrapper";
 import { ThemeProvider } from "next-themes";
 import { validateConfig } from "@/lib/config";
 import "../globals.css";
@@ -98,8 +99,10 @@ export default async function RootLayout({
         >
           <NextIntlClientProvider messages={messages}>
             <StoreProvider>
-              <OfflineBannerWrapper />
-              {children}
+              <RateLimitWrapper>
+                <OfflineBannerWrapper />
+                {children}
+              </RateLimitWrapper>
             </StoreProvider>
           </NextIntlClientProvider>
         </ThemeProvider>

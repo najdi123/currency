@@ -34,6 +34,10 @@
     "loadingNewData": "در حال بارگذاری داده‌های جدید",
     "loadingText": "در حال بارگذاری..."
   },
+  "ItemCard": {
+    "priceIncrease": "افزایش قیمت",
+    "priceDecrease": "کاهش قیمت"
+  },
   "SettingsModal": {
     "title": "تنظیمات",
     "close": "بستن",
@@ -42,6 +46,7 @@
     "dark": "تیره",
     "system": "سیستم",
     "language": "زبان",
+    "apiUsage": "مصرف API",
     "account": "حساب کاربری",
     "userInfo": "اطلاعات کاربر",
     "manageAccount": "مدیریت حساب کاربری",
@@ -551,5 +556,37 @@
     "backToToday": "بازگشت به امروز",
     "noDataAvailable": "داده تاریخی برای این تاریخ موجود نیست",
     "daysAgoLabel": "{count} روز قبل"
+  },
+  "rateLimit": {
+    "apiUsage": "استفاده از API",
+    "plan": "پلن",
+    "requests": "درخواست‌ها",
+    "request": "درخواست",
+    "remaining": "باقی‌مانده",
+    "resetsIn": "بازنشانی در",
+    "hours": "ساعت",
+    "hour": "ساعت",
+    "day": "روز",
+    "days": "روز",
+    "minutes": "دقیقه",
+    "minute": "دقیقه",
+    "lessThanHour": "کمتر از ۱ ساعت",
+    "lessThanMinute": "کمتر از یک دقیقه",
+    "upgradePlan": "ارتقای پلن",
+    "upgradeForMore": "برای درخواست‌های نامحدود ارتقا دهید",
+    "nearLimitWarning": "شما به محدودیت روزانه خود نزدیک می‌شوید",
+    "lowUsageMessage": "میزان استفاده از API شما پایین است. درخواست‌های زیادی باقی مانده است.",
+    "criticalWarning": "تقریباً از درخواست‌ها تمام شده!",
+    "criticalMessage": "برای جلوگیری از قطع سرویس، ارتقا را در نظر بگیرید",
+    "rateLimitExceeded": "محدودیت نرخ فراتر رفت",
+    "rateLimitMessage": "شما به محدودیت روزانه API خود رسیده‌اید. سهمیه شما به زودی بازنشانی می‌شود.",
+    "tryAgainIn": "می‌توانید دوباره امتحان کنید در",
+    "tryAgain": "دوباره امتحان کنید",
+    "pleaseWait": "لطفا صبر کنید",
+    "canRetryNow": "اکنون می‌توانید دوباره تلاش کنید",
+    "quotaResetsAt": "سهمیه بازنشانی می‌شود در",
+    "timeRemaining": "زمان باقی‌مانده تا بازنشانی:",
+    "errorLoading": "بارگذاری وضعیت محدودیت نرخ ناموفق بود",
+    "loading": "در حال بارگذاری..."
   }
 }

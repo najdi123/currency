@@ -1,21 +1,42 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { SchedulerRegistry, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CronJob } from 'cron';
 import { NavasanService } from '../navasan/navasan.service';
+import { ScheduleConfigService } from './schedule-config.service';
 
 @Injectable()
-export class NavasanSchedulerService {
+export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NavasanSchedulerService.name);
   private fetchPromise: Promise<void> | null = null;
   private cronJob: CronJob | null = null;
+  private dynamicTimeout: NodeJS.Timeout | null = null;
+  private useDynamicScheduling: boolean = false;
 
   constructor(
     private readonly navasanService: NavasanService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly configService: ConfigService,
-  ) {
+    private readonly scheduleConfig: ScheduleConfigService,
+  ) {}
+
+  /**
+   * Initialize scheduler on module initialization
+   */
+  onModuleInit() {
     this.initializeScheduler();
+  }
+
+  /**
+   * Cleanup on module destroy
+   */
+  onModuleDestroy() {
+    if (this.cronJob) {
+      this.cronJob.stop();
+    }
+    if (this.dynamicTimeout) {
+      clearTimeout(this.dynamicTimeout);
+    }
   }
 
   /**
@@ -29,6 +50,68 @@ export class NavasanSchedulerService {
       return;
     }
 
+    // Check if dynamic scheduling is enabled
+    this.useDynamicScheduling =
+      this.configService.get<string>('SCHEDULER_USE_DYNAMIC', 'true') === 'true';
+
+    if (this.useDynamicScheduling) {
+      this.logger.log('🌟 Using DYNAMIC scheduling (time-of-day aware)');
+      this.startDynamicScheduler();
+    } else {
+      this.logger.log('📅 Using STATIC scheduling (cron-based)');
+      this.startStaticScheduler();
+    }
+  }
+
+  /**
+   * Start dynamic scheduler (time-of-day aware)
+   */
+  private startDynamicScheduler() {
+    const currentPeriod = this.scheduleConfig.getCurrentSchedulePeriod();
+    const intervalMinutes = this.scheduleConfig.getCurrentScheduleInterval();
+    const nextRun = this.scheduleConfig.getNextScheduledTime();
+    const tehranTime = this.scheduleConfig.getTehranTime().format('YYYY-MM-DD HH:mm:ss');
+
+    this.logger.log(`✅ Dynamic Scheduler initialized`);
+    this.logger.log(`   Current Period: ${currentPeriod}`);
+    this.logger.log(`   Current Interval: ${intervalMinutes} minutes`);
+    this.logger.log(`   Tehran Time: ${tehranTime}`);
+    this.logger.log(`   Next Run: ${nextRun.toISOString()}`);
+
+    // Schedule first fetch
+    this.scheduleDynamicFetch();
+  }
+
+  /**
+   * Schedule next fetch with dynamic interval
+   */
+  private scheduleDynamicFetch() {
+    // Clear any existing timeout
+    if (this.dynamicTimeout) {
+      clearTimeout(this.dynamicTimeout);
+    }
+
+    const intervalMinutes = this.scheduleConfig.getCurrentScheduleInterval();
+    const nextTime = this.scheduleConfig.getNextScheduledTime();
+    const currentPeriod = this.scheduleConfig.getCurrentSchedulePeriod();
+    const delay = intervalMinutes * 60 * 1000; // Convert to milliseconds
+
+    this.logger.log(
+      `⏰ Next fetch scheduled for ${nextTime.toISOString()} ` +
+      `(${currentPeriod}, ${intervalMinutes}m interval)`
+    );
+
+    this.dynamicTimeout = setTimeout(async () => {
+      await this.fetchAllData();
+      // Reschedule for next interval (may be different based on new time)
+      this.scheduleDynamicFetch();
+    }, delay);
+  }
+
+  /**
+   * Start static scheduler (original cron-based)
+   */
+  private startStaticScheduler() {
     // Get configuration
     const customCron = this.configService.get<string>('SCHEDULER_CRON_EXPRESSION');
     const intervalMinutes = parseInt(
@@ -60,7 +143,7 @@ export class NavasanSchedulerService {
     this.schedulerRegistry.addCronJob('navasan-dynamic-fetch', this.cronJob);
 
     const nextRun = this.cronJob.nextDate().toJSDate();
-    this.logger.log(`✅ Scheduler initialized. Next run: ${nextRun.toISOString()}`);
+    this.logger.log(`✅ Static Scheduler initialized. Next run: ${nextRun.toISOString()}`);
   }
 
   /**
@@ -200,13 +283,32 @@ export class NavasanSchedulerService {
    * Get current scheduler configuration
    */
   getSchedulerConfig() {
-    return {
+    const baseConfig = {
       enabled: this.configService.get<string>('SCHEDULER_ENABLED') === 'true',
-      intervalMinutes: this.configService.get<string>('SCHEDULER_INTERVAL_MINUTES'),
-      cronExpression: this.configService.get<string>('SCHEDULER_CRON_EXPRESSION'),
-      timezone: this.configService.get<string>('SCHEDULER_TIMEZONE'),
+      useDynamicScheduling: this.useDynamicScheduling,
       nextRun: this.getNextRunTime(),
     };
+
+    if (this.useDynamicScheduling) {
+      return {
+        ...baseConfig,
+        type: 'dynamic',
+        currentPeriod: this.scheduleConfig.getCurrentSchedulePeriod(),
+        currentInterval: this.scheduleConfig.getCurrentScheduleInterval(),
+        tehranTime: this.scheduleConfig.getTehranTime().format('YYYY-MM-DD HH:mm:ss'),
+        isPeakHours: this.scheduleConfig.isCurrentlyPeakHours(),
+        isWeekend: this.scheduleConfig.isCurrentlyWeekend(),
+        minutesUntilPeriodChange: this.scheduleConfig.getMinutesUntilNextPeriodChange(),
+      };
+    } else {
+      return {
+        ...baseConfig,
+        type: 'static',
+        intervalMinutes: this.configService.get<string>('SCHEDULER_INTERVAL_MINUTES'),
+        cronExpression: this.configService.get<string>('SCHEDULER_CRON_EXPRESSION'),
+        timezone: this.configService.get<string>('SCHEDULER_TIMEZONE'),
+      };
+    }
   }
 
   /**

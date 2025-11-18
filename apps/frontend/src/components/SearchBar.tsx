@@ -241,6 +241,13 @@ export function SearchBar({
 
   return (
     <div className="relative w-full max-w-2xl mx-auto px-3 sm:px-6 lg:px-8 mb-6">
+      {/* Screen reader announcement for search results */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {isFocused && debouncedQuery.trim() && searchResults.length > 0 &&
+          `${searchResults.length} ${tSearch('resultsFound') || 'results found'}`}
+        {isFocused && debouncedQuery.trim() && searchResults.length === 0 &&
+          tSearch('noResults')}
+      </div>
       {/* Search Input */}
       <div className="relative">
         <div className="absolute inset-y-0 ltr:left-0 rtl:right-0 flex items-center ltr:pl-4 rtl:pr-4 pointer-events-none">
