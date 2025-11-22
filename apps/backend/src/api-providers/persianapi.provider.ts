@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   IApiProvider,
   FetchParams,
@@ -14,11 +16,48 @@ import {
   ApiProviderMetadata,
   ApiProviderError,
 } from './api-provider.interface';
+import { CategoryMatcher } from './category-matcher';
+import { ErrorTracker } from './error-tracker';
+import { PerformanceMonitor } from './performance-monitor';
 
 /**
  * Type definitions for PersianAPI responses
  * These provide compile-time type checking for better code quality
  */
+
+/**
+ * Combined response item from /common/gold-currency-coin endpoint
+ * This endpoint returns currencies, gold, and coins in a single response
+ */
+interface PersianApiCombinedItem {
+  key: number | string;
+  title?: string;
+  Title?: string;
+  عنوان?: string;
+  price?: number | string;
+  Price?: number | string;
+  قیمت?: number | string;
+  change?: number | string;
+  Change?: number | string;
+  high?: number | string;
+  High?: number | string;
+  بیشترین?: number | string;
+  low?: number | string;
+  Low?: number | string;
+  کمترین?: number | string;
+  category?: string;
+  Category?: string;
+  created_at?: string | Date;
+  'تاریخ بروزرسانی'?: string | Date;
+}
+
+/**
+ * Response structure from /common/gold-currency-coin endpoint
+ */
+interface PersianApiCombinedResponse {
+  result: PersianApiCombinedItem[];
+}
+
 interface PersianApiCurrencyResponse {
   Key?: string;
   key?: string;
@@ -91,6 +130,15 @@ interface PersianApiCoinResponse {
 }
 
 /**
+ * Key mapping structure loaded from external JSON configuration
+ */
+interface KeyMappingConfig {
+  currencies: Record<string, { code: string; name: string; category: string }>;
+  gold: Record<string, { code: string; name: string; category: string }>;
+  coins: Record<string, { code: string; name: string; category: string }>;
+}
+
+/**
  * PersianAPI Provider Implementation
  *
  * Integrates with PersianAPI (https://workspace.persianapi.com)
@@ -103,13 +151,27 @@ export class PersianApiProvider implements IApiProvider {
   private readonly apiKey: string;
   private readonly timeout = 10000; // 10 seconds
 
-  // Rate limiting tracking
-  private lastRequestTime = 0;
-  private requestCount = 0;
-  private rateLimitReset = new Date();
+  // Rate limiting - Token bucket implementation
+  private tokens = 1; // Start with 1 token
+  private readonly maxTokens = 1; // Maximum 1 token (rate: 1 req per 5 seconds)
+  private readonly tokenRefillRate = 1 / 5000; // 1 token per 5000ms
+  private lastRefillTime = Date.now();
 
   // Request deduplication - cache in-flight requests to avoid duplicate API calls
   private requestCache = new Map<string, Promise<any>>();
+  private readonly cacheTTL = 5000; // 5 seconds cache TTL
+
+  // Category matcher for type-safe filtering
+  private readonly categoryMatcher = new CategoryMatcher();
+
+  // Error tracking with circuit breaker
+  private readonly errorTracker = new ErrorTracker(5, 60000);
+
+  // Performance monitoring
+  private readonly performanceMonitor = new PerformanceMonitor(1000);
+
+  // Key mapping loaded from external JSON file
+  private keyMapping: Record<number, string> = {};
 
   constructor(
     private readonly httpService: HttpService,
@@ -118,6 +180,129 @@ export class PersianApiProvider implements IApiProvider {
     this.apiKey = this.configService.get<string>('PERSIANAPI_KEY') || '';
     if (!this.apiKey) {
       throw new Error('PERSIANAPI_KEY is required but not configured in environment variables');
+    }
+    this.loadKeyMapping();
+  }
+
+  /**
+   * Validate key mapping configuration structure
+   */
+  private validateKeyMappingConfig(config: any): config is KeyMappingConfig {
+    const requiredSections = ['currencies', 'gold', 'coins'];
+    const requiredFields = ['code', 'name', 'category'];
+
+    // Check top-level structure
+    for (const section of requiredSections) {
+      if (!config[section] || typeof config[section] !== 'object') {
+        throw new Error(`Missing or invalid section: ${section}`);
+      }
+    }
+
+    // Validate each item in each section
+    const seenCodes = new Set<string>();
+    const seenKeys = new Set<string>();
+
+    for (const section of requiredSections) {
+      for (const [key, value] of Object.entries(config[section])) {
+        // Validate key is numeric
+        if (!/^\d+$/.test(key)) {
+          throw new Error(`Invalid numeric key in ${section}: ${key}`);
+        }
+
+        // Check for duplicate keys
+        if (seenKeys.has(key)) {
+          throw new Error(`Duplicate key found: ${key}`);
+        }
+        seenKeys.add(key);
+
+        // Validate item structure
+        if (!value || typeof value !== 'object') {
+          throw new Error(`Invalid item structure for ${section}[${key}]`);
+        }
+
+        // Check required fields
+        for (const field of requiredFields) {
+          if (!(value as any)[field]) {
+            throw new Error(`Missing required field '${field}' in ${section}[${key}]`);
+          }
+        }
+
+        // Check for duplicate codes
+        const itemCode = (value as any).code;
+        if (seenCodes.has(itemCode)) {
+          throw new Error(`Duplicate code found: ${itemCode} in ${section}[${key}]`);
+        }
+        seenCodes.add(itemCode);
+      }
+    }
+
+    this.logger.debug(`✅ Config validation passed: ${seenKeys.size} items, ${seenCodes.size} unique codes`);
+    return true;
+  }
+
+  /**
+   * Load key mapping from external JSON configuration file
+   */
+  private loadKeyMapping(): void {
+    try {
+      // Try multiple paths: development and production
+      const possiblePaths = [
+        path.join(__dirname, 'persianapi-key-mapping.json'),
+        path.join(__dirname, '..', '..', 'src', 'api-providers', 'persianapi-key-mapping.json'),
+        path.join(process.cwd(), 'apps', 'backend', 'src', 'api-providers', 'persianapi-key-mapping.json'),
+        path.join(process.cwd(), 'src', 'api-providers', 'persianapi-key-mapping.json'),
+      ];
+
+      let configData: string | null = null;
+      let loadedFrom: string | null = null;
+
+      for (const configPath of possiblePaths) {
+        try {
+          if (fs.existsSync(configPath)) {
+            configData = fs.readFileSync(configPath, 'utf-8');
+            loadedFrom = configPath;
+            break;
+          }
+        } catch (err) {
+          // Try next path
+          continue;
+        }
+      }
+
+      if (!configData) {
+        throw new Error('Configuration file not found in any expected location');
+      }
+
+      const config = JSON.parse(configData);
+
+      // Validate configuration structure
+      this.validateKeyMappingConfig(config);
+
+      // Now we can safely cast to KeyMappingConfig after validation
+      const validatedConfig = config as KeyMappingConfig;
+
+      // Flatten all mappings into a single numeric key -> string code map
+      const flatMapping: Record<number, string> = {};
+
+      Object.entries(validatedConfig.currencies).forEach(([key, value]) => {
+        flatMapping[parseInt(key, 10)] = value.code;
+      });
+
+      Object.entries(validatedConfig.gold).forEach(([key, value]) => {
+        flatMapping[parseInt(key, 10)] = value.code;
+      });
+
+      Object.entries(validatedConfig.coins).forEach(([key, value]) => {
+        flatMapping[parseInt(key, 10)] = value.code;
+      });
+
+      this.keyMapping = flatMapping;
+      this.logger.log(`✅ Loaded ${Object.keys(flatMapping).length} key mappings from ${loadedFrom}`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to load key mapping configuration: ${error?.message || 'Unknown error'}`);
+      this.logger.warn('Using fallback code generation');
+      // If file doesn't exist or validation fails, we'll fall back to generateCurrencyCode()
+      // This is not a critical error - the fallback system works fine
     }
   }
 
@@ -132,17 +317,40 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Fetch currencies from common/forex endpoint
+   * Fetch combined data from /common/gold-currency-coin endpoint and categorize
+   * This is the core data fetching method that all other fetch methods use
+   */
+  private async fetchCombinedData(params?: FetchParams): Promise<{
+    currencies: PersianApiCombinedItem[];
+    gold: PersianApiCombinedItem[];
+    coins: PersianApiCombinedItem[];
+  }> {
+    const response = await this.makeRequestWithDedup('/common/gold-currency-coin', {
+      ...params,
+      limit: 100,
+    });
+
+    if (!response || !response.result || !Array.isArray(response.result)) {
+      throw new ApiProviderError('Invalid response format: expected result array', 500, 'PersianAPI');
+    }
+
+    // Use CategoryMatcher for type-safe filtering
+    return this.categoryMatcher.categorize(response.result);
+  }
+
+  /**
+   * Fetch currencies from common/gold-currency-coin endpoint
+   * This endpoint works with Base Package and returns all data in one call
    */
   async fetchCurrencies(params?: FetchParams): Promise<CurrencyData[]> {
     try {
-      const response = await this.makeRequestWithDedup('/common/forex', params);
+      const { currencies: currencyItems } = await this.fetchCombinedData(params);
 
-      if (!Array.isArray(response)) {
-        throw new ApiProviderError('Invalid response format: expected array', 500, 'PersianAPI');
-      }
+      // Map to CurrencyData
+      const currencies = currencyItems.map((item) => this.mapToCurrencyData(item));
 
-      return response.map((item) => this.mapToCurrencyData(item));
+      this.logger.log(`✅ Fetched ${currencies.length} currencies from PersianAPI`);
+      return currencies;
     } catch (error: any) {
       this.logger.error('Failed to fetch currencies from PersianAPI', error);
       throw this.handleError(error);
@@ -150,36 +358,36 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Fetch cryptocurrencies from common/digitalcurrency endpoint
+   * Fetch cryptocurrencies from common/gold-currency-coin endpoint
+   * NOTE: Base Package may not include crypto data
    */
   async fetchCrypto(params?: FetchParams): Promise<CryptoData[]> {
     try {
+      // Try to use digitalcurrency endpoint, but it may fail with Base Package
       const response = await this.makeRequestWithDedup('/common/digitalcurrency', params);
 
       if (!Array.isArray(response)) {
-        this.logger.error(`Invalid response format: expected array, got ${typeof response}`);
-        throw new ApiProviderError('Invalid response format: expected array', 500, 'PersianAPI');
+        this.logger.warn(`Crypto endpoint not available with Base Package`);
+        return [];
       }
 
       return response.map((item) => this.mapToCryptoData(item));
     } catch (error: any) {
-      this.logger.error('Failed to fetch crypto from PersianAPI', error);
-      throw this.handleError(error);
+      this.logger.warn('Crypto data not available (Base Package limitation)');
+      return []; // Return empty array instead of throwing
     }
   }
 
   /**
-   * Fetch gold prices from gold endpoint
+   * Fetch gold prices from common/gold-currency-coin endpoint
    */
   async fetchGold(params?: FetchParams): Promise<GoldData[]> {
     try {
-      const response = await this.makeRequestWithDedup('/gold', params);
+      const { gold: goldItems } = await this.fetchCombinedData(params);
 
-      if (!Array.isArray(response)) {
-        throw new ApiProviderError('Invalid response format: expected array', 500, 'PersianAPI');
-      }
-
-      return response.map((item) => this.mapToGoldData(item));
+      const gold = goldItems.map((item) => this.mapToGoldData(item));
+      this.logger.log(`✅ Fetched ${gold.length} gold items from PersianAPI`);
+      return gold;
     } catch (error: any) {
       this.logger.error('Failed to fetch gold from PersianAPI', error);
       throw this.handleError(error);
@@ -187,17 +395,15 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Fetch coin prices from coin/cash endpoint
+   * Fetch coin prices from common/gold-currency-coin endpoint
    */
   async fetchCoins(params?: FetchParams): Promise<CoinData[]> {
     try {
-      const response = await this.makeRequestWithDedup('/coin/cash', params);
+      const { coins: coinItems } = await this.fetchCombinedData(params);
 
-      if (!Array.isArray(response)) {
-        throw new ApiProviderError('Invalid response format: expected array', 500, 'PersianAPI');
-      }
-
-      return response.map((item) => this.mapToCoinData(item));
+      const coins = coinItems.map((item) => this.mapToCoinData(item));
+      this.logger.log(`✅ Fetched ${coins.length} coins from PersianAPI`);
+      return coins;
     } catch (error: any) {
       this.logger.error('Failed to fetch coins from PersianAPI', error);
       throw this.handleError(error);
@@ -205,7 +411,8 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Fetch all data types in parallel
+   * Fetch all data types efficiently with a single API call
+   * This is much more efficient than calling fetchCurrencies, fetchGold, fetchCoins separately
    */
   async fetchAll(params?: FetchParams): Promise<{
     currencies: CurrencyData[];
@@ -214,18 +421,19 @@ export class PersianApiProvider implements IApiProvider {
     coins: CoinData[];
   }> {
     try {
-      const [currencies, crypto, gold, coins] = await Promise.allSettled([
-        this.fetchCurrencies(params),
-        this.fetchCrypto(params),
-        this.fetchGold(params),
-        this.fetchCoins(params),
-      ]);
+      // Fetch combined data once (currencies, gold, coins from single endpoint)
+      const combinedData = await this.fetchCombinedData(params);
+
+      // Fetch crypto separately (different endpoint, may fail with Base Package)
+      const cryptoPromise = this.fetchCrypto(params).catch(() => []);
+
+      const [crypto] = await Promise.all([cryptoPromise]);
 
       return {
-        currencies: currencies.status === 'fulfilled' ? currencies.value : [],
-        crypto: crypto.status === 'fulfilled' ? crypto.value : [],
-        gold: gold.status === 'fulfilled' ? gold.value : [],
-        coins: coins.status === 'fulfilled' ? coins.value : [],
+        currencies: combinedData.currencies.map((item) => this.mapToCurrencyData(item)),
+        crypto,
+        gold: combinedData.gold.map((item) => this.mapToGoldData(item)),
+        coins: combinedData.coins.map((item) => this.mapToCoinData(item)),
       };
     } catch (error: any) {
       this.logger.error('Failed to fetch all data from PersianAPI', error);
@@ -235,36 +443,32 @@ export class PersianApiProvider implements IApiProvider {
 
   /**
    * Get available items from API
-   * Note: PersianAPI returns all items in responses, so we fetch once and extract unique codes
+   * Optimized to use single API call for currencies, gold, and coins
    */
   async getAvailableItems(): Promise<AvailableItems> {
     try {
-      const [currencies, crypto, gold, coins] = await Promise.all([
-        this.fetchCurrencies({ limit: 100 }),
-        this.fetchCrypto({ limit: 100 }),
-        this.fetchGold({ limit: 100 }),
-        this.fetchCoins({ limit: 100 }),
-      ]);
+      // Use fetchAll which is already optimized to make minimal API calls
+      const allData = await this.fetchAll({ limit: 100 });
 
       return {
-        currencies: currencies.map((item) => ({
+        currencies: allData.currencies.map((item) => ({
           code: item.code,
           name: item.name,
           type: 'currency' as const,
           category: item.category,
         })),
-        crypto: crypto.map((item) => ({
+        crypto: allData.crypto.map((item) => ({
           code: item.code,
           name: item.name,
           type: 'crypto' as const,
         })),
-        gold: gold.map((item) => ({
+        gold: allData.gold.map((item) => ({
           code: item.code,
           name: item.name,
           type: 'gold' as const,
           category: item.category,
         })),
-        coins: coins.map((item) => ({
+        coins: allData.coins.map((item) => ({
           code: item.code,
           name: item.name,
           type: 'coin' as const,
@@ -292,55 +496,88 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Get current rate limit status
+   * Get current rate limit status using token bucket algorithm
    */
   async getRateLimitStatus(): Promise<RateLimitStatus> {
-    const now = Date.now();
-    const secondsSinceLastRequest = (now - this.lastRequestTime) / 1000;
-
-    // PersianAPI: 1 request per 5 seconds
-    const remaining = secondsSinceLastRequest >= 5 ? 1 : 0;
+    this.refillTokens();
 
     return {
-      remaining,
-      reset: new Date(this.lastRequestTime + 5000), // 5 seconds from last request
+      remaining: Math.floor(this.tokens),
+      reset: new Date(Date.now() + 5000), // Next token in 5 seconds
       total: 720, // 720 requests per hour (1 per 5 seconds)
     };
   }
 
   /**
+   * Refill tokens based on time elapsed (Token Bucket algorithm)
+   */
+  private refillTokens(): void {
+    const now = Date.now();
+    const timePassed = now - this.lastRefillTime;
+    const tokensToAdd = timePassed * this.tokenRefillRate;
+
+    this.tokens = Math.min(this.maxTokens, this.tokens + tokensToAdd);
+    this.lastRefillTime = now;
+  }
+
+  /**
+   * Wait for a token to become available (Token Bucket algorithm)
+   */
+  private async waitForToken(): Promise<void> {
+    this.refillTokens();
+
+    if (this.tokens >= 1) {
+      this.tokens -= 1;
+      return;
+    }
+
+    // Calculate wait time needed for next token
+    const tokensNeeded = 1 - this.tokens;
+    const waitTime = Math.ceil(tokensNeeded / this.tokenRefillRate);
+
+    this.logger.debug(`Rate limit: waiting ${waitTime}ms for next token`);
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
+
+    // Refill and consume token after waiting
+    this.refillTokens();
+    this.tokens -= 1;
+  }
+
+  /**
    * Make HTTP request with deduplication to prevent multiple simultaneous requests
    * Caches the Promise (not the result) to share in-flight requests
-   * Cache entry is cleared after 1 second
+   * Cache entry is cleared after configurable TTL
    */
   private async makeRequestWithDedup(endpoint: string, params?: FetchParams): Promise<any> {
-    // Create cache key from endpoint and params
-    const cacheKey = `${endpoint}-${JSON.stringify(params || {})}`;
+    return this.performanceMonitor.measure(`api-request:${endpoint}`, async () => {
+      // Create cache key from endpoint and params
+      const cacheKey = `${endpoint}-${JSON.stringify(params || {})}`;
 
-    // Check if there's already an in-flight request for this key
-    const existingRequest = this.requestCache.get(cacheKey);
-    if (existingRequest) {
-      this.logger.debug(`Using deduplicated request for ${endpoint}`);
-      return existingRequest;
-    }
+      // Check if there's already an in-flight request for this key
+      const existingRequest = this.requestCache.get(cacheKey);
+      if (existingRequest) {
+        this.logger.debug(`Using deduplicated request for ${endpoint}`);
+        return existingRequest;
+      }
 
-    // Create new request and cache the Promise
-    const requestPromise = this.makeRequestWithRetry(endpoint, params);
-    this.requestCache.set(cacheKey, requestPromise);
+      // Create new request and cache the Promise
+      const requestPromise = this.makeRequestWithRetry(endpoint, params);
+      this.requestCache.set(cacheKey, requestPromise);
 
-    // Clear cache entry after 1 second
-    setTimeout(() => {
-      this.requestCache.delete(cacheKey);
-    }, 1000);
+      // Clear cache entry after configurable TTL
+      setTimeout(() => {
+        this.requestCache.delete(cacheKey);
+      }, this.cacheTTL);
 
-    try {
-      const result = await requestPromise;
-      return result;
-    } catch (error) {
-      // Remove from cache on error to allow retry
-      this.requestCache.delete(cacheKey);
-      throw error;
-    }
+      try {
+        const result = await requestPromise;
+        return result;
+      } catch (error) {
+        // Remove from cache on error to allow retry
+        this.requestCache.delete(cacheKey);
+        throw error;
+      }
+    });
   }
 
   /**
@@ -385,11 +622,11 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Make HTTP request to PersianAPI
+   * Make HTTP request to PersianAPI using token bucket rate limiting
    */
   private async makeRequest(endpoint: string, params?: FetchParams): Promise<any> {
-    // Respect rate limit: wait if needed
-    await this.respectRateLimit();
+    // Wait for token to become available (Token Bucket algorithm)
+    await this.waitForToken();
 
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
@@ -409,8 +646,6 @@ export class PersianApiProvider implements IApiProvider {
           timeout: this.timeout,
         }),
       );
-
-      this.updateRateLimitTracking();
 
       // PersianAPI wraps data in different structures depending on endpoint
       // Check for result.data (used by forex, gold, coins endpoints)
@@ -448,42 +683,184 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Respect rate limit: wait if necessary
+   * Generate currency code from Persian title and category
+   * Converts Persian currency names to English codes
+   * Example: "دلار / یورو" + "تقاضا" → "usd_eur_buy"
    */
-  private async respectRateLimit(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-    const minInterval = 5000; // 5 seconds
+  private generateCurrencyCode(title: string, category?: string): string {
+    // Persian to English currency name mapping
+    // NOTE: Order matters! More specific matches must come first
+    const currencyMap: Record<string, string> = {
+      // Dollar variants (specific first!)
+      'دلار استرالیا': 'aud',
+      'دلار سنگاپور': 'sgd',
+      'دلار کانادا': 'cad',
+      'دلار هنگ کنگ': 'hkd',
+      'دلار نیوزلند': 'nzd',
+      'دلار آمریکا': 'usd',
+      'دلار': 'usd',
 
-    if (timeSinceLastRequest < minInterval) {
-      const waitTime = minInterval - timeSinceLastRequest;
-      this.logger.debug(`Rate limit: waiting ${waitTime}ms before next request`);
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
-  }
+      // Pound
+      'پوند انگلیس': 'gbp',
+      'پوند': 'gbp',
 
-  /**
-   * Update rate limit tracking
-   */
-  private updateRateLimitTracking(): void {
-    this.lastRequestTime = Date.now();
-    this.requestCount++;
-  }
+      // Euro
+      'یورو': 'eur',
 
-  /**
-   * Map PersianAPI currency response to standard format
-   */
-  private mapToCurrencyData(item: PersianApiCurrencyResponse): CurrencyData {
-    return {
-      code: item.Key || item.key || 'unknown',
-      name: item.Title || item.title || item.عنوان || 'Unknown',
-      price: this.parsePrice(item.Price || item.price || item.قیمت),
-      change: this.parsePrice(item.Change || item.change),
-      high: this.parsePrice(item.High || item.high || item.بیشترین),
-      low: this.parsePrice(item.Low || item.low || item.کمترین),
-      updatedAt: this.parseDate(item.created_at || item['تاریخ بروزرسانی']),
-      category: item.Category || item.category,
+      // Yen
+      'ین ژاپن': 'jpy',
+      'ین': 'jpy',
+
+      // Yuan
+      'یوان چین': 'cny',
+      'یوان': 'cny',
+
+      // Ruble
+      'روبل روسیه': 'rub',
+      'روبل': 'rub',
+
+      // Lira
+      'لیره ترکیه': 'try',
+      'لیره': 'try',
+
+      // Rupee
+      'روپیه هند': 'inr',
+      'روپیه پاکستان': 'pkr',
+      'روپیه': 'inr',
+
+      // Riyal
+      'ریال عربستان': 'sar',
+      'ریال قطر': 'qar',
+      'ریال عمان': 'omr',
+      'ریال': 'sar',
+
+      // Dirham
+      'درهم امارات': 'aed',
+      'درهم': 'aed',
+
+      // Dinar variants (specific first!)
+      'دینار کویت': 'kwd',
+      'دینار عراق': 'iqd',
+      'دینار بحرین': 'bhd',
+      'دینار اردن': 'jod',
+      'دینار': 'kwd',
+
+      // Krone/Krona variants
+      'کرون دانمارک': 'dkk',
+      'کرون سوئد': 'sek',
+      'کرون نروژ': 'nok',
+      'کرون': 'sek',
+
+      // Franc
+      'فرانک سوئیس': 'chf',
+      'فرانک': 'chf',
+
+      // Baht
+      'بات تایلند': 'thb',
+      'بات': 'thb',
+
+      // Ringgit
+      'رینگیت مالزی': 'myr',
+      'رینگیت': 'myr',
+
+      // Others
+      'وون کره جنوبی': 'krw',
+      'پزو مکزیک': 'mxn',
+      'رند آفریقای جنوبی': 'zar',
     };
+
+    // Determine if it's buy or sell from category
+    const isBuy = category?.includes('تقاضا'); // تقاضا = demand = buy
+    const isSell = category?.includes('عرضه'); // عرضه = supply = sell
+    const suffix = isBuy ? '_buy' : isSell ? '_sell' : '';
+
+    // Helper function to find currency code in text (checks longest matches first)
+    const findCurrencyCode = (text: string): string => {
+      // Sort currency names by length (longest first) to match specific names before generic ones
+      const sortedEntries = Object.entries(currencyMap).sort((a, b) => b[0].length - a[0].length);
+
+      for (const [persian, english] of sortedEntries) {
+        if (text.includes(persian)) {
+          return english;
+        }
+      }
+
+      // Fallback: use first 3 characters as code
+      return text.substring(0, 3).toLowerCase();
+    };
+
+    // Split currency pair (e.g., "دلار / یورو" → ["دلار", "یورو"])
+    const parts = title.split('/').map(p => p.trim());
+
+    if (parts.length === 2) {
+      const firstCurrency = findCurrencyCode(parts[0]);
+      const secondCurrency = findCurrencyCode(parts[1]);
+      return `${firstCurrency}_${secondCurrency}${suffix}`;
+    }
+
+    // Fallback: try to match single currency
+    const currencyCode = findCurrencyCode(title);
+    if (currencyCode !== title.substring(0, 3).toLowerCase()) {
+      return `${currencyCode}${suffix}`;
+    }
+
+    // Final fallback: use sanitized title
+    return title.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() + suffix;
+  }
+
+  /**
+   * Extract field value from item with multiple possible field names
+   * Helper to handle PersianAPI's inconsistent field naming (English/Persian/capitalization)
+   */
+  private extractField<T = any>(item: any, ...fieldNames: string[]): T | undefined {
+    for (const fieldName of fieldNames) {
+      if (item[fieldName] !== undefined && item[fieldName] !== null) {
+        return item[fieldName] as T;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Map PersianAPI combined item to CurrencyData format
+   * Uses type-safe field extraction with error tracking
+   */
+  private mapToCurrencyData(item: PersianApiCombinedItem): CurrencyData {
+    return this.performanceMonitor.measureSync('map-currency', () => {
+      const context = `map-currency-${item.key}`;
+
+      try {
+        const title = this.extractField<string>(item, 'title', 'Title', 'عنوان') || 'Unknown';
+        const category = this.extractField<string>(item, 'category', 'Category');
+        const numericKey = typeof item.key === 'number' ? item.key : parseInt(String(item.key), 10);
+
+        // Use key mapping if available, otherwise generate code from title
+        const code = this.keyMapping[numericKey] || this.generateCurrencyCode(title, category);
+
+        const result = {
+          code,
+          name: title,
+          price: this.parsePrice(this.extractField(item, 'price', 'Price', 'قیمت')),
+          change: this.parsePrice(this.extractField(item, 'change', 'Change')),
+          high: this.parsePrice(this.extractField(item, 'high', 'High', 'بیشترین')),
+          low: this.parsePrice(this.extractField(item, 'low', 'Low', 'کمترین')),
+          updatedAt: this.parseDate(this.extractField(item, 'created_at', 'تاریخ بروزرسانی')),
+          category,
+        };
+
+        // Reset error counter on success
+        this.errorTracker.resetError(context);
+
+        return result;
+      } catch (error) {
+        this.errorTracker.trackError(context, error as Error);
+        this.logger.error(`Failed to map currency item: ${item.key}`, {
+          availableFields: Object.keys(item),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    });
   }
 
   /**
@@ -504,32 +881,76 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Map PersianAPI gold response to standard format
+   * Map PersianAPI combined item to GoldData format
+   * Uses type-safe field extraction
    */
-  private mapToGoldData(item: PersianApiGoldResponse): GoldData {
-    return {
-      code: item.Key || item.key || 'unknown',
-      name: item.عنوان || item.title || item.Title || 'Unknown',
-      price: this.parsePrice(item.قیمت || item.price || item.Price),
-      high: this.parsePrice(item.بیشترین || item.high),
-      low: this.parsePrice(item.کمترین || item.low),
-      updatedAt: this.parseDate(item['تاریخ بروزرسانی'] || item.updated_at),
-      category: item.category,
-    };
+  private mapToGoldData(item: PersianApiCombinedItem): GoldData {
+    return this.performanceMonitor.measureSync('map-gold', () => {
+      const context = `map-gold-${item.key}`;
+
+      try {
+        const numericKey = typeof item.key === 'number' ? item.key : parseInt(String(item.key), 10);
+        const code = this.keyMapping[numericKey] || String(item.key) || 'unknown';
+
+        const result = {
+          code,
+          name: this.extractField<string>(item, 'عنوان', 'title', 'Title') || 'Unknown',
+          price: this.parsePrice(this.extractField(item, 'قیمت', 'price', 'Price')),
+          high: this.parsePrice(this.extractField(item, 'بیشترین', 'high', 'High')),
+          low: this.parsePrice(this.extractField(item, 'کمترین', 'low', 'Low')),
+          updatedAt: this.parseDate(this.extractField(item, 'تاریخ بروزرسانی', 'updated_at', 'created_at')),
+          category: this.extractField<string>(item, 'category', 'Category'),
+        };
+
+        // Reset error counter on success
+        this.errorTracker.resetError(context);
+
+        return result;
+      } catch (error) {
+        this.errorTracker.trackError(context, error as Error);
+        this.logger.error(`Failed to map gold item: ${item.key}`, {
+          availableFields: Object.keys(item),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    });
   }
 
   /**
-   * Map PersianAPI coin response to standard format
+   * Map PersianAPI combined item to CoinData format
+   * Uses type-safe field extraction
    */
-  private mapToCoinData(item: PersianApiCoinResponse): CoinData {
-    return {
-      code: item.Key || item.key || 'unknown',
-      name: item.عنوان || item.title || item.Title || 'Unknown',
-      price: this.parsePrice(item.قیمت || item.price || item.Price),
-      high: this.parsePrice(item.بیشترین || item.high),
-      low: this.parsePrice(item.کمترین || item.low),
-      updatedAt: this.parseDate(item['تاریخ بروزرسانی'] || item.updated_at),
-    };
+  private mapToCoinData(item: PersianApiCombinedItem): CoinData {
+    return this.performanceMonitor.measureSync('map-coin', () => {
+      const context = `map-coin-${item.key}`;
+
+      try {
+        const numericKey = typeof item.key === 'number' ? item.key : parseInt(String(item.key), 10);
+        const code = this.keyMapping[numericKey] || String(item.key) || 'unknown';
+
+        const result = {
+          code,
+          name: this.extractField<string>(item, 'عنوان', 'title', 'Title') || 'Unknown',
+          price: this.parsePrice(this.extractField(item, 'قیمت', 'price', 'Price')),
+          high: this.parsePrice(this.extractField(item, 'بیشترین', 'high', 'High')),
+          low: this.parsePrice(this.extractField(item, 'کمترین', 'low', 'Low')),
+          updatedAt: this.parseDate(this.extractField(item, 'تاریخ بروزرسانی', 'updated_at', 'created_at')),
+        };
+
+        // Reset error counter on success
+        this.errorTracker.resetError(context);
+
+        return result;
+      } catch (error) {
+        this.errorTracker.trackError(context, error as Error);
+        this.logger.error(`Failed to map coin item: ${item.key}`, {
+          availableFields: Object.keys(item),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    });
   }
 
   /**

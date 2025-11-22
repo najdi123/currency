@@ -1,0 +1,26 @@
+{
+  "currencies": {
+    "137202": { "code": "usd_sell", "name": "دلار", "category": "ارز آزاد" },
+    "137204": { "code": "eur", "name": "یورو", "category": "ارز آزاد" },
+    "137206": { "code": "gbp", "name": "پوند انگلیس", "category": "ارز آزاد" },
+    "137205": { "code": "aed", "name": "درهم امارات", "category": "ارز آزاد" },
+    "137213": { "code": "rub", "name": "روبل روسیه", "category": "ارز آزاد" },
+    "137252": { "code": "usd_buy", "name": "دلار (بانکی)", "category": "ارز دولتی" },
+    "137253": { "code": "eur_buy", "name": "یورو (بانکی)", "category": "ارز دولتی" },
+    "137255": { "code": "gbp_buy", "name": "پوند (بانکی)", "category": "ارز دولتی" },
+    "790758": { "code": "aed_buy", "name": "درهم امارات (بانکی)", "category": "ارز دولتی" }
+  },
+  "gold": {
+    "137120": { "code": "18ayar", "name": "طلای 18 عیار", "category": "طلا" },
+    "137121": { "code": "24ayar", "name": "طلای 24 عیار", "category": "طلا" }
+  },
+  "coins": {
+    "137137": { "code": "sekkeh", "name": "سکه امامی", "category": "سکه نقدی" },
+    "137136": { "code": "bahar", "name": "سکه بهار آزادی", "category": "سکه نقدی" },
+    "137138": { "code": "nim", "name": "نیم سکه", "category": "سکه نقدی" },
+    "137139": { "code": "rob", "name": "ربع سکه", "category": "سکه نقدی" },
+    "137140": { "code": "gerami", "name": "سکه گرمی", "category": "سکه نقدی" },
+    "137119": { "code": "mesghal", "name": "مثقال طلا", "category": "مظنه / مثقال" },
+    "391296": { "code": "abshodeh", "name": "آبشده نقدی", "category": "آبشده" }
+  }
+}

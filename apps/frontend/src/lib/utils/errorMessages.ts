@@ -69,12 +69,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // Timeout Error
     if (error.status === 'TIMEOUT_ERROR') {
       return {
-        title: 'زمان درخواست به پایان رسید',
-        description: 'پاسخ سرور بیش از حد معمول طول کشید. این ممکن است به دلیل کندی اتصال اینترنت یا مشکل موقت سرور باشد.',
-        suggestedActions: [
-          'سرعت اینترنت خود را بررسی کنید',
-          'چند دقیقه صبر کنید و دوباره تلاش کنید',
-          'اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید',
+        title: t ? t('timeoutTitle') : 'Request timed out',
+        description: t ? t('timeoutDescription') : 'The server response took longer than usual. This may be due to slow internet connection or temporary server issue.',
+        suggestedActions: t ? [
+          t('timeoutAction1'),
+          t('timeoutAction2'),
+          t('timeoutAction3'),
+        ] : [
+          'Check your internet speed',
+          'Wait a few minutes and try again',
+          'If the problem persists, contact support',
         ],
         severity: 'warning',
         icon: '⏱️',
@@ -86,12 +90,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // Parsing Error
     if (error.status === 'PARSING_ERROR') {
       return {
-        title: 'خطا در پردازش داده‌ها',
-        description: 'داده‌های دریافتی از سرور قابل پردازش نیستند. این مشکل احتمالاً موقتی است.',
-        suggestedActions: [
-          'صفحه را رفرش کنید',
-          'چند لحظه صبر کنید و دوباره تلاش کنید',
-          'اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید',
+        title: t ? t('parsingErrorTitle') : 'Data processing error',
+        description: t ? t('parsingErrorDescription') : 'The data received from the server cannot be processed. This issue is likely temporary.',
+        suggestedActions: t ? [
+          t('parsingErrorAction1'),
+          t('parsingErrorAction2'),
+          t('parsingErrorAction3'),
+        ] : [
+          'Refresh the page',
+          'Wait a moment and try again',
+          'If the problem persists, contact support',
         ],
         severity: 'error',
         icon: '❌',
@@ -106,12 +114,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 400 - Bad Request
     if (status === 400) {
       return {
-        title: 'درخواست نامعتبر',
-        description: 'اطلاعات ارسالی نادرست است. لطفاً مطمئن شوید که تمام فیلدها به درستی پر شده‌اند.',
-        suggestedActions: [
-          'اطلاعات وارد شده را بررسی کنید',
-          'تمام فیلدهای الزامی را پر کنید',
-          'از صحت فرمت داده‌ها مطمئن شوید',
+        title: t ? t('badRequestTitle') : 'Invalid request',
+        description: t ? t('badRequestDescription') : 'The submitted information is incorrect. Please make sure all fields are filled correctly.',
+        suggestedActions: t ? [
+          t('badRequestAction1'),
+          t('badRequestAction2'),
+          t('badRequestAction3'),
+        ] : [
+          'Review the entered information',
+          'Fill in all required fields',
+          'Ensure data format is correct',
         ],
         severity: 'error',
         icon: '❌',
@@ -123,11 +135,14 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 401 - Unauthorized
     if (status === 401) {
       return {
-        title: 'نیاز به ورود',
-        description: 'برای دسترسی به این بخش باید وارد حساب کاربری خود شوید.',
-        suggestedActions: [
-          'وارد حساب کاربری خود شوید',
-          'اگر وارد شده‌اید، از صفحه خارج و دوباره وارد شوید',
+        title: t ? t('unauthorizedTitle') : 'Login required',
+        description: t ? t('unauthorizedDescription') : 'You need to log in to your account to access this section.',
+        suggestedActions: t ? [
+          t('unauthorizedAction1'),
+          t('unauthorizedAction2'),
+        ] : [
+          'Log in to your account',
+          'If already logged in, log out and log in again',
         ],
         severity: 'warning',
         icon: '🔒',
@@ -139,11 +154,14 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 403 - Forbidden
     if (status === 403) {
       return {
-        title: 'دسترسی غیرمجاز',
-        description: 'شما مجوز دسترسی به این بخش را ندارید.',
-        suggestedActions: [
-          'مطمئن شوید که با حساب کاربری صحیح وارد شده‌اید',
-          'اگر فکر می‌کنید باید دسترسی داشته باشید، با پشتیبانی تماس بگیرید',
+        title: t ? t('forbiddenTitle') : 'Access denied',
+        description: t ? t('forbiddenDescription') : 'You do not have permission to access this section.',
+        suggestedActions: t ? [
+          t('forbiddenAction1'),
+          t('forbiddenAction2'),
+        ] : [
+          'Make sure you are logged in with the correct account',
+          'If you think you should have access, contact support',
         ],
         severity: 'error',
         icon: '🔒',
@@ -155,12 +173,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 404 - Not Found
     if (status === 404) {
       return {
-        title: 'داده‌ای یافت نشد',
-        description: 'اطلاعات مورد نظر در سرور موجود نیست. ممکن است حذف شده یا منتقل شده باشد.',
-        suggestedActions: [
-          'آدرس صفحه را بررسی کنید',
-          'به صفحه اصلی بازگردید و دوباره جستجو کنید',
-          'اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید',
+        title: t ? t('notFoundTitle') : 'Data not found',
+        description: t ? t('notFoundDescription') : 'The requested information is not available on the server. It may have been deleted or moved.',
+        suggestedActions: t ? [
+          t('notFoundAction1'),
+          t('notFoundAction2'),
+          t('notFoundAction3'),
+        ] : [
+          'Check the page address',
+          'Return to the homepage and search again',
+          'If the problem persists, contact support',
         ],
         severity: 'error',
         icon: '❌',
@@ -172,12 +194,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 429 - Too Many Requests
     if (status === 429) {
       return {
-        title: 'درخواست‌های بیش از حد',
-        description: 'شما تعداد زیادی درخواست در مدت زمان کوتاه ارسال کرده‌اید. لطفاً کمی صبر کنید.',
-        suggestedActions: [
-          'چند دقیقه صبر کنید',
-          'از ارسال درخواست‌های مکرر خودداری کنید',
-          'دوباره تلاش کنید',
+        title: t ? t('tooManyRequestsTitle') : 'Too many requests',
+        description: t ? t('tooManyRequestsDescription') : 'You have sent too many requests in a short period. Please wait.',
+        suggestedActions: t ? [
+          t('tooManyRequestsAction1'),
+          t('tooManyRequestsAction2'),
+          t('tooManyRequestsAction3'),
+        ] : [
+          'Wait a few minutes',
+          'Avoid sending repeated requests',
+          'Try again',
         ],
         severity: 'warning',
         icon: '⏱️',
@@ -189,12 +215,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 500 - Internal Server Error
     if (status === 500) {
       return {
-        title: 'خطای سرور',
-        description: 'مشکلی در سرور رخ داده است. تیم فنی در حال بررسی موضوع هستند.',
-        suggestedActions: [
-          'چند دقیقه صبر کنید و دوباره تلاش کنید',
-          'صفحه را رفرش کنید',
-          'اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید',
+        title: t ? t('serverErrorTitle') : 'Server error',
+        description: t ? t('serverErrorDescription') : 'A problem occurred on the server. The technical team is reviewing the issue.',
+        suggestedActions: t ? [
+          t('serverErrorAction1'),
+          t('serverErrorAction2'),
+          t('serverErrorAction3'),
+        ] : [
+          'Wait a few minutes and try again',
+          'Refresh the page',
+          'If the problem persists, contact support',
         ],
         severity: 'error',
         icon: '🔴',
@@ -206,12 +236,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 502 - Bad Gateway
     if (status === 502) {
       return {
-        title: 'خطا در ارتباط با سرور',
-        description: 'سرور موقتاً در دسترس نیست. این مشکل معمولاً به سرعت برطرف می‌شود.',
-        suggestedActions: [
-          'چند لحظه صبر کنید',
-          'صفحه را رفرش کنید',
-          'دوباره تلاش کنید',
+        title: t ? t('badGatewayTitle') : 'Server communication error',
+        description: t ? t('badGatewayDescription') : 'The server is temporarily unavailable. This issue is usually resolved quickly.',
+        suggestedActions: t ? [
+          t('badGatewayAction1'),
+          t('badGatewayAction2'),
+          t('badGatewayAction3'),
+        ] : [
+          'Wait a moment',
+          'Refresh the page',
+          'Try again',
         ],
         severity: 'warning',
         icon: '📡',
@@ -223,12 +257,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // 503 - Service Unavailable
     if (status === 503) {
       return {
-        title: 'سرویس در دسترس نیست',
-        description: 'سرور در حال حاضر قادر به پاسخگویی نیست. ممکن است در حال تعمیر و نگهداری باشد.',
-        suggestedActions: [
-          'چند دقیقه صبر کنید',
-          'دوباره تلاش کنید',
-          'اگر مشکل ادامه داشت، بعداً مراجعه کنید',
+        title: t ? t('serviceUnavailableTitle') : 'Service unavailable',
+        description: t ? t('serviceUnavailableDescription') : 'The server is currently unable to respond. It may be under maintenance.',
+        suggestedActions: t ? [
+          t('serviceUnavailableAction1'),
+          t('serviceUnavailableAction2'),
+          t('serviceUnavailableAction3'),
+        ] : [
+          'Wait a few minutes',
+          'Try again',
+          'If the problem persists, check back later',
         ],
         severity: 'warning',
         icon: '⏱️',
@@ -240,12 +278,16 @@ export function getUserErrorMessage(error: unknown, t?: ErrorTranslations): User
     // Server Errors (5xx)
     if (isServerError(error)) {
       return {
-        title: 'مشکل سرور',
-        description: 'سرور با مشکل مواجه شده است. لطفاً بعداً مراجعه کنید.',
-        suggestedActions: [
-          'چند دقیقه صبر کنید',
-          'دوباره تلاش کنید',
-          'اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید',
+        title: t ? t('genericServerErrorTitle') : 'Server issue',
+        description: t ? t('genericServerErrorDescription') : 'The server has encountered a problem. Please check back later.',
+        suggestedActions: t ? [
+          t('genericServerErrorAction1'),
+          t('genericServerErrorAction2'),
+          t('genericServerErrorAction3'),
+        ] : [
+          'Wait a few minutes',
+          'Try again',
+          'If the problem persists, contact support',
         ],
         severity: 'error',
         icon: '🔴',
