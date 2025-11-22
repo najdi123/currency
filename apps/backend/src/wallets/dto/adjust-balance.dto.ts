@@ -1,8 +1,22 @@
-import { IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, IsMongoId, Length, Matches, MaxLength } from 'class-validator';
-import { CurrencyType, TransactionDirection, TransactionReason } from '../types';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumberString,
+  IsOptional,
+  IsString,
+  IsMongoId,
+  Length,
+  Matches,
+  MaxLength,
+} from "class-validator";
+import {
+  CurrencyType,
+  TransactionDirection,
+  TransactionReason,
+} from "../types";
 
 export class AdjustBalanceDto {
-  @IsEnum(['fiat','crypto','gold'] as const)
+  @IsEnum(["fiat", "crypto", "gold"] as const)
   currencyType!: CurrencyType;
 
   @IsString()
@@ -10,18 +24,18 @@ export class AdjustBalanceDto {
   @Matches(/^[A-Z0-9_-]+$/i)
   currencyCode!: string;
 
-  @IsEnum(['credit','debit'] as const)
+  @IsEnum(["credit", "debit"] as const)
   direction!: TransactionDirection;
 
   /** send as string to preserve precision on the wire */
   @IsNumberString()
   @Matches(/^\d+(\.\d{1,8})?$/, {
-    message: 'Amount must be a positive number with up to 8 decimal places'
+    message: "Amount must be a positive number with up to 8 decimal places",
   })
   @MaxLength(20)
   amount!: string;
 
-  @IsEnum(['deposit','withdrawal','transfer','adjustment'] as const)
+  @IsEnum(["deposit", "withdrawal", "transfer", "adjustment"] as const)
   reason!: TransactionReason;
 
   @IsOptional()
@@ -32,7 +46,8 @@ export class AdjustBalanceDto {
   @IsString()
   @Length(1, 100)
   @Matches(/^[a-zA-Z0-9_-]+$/, {
-    message: 'Idempotency key must contain only alphanumeric characters, underscores, and hyphens'
+    message:
+      "Idempotency key must contain only alphanumeric characters, underscores, and hyphens",
   })
   idempotencyKey?: string;
 }

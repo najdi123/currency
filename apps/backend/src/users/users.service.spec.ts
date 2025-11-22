@@ -1,26 +1,31 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
-import { getModelToken } from '@nestjs/mongoose';
-import { Model, Types, Query } from 'mongoose';
-import * as bcrypt from 'bcrypt';
-import { UsersService } from './users.service';
-import { User, UserDocument, UserRole, UserStatus } from './schemas/user.schema';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConflictException, NotFoundException } from "@nestjs/common";
+import { getModelToken } from "@nestjs/mongoose";
+import { Model, Types, Query } from "mongoose";
+import * as bcrypt from "bcrypt";
+import { UsersService } from "./users.service";
+import {
+  User,
+  UserDocument,
+  UserRole,
+  UserStatus,
+} from "./schemas/user.schema";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
 
-describe('UsersService', () => {
+describe("UsersService", () => {
   let service: UsersService;
   let userModel: jest.Mocked<Model<UserDocument>>;
 
   const mockUserId = new Types.ObjectId();
   const mockUser = {
     _id: mockUserId,
-    email: 'test@example.com',
-    passwordHash: '$2b$12$hashedpassword',
+    email: "test@example.com",
+    passwordHash: "$2b$12$hashedpassword",
     role: UserRole.USER,
     status: UserStatus.ACTIVE,
-    firstName: 'John',
-    lastName: 'Doe',
+    firstName: "John",
+    lastName: "Doe",
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -62,13 +67,13 @@ describe('UsersService', () => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
-    it('should create user with hashed password', async () => {
+  describe("create", () => {
+    it("should create user with hashed password", async () => {
       const createDto: CreateUserDto = {
-        email: 'newuser@example.com',
-        password: 'Password123!',
-        firstName: 'Jane',
-        lastName: 'Smith',
+        email: "newuser@example.com",
+        password: "Password123!",
+        firstName: "Jane",
+        lastName: "Smith",
       };
 
       const createdUser = {
@@ -83,7 +88,7 @@ describe('UsersService', () => {
           status: UserStatus.ACTIVE,
           firstName: createDto.firstName,
           lastName: createDto.lastName,
-          passwordHash: '$2b$12$newhash',
+          passwordHash: "$2b$12$newhash",
         }),
       };
 
@@ -104,21 +109,23 @@ describe('UsersService', () => {
       expect(result.lastName).toBe(createDto.lastName);
       expect(result.passwordHash).toBeUndefined(); // Should be sanitized
       expect(userModel.create).toHaveBeenCalledWith(
-        [expect.objectContaining({
-          email: createDto.email.toLowerCase().trim(),
-          role: UserRole.USER,
-          status: UserStatus.ACTIVE,
-          firstName: createDto.firstName,
-          lastName: createDto.lastName,
-        })],
-        expect.objectContaining({ session: expect.anything() })
+        [
+          expect.objectContaining({
+            email: createDto.email.toLowerCase().trim(),
+            role: UserRole.USER,
+            status: UserStatus.ACTIVE,
+            firstName: createDto.firstName,
+            lastName: createDto.lastName,
+          }),
+        ],
+        expect.objectContaining({ session: expect.anything() }),
       );
     });
 
-    it('should throw ConflictException for duplicate email', async () => {
+    it("should throw ConflictException for duplicate email", async () => {
       const createDto: CreateUserDto = {
-        email: 'existing@example.com',
-        password: 'Password123!',
+        email: "existing@example.com",
+        password: "Password123!",
       };
 
       // Mock findByEmail to return existing user
@@ -128,15 +135,19 @@ describe('UsersService', () => {
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      await expect(service.create(createDto)).rejects.toThrow(ConflictException);
-      await expect(service.create(createDto)).rejects.toThrow('Email already in use');
+      await expect(service.create(createDto)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.create(createDto)).rejects.toThrow(
+        "Email already in use",
+      );
       expect(userModel.create).not.toHaveBeenCalled();
     });
 
-    it('should set default status to ACTIVE', async () => {
+    it("should set default status to ACTIVE", async () => {
       const createDto: CreateUserDto = {
-        email: 'newuser@example.com',
-        password: 'Password123!',
+        email: "newuser@example.com",
+        password: "Password123!",
       };
 
       const createdUser = {
@@ -147,7 +158,7 @@ describe('UsersService', () => {
           email: createDto.email,
           role: UserRole.USER,
           status: UserStatus.ACTIVE,
-          passwordHash: '$2b$12$newhash',
+          passwordHash: "$2b$12$newhash",
         }),
       };
 
@@ -161,17 +172,19 @@ describe('UsersService', () => {
       const result = await service.create(createDto);
 
       expect(userModel.create).toHaveBeenCalledWith(
-        [expect.objectContaining({
-          status: UserStatus.ACTIVE,
-        })],
-        expect.objectContaining({ session: expect.anything() })
+        [
+          expect.objectContaining({
+            status: UserStatus.ACTIVE,
+          }),
+        ],
+        expect.objectContaining({ session: expect.anything() }),
       );
     });
 
-    it('should hash password before saving', async () => {
+    it("should hash password before saving", async () => {
       const createDto: CreateUserDto = {
-        email: 'newuser@example.com',
-        password: 'Password123!',
+        email: "newuser@example.com",
+        password: "Password123!",
       };
 
       const createdUser = {
@@ -196,25 +209,25 @@ describe('UsersService', () => {
     });
   });
 
-  describe('findByEmail', () => {
-    it('should return user when found', async () => {
+  describe("findByEmail", () => {
+    it("should return user when found", async () => {
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockUser),
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      const result = await service.findByEmail('test@example.com');
+      const result = await service.findByEmail("test@example.com");
 
       expect(result).toBeDefined();
       expect(result?.email).toBe(mockUser.email);
       expect(userModel.findOne).toHaveBeenCalledWith({
-        email: 'test@example.com',
+        email: "test@example.com",
         deletedAt: null,
       });
     });
 
-    it('should exclude password hash by default', async () => {
+    it("should exclude password hash by default", async () => {
       const userWithoutPassword = { ...mockUser };
       delete (userWithoutPassword as any).passwordHash;
 
@@ -224,13 +237,16 @@ describe('UsersService', () => {
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      const result = await service.findByEmail('test@example.com');
+      const result = await service.findByEmail("test@example.com");
 
       expect(result?.passwordHash).toBeUndefined();
     });
 
-    it('should include password hash when requested', async () => {
-      const userWithPasswordHash = { ...mockUser, passwordHash: '$2b$12$hashedpassword' };
+    it("should include password hash when requested", async () => {
+      const userWithPasswordHash = {
+        ...mockUser,
+        passwordHash: "$2b$12$hashedpassword",
+      };
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -238,42 +254,42 @@ describe('UsersService', () => {
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      const result = await service.findByEmail('test@example.com', true);
+      const result = await service.findByEmail("test@example.com", true);
 
       expect(result?.passwordHash).toBeDefined();
-      expect(mockQuery.select).toHaveBeenCalledWith('+passwordHash');
+      expect(mockQuery.select).toHaveBeenCalledWith("+passwordHash");
     });
 
-    it('should return null for non-existent email', async () => {
+    it("should return null for non-existent email", async () => {
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(null),
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      const result = await service.findByEmail('nonexistent@example.com');
+      const result = await service.findByEmail("nonexistent@example.com");
 
       expect(result).toBeNull();
     });
 
-    it('should normalize email to lowercase and trim', async () => {
+    it("should normalize email to lowercase and trim", async () => {
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockUser),
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      await service.findByEmail('  TEST@EXAMPLE.COM  ');
+      await service.findByEmail("  TEST@EXAMPLE.COM  ");
 
       expect(userModel.findOne).toHaveBeenCalledWith({
-        email: 'test@example.com',
+        email: "test@example.com",
         deletedAt: null,
       });
     });
   });
 
-  describe('findById', () => {
-    it('should return user when found', async () => {
+  describe("findById", () => {
+    it("should return user when found", async () => {
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockUser),
@@ -287,7 +303,7 @@ describe('UsersService', () => {
       expect(result.passwordHash).toBeUndefined(); // Should be sanitized
     });
 
-    it('should throw NotFoundException for invalid ID', async () => {
+    it("should throw NotFoundException for invalid ID", async () => {
       const validButNonExistentId = new Types.ObjectId().toString();
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
@@ -295,12 +311,19 @@ describe('UsersService', () => {
       };
       userModel.findOne.mockReturnValue(mockQuery as any);
 
-      await expect(service.findById(validButNonExistentId)).rejects.toThrow(NotFoundException);
-      await expect(service.findById(validButNonExistentId)).rejects.toThrow('User not found');
+      await expect(service.findById(validButNonExistentId)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findById(validButNonExistentId)).rejects.toThrow(
+        "User not found",
+      );
     });
 
-    it('should include password hash when requested', async () => {
-      const userWithPasswordHash = { ...mockUser, passwordHash: '$2b$12$hashedpassword' };
+    it("should include password hash when requested", async () => {
+      const userWithPasswordHash = {
+        ...mockUser,
+        passwordHash: "$2b$12$hashedpassword",
+      };
       const mockQuery = {
         lean: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -311,15 +334,15 @@ describe('UsersService', () => {
       const result = await service.findById(mockUserId.toString(), true);
 
       expect(result.passwordHash).toBeDefined();
-      expect(mockQuery.select).toHaveBeenCalledWith('+passwordHash');
+      expect(mockQuery.select).toHaveBeenCalledWith("+passwordHash");
     });
   });
 
-  describe('update', () => {
-    it('should update user fields successfully', async () => {
+  describe("update", () => {
+    it("should update user fields successfully", async () => {
       const updateDto: UpdateUserDto = {
-        firstName: 'UpdatedFirstName',
-        lastName: 'UpdatedLastName',
+        firstName: "UpdatedFirstName",
+        lastName: "UpdatedLastName",
       };
 
       const updatedUser = {
@@ -340,13 +363,13 @@ describe('UsersService', () => {
       expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(
         mockUserId.toString(),
         { $set: updateDto },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       );
     });
 
-    it('should throw NotFoundException for invalid ID', async () => {
+    it("should throw NotFoundException for invalid ID", async () => {
       const updateDto: UpdateUserDto = {
-        firstName: 'Updated',
+        firstName: "Updated",
       };
 
       const mockQuery = {
@@ -355,13 +378,17 @@ describe('UsersService', () => {
       };
       userModel.findByIdAndUpdate.mockReturnValue(mockQuery as any);
 
-      await expect(service.update('invalid-id', updateDto)).rejects.toThrow(NotFoundException);
-      await expect(service.update('invalid-id', updateDto)).rejects.toThrow('User not found');
+      await expect(service.update("invalid-id", updateDto)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.update("invalid-id", updateDto)).rejects.toThrow(
+        "User not found",
+      );
     });
 
-    it('should sanitize returned user', async () => {
+    it("should sanitize returned user", async () => {
       const updateDto: UpdateUserDto = {
-        firstName: 'Updated',
+        firstName: "Updated",
       };
 
       const updatedUser = {
@@ -381,8 +408,8 @@ describe('UsersService', () => {
     });
   });
 
-  describe('list', () => {
-    it('should return paginated users', async () => {
+  describe("list", () => {
+    it("should return paginated users", async () => {
       const users = [mockUser, { ...mockUser, _id: new Types.ObjectId() }];
 
       const mockQuery = {
@@ -407,7 +434,7 @@ describe('UsersService', () => {
       expect(result.pagination.pageSize).toBe(10);
     });
 
-    it('should exclude password hashes', async () => {
+    it("should exclude password hashes", async () => {
       const users = [mockUser];
 
       const mockQuery = {
@@ -426,13 +453,13 @@ describe('UsersService', () => {
 
       const result = await service.list(1, 10);
 
-      expect(mockQuery.select).toHaveBeenCalledWith('-passwordHash');
+      expect(mockQuery.select).toHaveBeenCalledWith("-passwordHash");
       result.users.forEach((user: any) => {
         expect(user.passwordHash).toBeUndefined();
       });
     });
 
-    it('should calculate total correctly', async () => {
+    it("should calculate total correctly", async () => {
       const mockQuery = {
         select: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
@@ -452,7 +479,7 @@ describe('UsersService', () => {
       expect(result.pagination.total).toBe(50);
     });
 
-    it('should respect pagination parameters', async () => {
+    it("should respect pagination parameters", async () => {
       const mockQuery = {
         select: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
@@ -474,10 +501,10 @@ describe('UsersService', () => {
     });
   });
 
-  describe('updatePassword', () => {
-    it('should hash and update password', async () => {
+  describe("updatePassword", () => {
+    it("should hash and update password", async () => {
       const userId = mockUserId.toString();
-      const newPassword = 'NewPassword123!';
+      const newPassword = "NewPassword123!";
 
       const mockQuery = {
         exec: jest.fn().mockResolvedValue(mockUser),
@@ -492,7 +519,7 @@ describe('UsersService', () => {
           $set: expect.objectContaining({
             passwordHash: expect.any(String),
           }),
-        })
+        }),
       );
 
       const updateCall = userModel.findByIdAndUpdate.mock.calls[0][1] as any;
@@ -504,8 +531,8 @@ describe('UsersService', () => {
     });
   });
 
-  describe('setLastLogin', () => {
-    it('should update lastLogin timestamp', async () => {
+  describe("setLastLogin", () => {
+    it("should update lastLogin timestamp", async () => {
       const userId = mockUserId.toString();
 
       const mockQuery = {
@@ -521,7 +548,7 @@ describe('UsersService', () => {
           $set: expect.objectContaining({
             lastLogin: expect.any(Date),
           }),
-        })
+        }),
       );
     });
   });

@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from "@nestjs/common";
 
 /**
  * Database Error Handler Utility
@@ -37,14 +37,11 @@ export async function wrapDbOperation<T>(
     const errorStack = error instanceof Error ? error.stack : undefined;
 
     // Log structured error with context
-    logger.error(
-      `Database operation failed: ${operationName}`,
-      {
-        error: errorMessage,
-        context,
-        stack: errorStack,
-      },
-    );
+    logger.error(`Database operation failed: ${operationName}`, {
+      error: errorMessage,
+      context,
+      stack: errorStack,
+    });
 
     return {
       success: false,
@@ -111,7 +108,7 @@ export async function safeDbWrite<T>(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    const logLevel = isCritical ? 'error' : 'warn';
+    const logLevel = isCritical ? "error" : "warn";
     const logMessage = `Database write failed: ${operationName} - operation skipped`;
 
     logger[logLevel](logMessage, {
@@ -135,15 +132,15 @@ export function isMongoConnectionError(error: unknown): boolean {
   }
 
   const message = error.message.toLowerCase();
-  const name = error.name?.toLowerCase() || '';
+  const name = error.name?.toLowerCase() || "";
 
   return (
-    message.includes('mongoerror') ||
-    message.includes('connection') ||
-    message.includes('econnrefused') ||
-    message.includes('topology') ||
-    name.includes('mongoerror') ||
-    name.includes('mongotimeouterror')
+    message.includes("mongoerror") ||
+    message.includes("connection") ||
+    message.includes("econnrefused") ||
+    message.includes("topology") ||
+    name.includes("mongoerror") ||
+    name.includes("mongotimeouterror")
   );
 }
 
@@ -155,14 +152,14 @@ export function isMongoConnectionError(error: unknown): boolean {
 export function extractDbErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     // Check for specific MongoDB error patterns
-    if (error.message.includes('E11000')) {
-      return 'Duplicate key error - record already exists';
+    if (error.message.includes("E11000")) {
+      return "Duplicate key error - record already exists";
     }
-    if (error.message.includes('validation failed')) {
-      return 'Validation error - invalid data format';
+    if (error.message.includes("validation failed")) {
+      return "Validation error - invalid data format";
     }
     if (isMongoConnectionError(error)) {
-      return 'Database connection error - check MongoDB status';
+      return "Database connection error - check MongoDB status";
     }
     return error.message;
   }

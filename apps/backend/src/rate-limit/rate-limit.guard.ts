@@ -5,10 +5,10 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { RateLimitService } from './rate-limit.service';
-import { SKIP_RATE_LIMIT_KEY } from './decorators/skip-rate-limit.decorator';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { RateLimitService } from "./rate-limit.service";
+import { SKIP_RATE_LIMIT_KEY } from "./decorators/skip-rate-limit.decorator";
 
 /**
  * Rate Limit Guard - 2-hour window system
@@ -42,41 +42,63 @@ export class RateLimitGuard implements CanActivate {
 
     try {
       // Get identifier (user ID or IP)
-      const identifier = this.rateLimitService.getIdentifierFromRequest(request);
+      const identifier =
+        this.rateLimitService.getIdentifierFromRequest(request);
 
       // Extract metadata for tracking
       const endpoint = request.path;
       const itemType = request.params?.itemType || request.query?.itemType;
 
       // Atomically check and consume quota (prevents race conditions)
-      const rateLimitCheck = await this.rateLimitService.checkAndConsumeQuota(identifier, {
-        endpoint,
-        itemType,
-      });
+      const rateLimitCheck = await this.rateLimitService.checkAndConsumeQuota(
+        identifier,
+        {
+          endpoint,
+          itemType,
+        },
+      );
 
       // Get max requests from service
       const maxRequests = this.rateLimitService.getMaxRequestsPerWindow();
 
       // Set standard RateLimit-* headers (RFC 6585 / draft-ietf-httpapi-ratelimit-headers)
-      response.setHeader('RateLimit-Limit', maxRequests.toString());
-      response.setHeader('RateLimit-Remaining', rateLimitCheck.remaining.toString());
-      response.setHeader('RateLimit-Reset', rateLimitCheck.windowEnd.toISOString());
+      response.setHeader("RateLimit-Limit", maxRequests.toString());
+      response.setHeader(
+        "RateLimit-Remaining",
+        rateLimitCheck.remaining.toString(),
+      );
+      response.setHeader(
+        "RateLimit-Reset",
+        rateLimitCheck.windowEnd.toISOString(),
+      );
 
       // Set legacy X-RateLimit-* headers for backwards compatibility
-      response.setHeader('X-RateLimit-Limit', maxRequests.toString());
-      response.setHeader('X-RateLimit-Remaining', rateLimitCheck.remaining.toString());
-      response.setHeader('X-RateLimit-Reset', rateLimitCheck.windowEnd.toISOString());
-      response.setHeader('X-RateLimit-Window-Start', rateLimitCheck.windowStart.toISOString());
-      response.setHeader('X-RateLimit-Window-End', rateLimitCheck.windowEnd.toISOString());
+      response.setHeader("X-RateLimit-Limit", maxRequests.toString());
+      response.setHeader(
+        "X-RateLimit-Remaining",
+        rateLimitCheck.remaining.toString(),
+      );
+      response.setHeader(
+        "X-RateLimit-Reset",
+        rateLimitCheck.windowEnd.toISOString(),
+      );
+      response.setHeader(
+        "X-RateLimit-Window-Start",
+        rateLimitCheck.windowStart.toISOString(),
+      );
+      response.setHeader(
+        "X-RateLimit-Window-End",
+        rateLimitCheck.windowEnd.toISOString(),
+      );
 
       if (!rateLimitCheck.allowed) {
         // Quota exceeded - set retry header
-        response.setHeader('Retry-After', rateLimitCheck.retryAfter);
+        response.setHeader("Retry-After", rateLimitCheck.retryAfter);
 
         throw new HttpException(
           {
             statusCode: HttpStatus.TOO_MANY_REQUESTS,
-            message: 'Fresh data quota exceeded. Showing stale data.',
+            message: "Fresh data quota exceeded. Showing stale data.",
             remaining: 0,
             retryAfter: rateLimitCheck.retryAfter,
             windowEnd: rateLimitCheck.windowEnd,
@@ -94,10 +116,10 @@ export class RateLimitGuard implements CanActivate {
       }
 
       // Database or service error - log but allow request (fail-open for availability)
-      this.logger.error('Rate limit check failed, allowing request', error);
+      this.logger.error("Rate limit check failed, allowing request", error);
 
       // Set degraded service header
-      response.setHeader('X-RateLimit-Status', 'degraded');
+      response.setHeader("X-RateLimit-Status", "degraded");
 
       return true; // Fail-open: allow request when rate limiting is broken
     }

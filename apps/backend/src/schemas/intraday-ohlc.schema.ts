@@ -1,9 +1,9 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type IntradayOhlcDocument = IntradayOhlc & Document;
 
-@Schema({ collection: 'intraday_ohlc', timestamps: true })
+@Schema({ collection: "intraday_ohlc", timestamps: true })
 export class IntradayOhlc {
   @Prop({ required: true })
   itemCode: string; // References TrackedItem.code

@@ -1,45 +1,63 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
-import axios from 'axios';
-import { TimeRange, ItemType } from './dto/chart-query.dto';
-import { ChartDataPoint, ChartResponse } from './interfaces/chart.interface';
-import { Cache, CacheDocument } from '../navasan/schemas/cache.schema';
-import { OhlcSnapshot, OhlcSnapshotDocument } from '../navasan/schemas/ohlc-snapshot.schema';
-import { PriceSnapshot, PriceSnapshotDocument } from '../navasan/schemas/price-snapshot.schema';
-import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
-import { MetricsService } from '../metrics/metrics.service';
-import { NavasanOHLCDataPoint } from '../navasan/interfaces/navasan-response.interface';
-import { isOHLCDataArray } from '../navasan/utils/type-guards';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  InternalServerErrorException,
+} from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { ConfigService } from "@nestjs/config";
+import { Model } from "mongoose";
+import axios from "axios";
+import { TimeRange, ItemType } from "./dto/chart-query.dto";
+import { ChartDataPoint, ChartResponse } from "./interfaces/chart.interface";
+import { Cache, CacheDocument } from "../navasan/schemas/cache.schema";
+import {
+  OhlcSnapshot,
+  OhlcSnapshotDocument,
+} from "../navasan/schemas/ohlc-snapshot.schema";
+import {
+  PriceSnapshot,
+  PriceSnapshotDocument,
+} from "../navasan/schemas/price-snapshot.schema";
+import { safeDbRead, safeDbWrite } from "../common/utils/db-error-handler";
+import { MetricsService } from "../metrics/metrics.service";
+import { NavasanOHLCDataPoint } from "../navasan/interfaces/navasan-response.interface";
+import { isOHLCDataArray } from "../navasan/utils/type-guards";
 
 @Injectable()
 export class ChartService {
   private readonly logger = new Logger(ChartService.name);
   private readonly apiKey: string;
-  private readonly ohlcBaseUrl = 'http://api.navasan.tech/ohlcSearch/';
+  private readonly ohlcBaseUrl = "http://api.navasan.tech/ohlcSearch/";
   private readonly freshCacheMinutes = 60; // 1 hour cache for OHLC data
   private readonly staleCacheHours = 72; // Keep stale OHLC data for 3 days
   private readonly snapshotCoverageThreshold: number; // Minimum coverage % for price snapshot fallback
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
-    @InjectModel(OhlcSnapshot.name) private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
-    @InjectModel(PriceSnapshot.name) private priceSnapshotModel: Model<PriceSnapshotDocument>,
+    @InjectModel(OhlcSnapshot.name)
+    private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
+    @InjectModel(PriceSnapshot.name)
+    private priceSnapshotModel: Model<PriceSnapshotDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
   ) {
-    this.apiKey = this.configService.get<string>('NAVASAN_API_KEY') || '';
+    this.apiKey = this.configService.get<string>("NAVASAN_API_KEY") || "";
     if (!this.apiKey) {
-      this.logger.error('NAVASAN_API_KEY is not set in environment variables');
-      throw new Error('NAVASAN_API_KEY is required for chart service');
+      this.logger.error("NAVASAN_API_KEY is not set in environment variables");
+      throw new Error("NAVASAN_API_KEY is required for chart service");
     }
 
     // Read snapshot coverage threshold from env (default: 50%)
-    this.snapshotCoverageThreshold =
-      parseInt(this.configService.get<string>('SNAPSHOT_COVERAGE_THRESHOLD') || '50', 10);
+    this.snapshotCoverageThreshold = parseInt(
+      this.configService.get<string>("SNAPSHOT_COVERAGE_THRESHOLD") || "50",
+      10,
+    );
 
-    if (this.snapshotCoverageThreshold < 0 || this.snapshotCoverageThreshold > 100) {
+    if (
+      this.snapshotCoverageThreshold < 0 ||
+      this.snapshotCoverageThreshold > 100
+    ) {
       this.logger.warn(
         `Invalid SNAPSHOT_COVERAGE_THRESHOLD (${this.snapshotCoverageThreshold}), defaulting to 50%`,
       );
@@ -52,18 +70,18 @@ export class ChartService {
    * Only allows alphanumeric characters, underscores, hyphens, and reasonable length
    */
   private validateCacheKey(cacheKey: string): void {
-    if (!cacheKey || typeof cacheKey !== 'string') {
-      throw new Error('Cache key must be a non-empty string');
+    if (!cacheKey || typeof cacheKey !== "string") {
+      throw new Error("Cache key must be a non-empty string");
     }
 
     if (cacheKey.length > 100) {
-      throw new Error('Cache key too long');
+      throw new Error("Cache key too long");
     }
 
     // Only allow alphanumeric, underscore, hyphen
     const safePattern = /^[a-zA-Z0-9_-]+$/;
     if (!safePattern.test(cacheKey)) {
-      throw new Error('Cache key contains invalid characters');
+      throw new Error("Cache key contains invalid characters");
     }
   }
 
@@ -73,75 +91,75 @@ export class ChartService {
    */
   private readonly itemCodeMap: Record<string, string> = {
     // Main Currencies
-    USD_SELL: 'usd_sell',
-    USD: 'usd_sell', // Fallback for backwards compatibility
-    EUR: 'eur',
-    GBP: 'gbp',
-    CAD: 'cad',
-    AUD: 'aud',
-    AED: 'aed',
-    CNY: 'cny',
-    TRY: 'try',
+    USD_SELL: "usd_sell",
+    USD: "usd_sell", // Fallback for backwards compatibility
+    EUR: "eur",
+    GBP: "gbp",
+    CAD: "cad",
+    AUD: "aud",
+    AED: "aed",
+    CNY: "cny",
+    TRY: "try",
 
     // Additional Currencies
-    CHF: 'chf',
-    JPY: 'jpy',
-    RUB: 'rub',
-    INR: 'inr',
-    PKR: 'pkr',
-    IQD: 'iqd',
-    KWD: 'kwd',
-    SAR: 'sar',
-    QAR: 'qar',
-    OMR: 'omr',
-    BHD: 'bhd',
+    CHF: "chf",
+    JPY: "jpy",
+    RUB: "rub",
+    INR: "inr",
+    PKR: "pkr",
+    IQD: "iqd",
+    KWD: "kwd",
+    SAR: "sar",
+    QAR: "qar",
+    OMR: "omr",
+    BHD: "bhd",
 
     // Currency Variants
-    USD_BUY: 'usd_buy',
-    USD_HARAT_SELL: 'dolar_harat_sell',
-    USD_HARAT_CASH_SELL: 'harat_naghdi_sell',
-    USD_HARAT_CASH_BUY: 'harat_naghdi_buy',
-    USD_FARDA_SELL: 'usd_farda_sell',
-    USD_FARDA_BUY: 'usd_farda_buy',
-    USD_SHAKHS: 'usd_shakhs',
-    USD_SHERKAT: 'usd_sherkat',
-    USD_PP: 'usd_pp',
-    USD_MASHAD_SELL: 'dolar_mashad_sell',
-    USD_KORDESTAN_SELL: 'dolar_kordestan_sell',
-    USD_SOLEIMANIE_SELL: 'dolar_soleimanie_sell',
-    AED_SELL: 'aed_sell',
-    DIRHAM_DUBAI: 'dirham_dubai',
-    EUR_HAV: 'eur_hav',
-    GBP_HAV: 'gbp_hav',
-    GBP_WHT: 'gbp_wht',
-    CAD_HAV: 'cad_hav',
-    CAD_CASH: 'cad_cash',
-    AUD_HAV: 'aud_hav',
-    AUD_WHT: 'aud_wht',
+    USD_BUY: "usd_buy",
+    USD_HARAT_SELL: "dolar_harat_sell",
+    USD_HARAT_CASH_SELL: "harat_naghdi_sell",
+    USD_HARAT_CASH_BUY: "harat_naghdi_buy",
+    USD_FARDA_SELL: "usd_farda_sell",
+    USD_FARDA_BUY: "usd_farda_buy",
+    USD_SHAKHS: "usd_shakhs",
+    USD_SHERKAT: "usd_sherkat",
+    USD_PP: "usd_pp",
+    USD_MASHAD_SELL: "dolar_mashad_sell",
+    USD_KORDESTAN_SELL: "dolar_kordestan_sell",
+    USD_SOLEIMANIE_SELL: "dolar_soleimanie_sell",
+    AED_SELL: "aed_sell",
+    DIRHAM_DUBAI: "dirham_dubai",
+    EUR_HAV: "eur_hav",
+    GBP_HAV: "gbp_hav",
+    GBP_WHT: "gbp_wht",
+    CAD_HAV: "cad_hav",
+    CAD_CASH: "cad_cash",
+    AUD_HAV: "aud_hav",
+    AUD_WHT: "aud_wht",
 
     // Main Cryptocurrencies
-    USDT: 'usdt',
-    BTC: 'btc',
-    ETH: 'eth',
+    USDT: "usdt",
+    BTC: "btc",
+    ETH: "eth",
 
     // Additional Cryptocurrencies
-    BNB: 'bnb',
-    XRP: 'xrp',
-    ADA: 'ada',
-    DOGE: 'doge',
-    SOL: 'sol',
-    MATIC: 'matic',
-    DOT: 'dot',
-    LTC: 'ltc',
+    BNB: "bnb",
+    XRP: "xrp",
+    ADA: "ada",
+    DOGE: "doge",
+    SOL: "sol",
+    MATIC: "matic",
+    DOT: "dot",
+    LTC: "ltc",
 
     // Gold items
-    SEKKEH: 'sekkeh',
-    BAHAR: 'bahar',
-    NIM: 'nim',
-    ROB: 'rob',
-    GERAMI: 'gerami',
-    '18AYAR': '18ayar',
-    ABSHODEH: 'abshodeh',
+    SEKKEH: "sekkeh",
+    BAHAR: "bahar",
+    NIM: "nim",
+    ROB: "rob",
+    GERAMI: "gerami",
+    "18AYAR": "18ayar",
+    ABSHODEH: "abshodeh",
   };
 
   /**
@@ -154,7 +172,7 @@ export class ChartService {
     nim: 1000,
     rob: 1000,
     gerami: 1000,
-    '18ayar': 1, // No multiplication for 18ayar
+    "18ayar": 1, // No multiplication for 18ayar
     abshodeh: 1000,
   };
 
@@ -164,77 +182,77 @@ export class ChartService {
    */
   private readonly itemCategoryMap: Record<string, string> = {
     // Main Currencies
-    usd_sell: 'currencies',
-    eur: 'currencies',
-    gbp: 'currencies',
-    cad: 'currencies',
-    aud: 'currencies',
-    aed: 'currencies',
-    cny: 'currencies',
-    try: 'currencies',
+    usd_sell: "currencies",
+    eur: "currencies",
+    gbp: "currencies",
+    cad: "currencies",
+    aud: "currencies",
+    aed: "currencies",
+    cny: "currencies",
+    try: "currencies",
 
     // Additional Currencies
-    chf: 'currencies',
-    jpy: 'currencies',
-    rub: 'currencies',
-    inr: 'currencies',
-    pkr: 'currencies',
-    iqd: 'currencies',
-    kwd: 'currencies',
-    sar: 'currencies',
-    qar: 'currencies',
-    omr: 'currencies',
-    bhd: 'currencies',
+    chf: "currencies",
+    jpy: "currencies",
+    rub: "currencies",
+    inr: "currencies",
+    pkr: "currencies",
+    iqd: "currencies",
+    kwd: "currencies",
+    sar: "currencies",
+    qar: "currencies",
+    omr: "currencies",
+    bhd: "currencies",
 
     // Currency Variants
-    usd_buy: 'currencies',
-    dolar_harat_sell: 'currencies',
-    harat_naghdi_sell: 'currencies',
-    harat_naghdi_buy: 'currencies',
-    usd_farda_sell: 'currencies',
-    usd_farda_buy: 'currencies',
-    usd_shakhs: 'currencies',
-    usd_sherkat: 'currencies',
-    usd_pp: 'currencies',
-    dolar_mashad_sell: 'currencies',
-    dolar_kordestan_sell: 'currencies',
-    dolar_soleimanie_sell: 'currencies',
-    aed_sell: 'currencies',
-    dirham_dubai: 'currencies',
-    eur_hav: 'currencies',
-    gbp_hav: 'currencies',
-    gbp_wht: 'currencies',
-    cad_hav: 'currencies',
-    cad_cash: 'currencies',
-    hav_cad_my: 'currencies',
-    hav_cad_cheque: 'currencies',
-    hav_cad_cash: 'currencies',
-    aud_hav: 'currencies',
-    aud_wht: 'currencies',
+    usd_buy: "currencies",
+    dolar_harat_sell: "currencies",
+    harat_naghdi_sell: "currencies",
+    harat_naghdi_buy: "currencies",
+    usd_farda_sell: "currencies",
+    usd_farda_buy: "currencies",
+    usd_shakhs: "currencies",
+    usd_sherkat: "currencies",
+    usd_pp: "currencies",
+    dolar_mashad_sell: "currencies",
+    dolar_kordestan_sell: "currencies",
+    dolar_soleimanie_sell: "currencies",
+    aed_sell: "currencies",
+    dirham_dubai: "currencies",
+    eur_hav: "currencies",
+    gbp_hav: "currencies",
+    gbp_wht: "currencies",
+    cad_hav: "currencies",
+    cad_cash: "currencies",
+    hav_cad_my: "currencies",
+    hav_cad_cheque: "currencies",
+    hav_cad_cash: "currencies",
+    aud_hav: "currencies",
+    aud_wht: "currencies",
 
     // Main Cryptocurrencies
-    usdt: 'crypto',
-    btc: 'crypto',
-    eth: 'crypto',
+    usdt: "crypto",
+    btc: "crypto",
+    eth: "crypto",
 
     // Additional Cryptocurrencies
-    bnb: 'crypto',
-    xrp: 'crypto',
-    ada: 'crypto',
-    doge: 'crypto',
-    sol: 'crypto',
-    matic: 'crypto',
-    dot: 'crypto',
-    ltc: 'crypto',
+    bnb: "crypto",
+    xrp: "crypto",
+    ada: "crypto",
+    doge: "crypto",
+    sol: "crypto",
+    matic: "crypto",
+    dot: "crypto",
+    ltc: "crypto",
 
     // Gold
-    sekkeh: 'gold',
-    bahar: 'gold',
-    nim: 'gold',
-    rob: 'gold',
-    gerami: 'gold',
-    '18ayar': 'gold',
-    abshodeh: 'gold',
+    sekkeh: "gold",
+    bahar: "gold",
+    nim: "gold",
+    rob: "gold",
+    gerami: "gold",
+    "18ayar": "gold",
+    abshodeh: "gold",
   };
 
   /**
@@ -322,24 +340,76 @@ export class ChartService {
     const validCodes = {
       [ItemType.CURRENCY]: [
         // Main currencies
-        'USD_SELL', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'AED', 'CNY', 'CNY_HAV', 'TRY', 'TRY_HAV',
+        "USD_SELL",
+        "USD",
+        "EUR",
+        "GBP",
+        "CAD",
+        "AUD",
+        "AED",
+        "CNY",
+        "CNY_HAV",
+        "TRY",
+        "TRY_HAV",
         // Additional currencies
-        'CHF', 'JPY', 'JPY_HAV', 'RUB', 'INR', 'PKR', 'IQD', 'KWD', 'SAR', 'QAR', 'OMR', 'BHD',
+        "CHF",
+        "JPY",
+        "JPY_HAV",
+        "RUB",
+        "INR",
+        "PKR",
+        "IQD",
+        "KWD",
+        "SAR",
+        "QAR",
+        "OMR",
+        "BHD",
         // Currency variants
-        'USD_BUY', 'USD_HARAT_SELL', 'USD_HARAT_CASH_SELL', 'USD_HARAT_CASH_BUY',
-        'USD_FARDA_SELL', 'USD_FARDA_BUY', 'USD_SHAKHS', 'USD_SHERKAT', 'USD_PP',
-        'USD_MASHAD_SELL', 'USD_KORDESTAN_SELL', 'USD_SOLEIMANIE_SELL',
-        'AED_SELL', 'DIRHAM_DUBAI',
-        'EUR_HAV', 'GBP_HAV', 'GBP_WHT', 'CAD_HAV', 'CAD_CASH', 'AUD_HAV', 'AUD_WHT'
+        "USD_BUY",
+        "USD_HARAT_SELL",
+        "USD_HARAT_CASH_SELL",
+        "USD_HARAT_CASH_BUY",
+        "USD_FARDA_SELL",
+        "USD_FARDA_BUY",
+        "USD_SHAKHS",
+        "USD_SHERKAT",
+        "USD_PP",
+        "USD_MASHAD_SELL",
+        "USD_KORDESTAN_SELL",
+        "USD_SOLEIMANIE_SELL",
+        "AED_SELL",
+        "DIRHAM_DUBAI",
+        "EUR_HAV",
+        "GBP_HAV",
+        "GBP_WHT",
+        "CAD_HAV",
+        "CAD_CASH",
+        "AUD_HAV",
+        "AUD_WHT",
       ],
       [ItemType.CRYPTO]: [
         // Main crypto
-        'BTC', 'ETH', 'USDT',
+        "BTC",
+        "ETH",
+        "USDT",
         // Additional crypto
-        'BNB', 'XRP', 'ADA', 'DOGE', 'SOL', 'MATIC', 'DOT', 'LTC'
+        "BNB",
+        "XRP",
+        "ADA",
+        "DOGE",
+        "SOL",
+        "MATIC",
+        "DOT",
+        "LTC",
       ],
       [ItemType.GOLD]: [
-        'SEKKEH', 'BAHAR', 'NIM', 'ROB', 'GERAMI', '18AYAR', 'ABSHODEH'
+        "SEKKEH",
+        "BAHAR",
+        "NIM",
+        "ROB",
+        "GERAMI",
+        "18AYAR",
+        "ABSHODEH",
       ],
     };
 
@@ -349,11 +419,14 @@ export class ChartService {
   /**
    * Get date range (Unix timestamps) based on TimeRange enum
    */
-  private getDateRange(timeRange: TimeRange): { startTimestamp: number; endTimestamp: number } {
+  private getDateRange(timeRange: TimeRange): {
+    startTimestamp: number;
+    endTimestamp: number;
+  } {
     const now = new Date();
     const endTimestamp = Math.floor(now.getTime() / 1000); // Current time in Unix timestamp
 
-    let startDate = new Date(now);
+    const startDate = new Date(now);
 
     switch (timeRange) {
       case TimeRange.ONE_DAY:
@@ -402,8 +475,10 @@ export class ChartService {
       // Step 1: Check for fresh cache (< 1 hour old)
       const freshCache = await this.getFreshCachedOHLCData(cacheKey);
       if (freshCache) {
-        this.logger.log(`✅ Returning fresh cached OHLC data for ${itemCode} (${timeRange})`);
-        this.metricsService.trackCacheHit('ohlc', 'fresh_cache');
+        this.logger.log(
+          `✅ Returning fresh cached OHLC data for ${itemCode} (${timeRange})`,
+        );
+        this.metricsService.trackCacheHit("ohlc", "fresh_cache");
         return freshCache as NavasanOHLCDataPoint[];
       }
 
@@ -411,30 +486,57 @@ export class ChartService {
       const snapshotData = await this.getOhlcSnapshotData(itemCode, timeRange);
       if (snapshotData) {
         const dataAge = this.getDataAge(snapshotData.timestamp);
-        this.logger.log(`📦 Returning OHLC snapshot data for ${itemCode} (${timeRange}) - ${dataAge} old`);
-        this.metricsService.trackCacheHit('ohlc', 'snapshot_db');
+        this.logger.log(
+          `📦 Returning OHLC snapshot data for ${itemCode} (${timeRange}) - ${dataAge} old`,
+        );
+        this.metricsService.trackCacheHit("ohlc", "snapshot_db");
 
         // Refresh fresh cache for faster subsequent requests (fire-and-forget)
-        this.saveOHLCToFreshCacheWithRetry(cacheKey, snapshotData.data, snapshotData.metadata).catch(err => {
-          this.logger.warn(`Failed to refresh fresh cache from snapshot: ${err.message}`);
+        this.saveOHLCToFreshCacheWithRetry(
+          cacheKey,
+          snapshotData.data,
+          snapshotData.metadata,
+        ).catch((err) => {
+          this.logger.warn(
+            `Failed to refresh fresh cache from snapshot: ${err.message}`,
+          );
         });
 
         return snapshotData.data;
       }
 
       // Step 2: Try to fetch from API
-      this.logger.log(`📡 Fetching OHLC data from Navasan API for ${itemCode} (${timeRange})`);
-      this.metricsService.trackCacheMiss('ohlc', 'api_fetch');
+      this.logger.log(
+        `📡 Fetching OHLC data from Navasan API for ${itemCode} (${timeRange})`,
+      );
+      this.metricsService.trackCacheMiss("ohlc", "api_fetch");
       try {
-        const apiResponse = await this.fetchOHLCFromApi(itemCode, startTimestamp, endTimestamp);
+        const apiResponse = await this.fetchOHLCFromApi(
+          itemCode,
+          startTimestamp,
+          endTimestamp,
+        );
 
         // Success! Save to both fresh and stale caches with error handling
-        await this.saveOHLCToFreshCacheWithRetry(cacheKey, apiResponse.data, apiResponse.metadata);
-        await this.saveOHLCToStaleCacheWithRetry(cacheKey, apiResponse.data, apiResponse.metadata);
+        await this.saveOHLCToFreshCacheWithRetry(
+          cacheKey,
+          apiResponse.data,
+          apiResponse.metadata,
+        );
+        await this.saveOHLCToStaleCacheWithRetry(
+          cacheKey,
+          apiResponse.data,
+          apiResponse.metadata,
+        );
 
         // 📸 PERMANENT STORAGE: Save OHLC snapshot for historical record
         // This data is never deleted and builds a permanent chart history database
-        await this.saveOhlcSnapshot(itemCode, timeRange, apiResponse.data, apiResponse.metadata);
+        await this.saveOhlcSnapshot(
+          itemCode,
+          timeRange,
+          apiResponse.data,
+          apiResponse.metadata,
+        );
 
         return apiResponse.data;
       } catch (apiError) {
@@ -444,7 +546,8 @@ export class ChartService {
         );
 
         // Capture error message for tracking
-        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+        const errorMessage =
+          apiError instanceof Error ? apiError.message : String(apiError);
 
         // Check if it's a token error
         const isTokenError = this.isTokenExpirationError(apiError);
@@ -455,18 +558,26 @@ export class ChartService {
         // Try to get stale cache (up to 72 hours old)
         const staleCache = await this.getStaleCachedOHLCData(cacheKey);
         if (staleCache) {
-          this.logger.warn(`⚠️  Serving STALE OHLC data for ${itemCode} (${timeRange})`);
+          this.logger.warn(
+            `⚠️  Serving STALE OHLC data for ${itemCode} (${timeRange})`,
+          );
 
           // Mark cache as fallback with error message for monitoring
-          await this.markOHLCCacheAsFallback(cacheKey, errorMessage).catch((err) => {
-            this.logger.error(`Failed to mark OHLC cache as fallback: ${err.message}`);
-          });
+          await this.markOHLCCacheAsFallback(cacheKey, errorMessage).catch(
+            (err) => {
+              this.logger.error(
+                `Failed to mark OHLC cache as fallback: ${err.message}`,
+              );
+            },
+          );
 
           return staleCache as NavasanOHLCDataPoint[];
         }
 
         // Step 4: Try to build chart from price snapshots as last resort
-        this.logger.warn(`📸 Attempting price snapshot fallback for ${itemCode}`);
+        this.logger.warn(
+          `📸 Attempting price snapshot fallback for ${itemCode}`,
+        );
         const snapshotData = await this.buildChartFromPriceSnapshots(
           itemCode,
           startTimestamp,
@@ -504,13 +615,13 @@ export class ChartService {
         return true;
       }
       const responseData = error.response?.data;
-      if (typeof responseData === 'object' && responseData !== null) {
+      if (typeof responseData === "object" && responseData !== null) {
         const message = JSON.stringify(responseData).toLowerCase();
         return (
-          message.includes('token') ||
-          message.includes('unauthorized') ||
-          message.includes('api key') ||
-          message.includes('authentication')
+          message.includes("token") ||
+          message.includes("unauthorized") ||
+          message.includes("api key") ||
+          message.includes("authentication")
         );
       }
     }
@@ -524,8 +635,12 @@ export class ChartService {
   private validateOHLCResponse(data: unknown, itemCode: string): void {
     // Check that response is an array
     if (!Array.isArray(data)) {
-      this.logger.error(`Invalid OHLC API response for ${itemCode}: expected array, received ${typeof data}`);
-      throw new Error('Invalid OHLC API response structure: expected array of data points');
+      this.logger.error(
+        `Invalid OHLC API response for ${itemCode}: expected array, received ${typeof data}`,
+      );
+      throw new Error(
+        "Invalid OHLC API response structure: expected array of data points",
+      );
     }
 
     // Allow empty arrays (no data for time range is valid)
@@ -535,22 +650,37 @@ export class ChartService {
     }
 
     // Validate structure of each data point
-    const requiredFields = ['timestamp', 'date', 'open', 'high', 'low', 'close'];
+    const requiredFields = [
+      "timestamp",
+      "date",
+      "open",
+      "high",
+      "low",
+      "close",
+    ];
 
     for (let i = 0; i < data.length; i++) {
       const point = data[i];
 
       // Check that point is an object
-      if (!point || typeof point !== 'object' || Array.isArray(point)) {
-        this.logger.error(`Invalid OHLC data point at index ${i} for ${itemCode}: not an object`);
-        throw new Error(`Invalid OHLC API response: data point ${i} is not an object`);
+      if (!point || typeof point !== "object" || Array.isArray(point)) {
+        this.logger.error(
+          `Invalid OHLC data point at index ${i} for ${itemCode}: not an object`,
+        );
+        throw new Error(
+          `Invalid OHLC API response: data point ${i} is not an object`,
+        );
       }
 
       // Check all required fields exist
       for (const field of requiredFields) {
         if (!(field in point)) {
-          this.logger.error(`Missing required field "${field}" in OHLC data point ${i} for ${itemCode}`);
-          throw new Error(`Invalid OHLC API response: data point ${i} missing "${field}" field`);
+          this.logger.error(
+            `Missing required field "${field}" in OHLC data point ${i} for ${itemCode}`,
+          );
+          throw new Error(
+            `Invalid OHLC API response: data point ${i} missing "${field}" field`,
+          );
         }
       }
 
@@ -558,26 +688,46 @@ export class ChartService {
       const typedPoint = point as NavasanOHLCDataPoint;
 
       // Validate timestamp is a number
-      if (typeof typedPoint.timestamp !== 'number' || isNaN(typedPoint.timestamp)) {
-        this.logger.error(`Invalid timestamp in OHLC data point ${i} for ${itemCode}`);
-        throw new Error(`Invalid OHLC API response: data point ${i} has invalid timestamp`);
+      if (
+        typeof typedPoint.timestamp !== "number" ||
+        isNaN(typedPoint.timestamp)
+      ) {
+        this.logger.error(
+          `Invalid timestamp in OHLC data point ${i} for ${itemCode}`,
+        );
+        throw new Error(
+          `Invalid OHLC API response: data point ${i} has invalid timestamp`,
+        );
       }
 
       // Validate price fields are numbers or strings that can be parsed as numbers
-      const priceFields = ['open', 'high', 'low', 'close'];
+      const priceFields = ["open", "high", "low", "close"];
       for (const field of priceFields) {
-        const value = typedPoint[field as keyof Pick<NavasanOHLCDataPoint, 'open' | 'high' | 'low' | 'close'>];
+        const value =
+          typedPoint[
+            field as keyof Pick<
+              NavasanOHLCDataPoint,
+              "open" | "high" | "low" | "close"
+            >
+          ];
         // Accept both numbers and numeric strings (API can return either)
-        const isValidNumber = typeof value === 'number' && !isNaN(value);
-        const isValidString = typeof value === 'string' && !isNaN(parseFloat(value));
+        const isValidNumber = typeof value === "number" && !isNaN(value);
+        const isValidString =
+          typeof value === "string" && !isNaN(parseFloat(value));
         if (!isValidNumber && !isValidString) {
-          this.logger.error(`Invalid ${field} value in OHLC data point ${i} for ${itemCode}: ${typeof value} = ${value}`);
-          throw new Error(`Invalid OHLC API response: data point ${i} has invalid "${field}" value`);
+          this.logger.error(
+            `Invalid ${field} value in OHLC data point ${i} for ${itemCode}: ${typeof value} = ${value}`,
+          );
+          throw new Error(
+            `Invalid OHLC API response: data point ${i} has invalid "${field}" value`,
+          );
         }
       }
     }
 
-    this.logger.log(`✅ OHLC API response validation passed for ${itemCode}: ${data.length} data points`);
+    this.logger.log(
+      `✅ OHLC API response validation passed for ${itemCode}: ${data.length} data points`,
+    );
   }
 
   /**
@@ -589,12 +739,17 @@ export class ChartService {
     itemCode: string,
     startTimestamp: number,
     endTimestamp: number,
-  ): Promise<{ data: NavasanOHLCDataPoint[]; metadata?: Record<string, unknown> }> {
+  ): Promise<{
+    data: NavasanOHLCDataPoint[];
+    metadata?: Record<string, unknown>;
+  }> {
     try {
       // NOTE: Navasan API requires the API key as a query parameter (not in headers)
       const url = `${this.ohlcBaseUrl}?api_key=${this.apiKey}&item=${itemCode}&start=${startTimestamp}&end=${endTimestamp}`;
 
-      this.logger.log(`Calling Navasan OHLC API: ${itemCode} from ${startTimestamp} to ${endTimestamp}`);
+      this.logger.log(
+        `Calling Navasan OHLC API: ${itemCode} from ${startTimestamp} to ${endTimestamp}`,
+      );
 
       const response = await axios.get<NavasanOHLCDataPoint[]>(url, {
         timeout: 10000, // 10 second timeout
@@ -604,23 +759,25 @@ export class ChartService {
       // Handle authentication errors - throw error to trigger stale fallback
       if (response.status === 401 || response.status === 403) {
         throw new Error(
-          'Navasan OHLC API authentication failed. API key may be expired or invalid.',
+          "Navasan OHLC API authentication failed. API key may be expired or invalid.",
         );
       }
 
       // Handle rate limiting - throw error to trigger stale fallback
       if (response.status === 429) {
-        const retryAfter = response.headers['retry-after'];
+        const retryAfter = response.headers["retry-after"];
         // Throw regular Error so it gets caught by try-catch and triggers stale cache fallback
         throw new Error(
-          `Navasan OHLC API rate limit exceeded. Retry after ${retryAfter || 'some time'}.`,
+          `Navasan OHLC API rate limit exceeded. Retry after ${retryAfter || "some time"}.`,
         );
       }
 
       // Handle other non-200 responses
       if (response.status !== 200) {
         // SECURITY FIX: Don't expose specific status codes to prevent information leakage
-        throw new Error('External API returned unexpected response. Please try again later.');
+        throw new Error(
+          "External API returned unexpected response. Please try again later.",
+        );
       }
 
       // VALIDATION FIX: Validate OHLC API response structure before caching
@@ -637,19 +794,27 @@ export class ChartService {
       };
 
       // Extract rate limit headers if present
-      if (response.headers['x-ratelimit-remaining']) {
-        apiMetadata.rateLimitRemaining = parseInt(response.headers['x-ratelimit-remaining'], 10);
+      if (response.headers["x-ratelimit-remaining"]) {
+        apiMetadata.rateLimitRemaining = parseInt(
+          response.headers["x-ratelimit-remaining"],
+          10,
+        );
       }
-      if (response.headers['x-ratelimit-reset']) {
-        const resetTimestamp = parseInt(response.headers['x-ratelimit-reset'], 10);
+      if (response.headers["x-ratelimit-reset"]) {
+        const resetTimestamp = parseInt(
+          response.headers["x-ratelimit-reset"],
+          10,
+        );
         apiMetadata.rateLimitReset = new Date(resetTimestamp * 1000);
       }
 
       return { data: response.data, metadata: apiMetadata };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ECONNABORTED') {
-          throw new InternalServerErrorException('Request to Navasan API timed out');
+        if (error.code === "ECONNABORTED") {
+          throw new InternalServerErrorException(
+            "Request to Navasan API timed out",
+          );
         }
         if (error.response) {
           // Log detailed error internally for debugging
@@ -658,7 +823,7 @@ export class ChartService {
           );
           // SECURITY FIX: Don't expose API error details to clients to prevent information leakage
           throw new InternalServerErrorException(
-            'Failed to fetch chart data. Please try again later.',
+            "Failed to fetch chart data. Please try again later.",
           );
         }
       }
@@ -670,20 +835,24 @@ export class ChartService {
    * Get fresh cached OHLC data (< 1 hour old)
    * DB ERROR HANDLING: Returns null on DB failure instead of throwing
    */
-  private async getFreshCachedOHLCData(cacheKey: string): Promise<NavasanOHLCDataPoint[] | null> {
-    const freshExpiry = new Date(Date.now() - this.freshCacheMinutes * 60 * 1000);
+  private async getFreshCachedOHLCData(
+    cacheKey: string,
+  ): Promise<NavasanOHLCDataPoint[] | null> {
+    const freshExpiry = new Date(
+      Date.now() - this.freshCacheMinutes * 60 * 1000,
+    );
 
     const cached = await safeDbRead(
       () =>
         this.cacheModel
           .findOne({
             category: cacheKey,
-            cacheType: 'fresh',
+            cacheType: "fresh",
             timestamp: { $gte: freshExpiry },
           })
           .sort({ timestamp: -1 })
           .exec(),
-      'getFreshCachedOHLCData',
+      "getFreshCachedOHLCData",
       this.logger,
       { cacheKey },
     );
@@ -699,20 +868,24 @@ export class ChartService {
    * Get stale cached OHLC data (up to 72 hours old) for fallback
    * DB ERROR HANDLING: Returns null on DB failure instead of throwing
    */
-  private async getStaleCachedOHLCData(cacheKey: string): Promise<NavasanOHLCDataPoint[] | null> {
-    const staleExpiry = new Date(Date.now() - this.staleCacheHours * 60 * 60 * 1000);
+  private async getStaleCachedOHLCData(
+    cacheKey: string,
+  ): Promise<NavasanOHLCDataPoint[] | null> {
+    const staleExpiry = new Date(
+      Date.now() - this.staleCacheHours * 60 * 60 * 1000,
+    );
 
     const cached = await safeDbRead(
       () =>
         this.cacheModel
           .findOne({
             category: cacheKey,
-            cacheType: { $in: ['fresh', 'stale'] },
+            cacheType: { $in: ["fresh", "stale"] },
             timestamp: { $gte: staleExpiry },
           })
           .sort({ timestamp: -1 })
           .exec(),
-      'getStaleCachedOHLCData',
+      "getStaleCachedOHLCData",
       this.logger,
       { cacheKey },
     );
@@ -735,14 +908,16 @@ export class ChartService {
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.freshCacheMinutes * 60 * 1000);
+    const expiresAt = new Date(
+      now.getTime() + this.freshCacheMinutes * 60 * 1000,
+    );
 
     // Atomic upsert with DB error handling
     await safeDbWrite(
       () =>
         this.cacheModel
           .findOneAndUpdate(
-            { category: cacheKey, cacheType: 'fresh' },
+            { category: cacheKey, cacheType: "fresh" },
             {
               $set: {
                 data: data,
@@ -758,7 +933,7 @@ export class ChartService {
             { upsert: true, new: true },
           )
           .exec(),
-      'saveOHLCToFreshCache',
+      "saveOHLCToFreshCache",
       this.logger,
       { cacheKey },
       false, // Not critical
@@ -780,14 +955,16 @@ export class ChartService {
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.staleCacheHours * 60 * 60 * 1000);
+    const expiresAt = new Date(
+      now.getTime() + this.staleCacheHours * 60 * 60 * 1000,
+    );
 
     // Atomic upsert with DB error handling
     await safeDbWrite(
       () =>
         this.cacheModel
           .findOneAndUpdate(
-            { category: cacheKey, cacheType: 'stale' },
+            { category: cacheKey, cacheType: "stale" },
             {
               $set: {
                 data: data,
@@ -803,7 +980,7 @@ export class ChartService {
             { upsert: true, new: true },
           )
           .exec(),
-      'saveOHLCToStaleCache',
+      "saveOHLCToStaleCache",
       this.logger,
       { cacheKey },
       true, // Critical for fallback
@@ -856,7 +1033,9 @@ export class ChartService {
         );
 
         if (retries > maxRetries) {
-          this.logger.error(`Gave up saving stale OHLC cache for ${cacheKey} after ${maxRetries + 1} attempts`);
+          this.logger.error(
+            `Gave up saving stale OHLC cache for ${cacheKey} after ${maxRetries + 1} attempts`,
+          );
           // Don't fail the request, but log as critical
         }
       }
@@ -868,12 +1047,15 @@ export class ChartService {
    * Populates isFallback, lastApiError, and increments apiErrorCount
    * DB ERROR HANDLING: Won't throw on DB failure
    */
-  private async markOHLCCacheAsFallback(cacheKey: string, errorMessage: string): Promise<void> {
+  private async markOHLCCacheAsFallback(
+    cacheKey: string,
+    errorMessage: string,
+  ): Promise<void> {
     await safeDbWrite(
       () =>
         this.cacheModel
           .updateMany(
-            { category: cacheKey, cacheType: { $in: ['fresh', 'stale'] } },
+            { category: cacheKey, cacheType: { $in: ["fresh", "stale"] } },
             {
               $set: {
                 isFallback: true,
@@ -885,7 +1067,7 @@ export class ChartService {
             },
           )
           .exec(),
-      'markOHLCCacheAsFallback',
+      "markOHLCCacheAsFallback",
       this.logger,
       { cacheKey, errorMessage },
       false, // Not critical - just metadata
@@ -898,10 +1080,14 @@ export class ChartService {
   private transformOHLCData(data: NavasanOHLCDataPoint[]): ChartDataPoint[] {
     return data.map((point) => {
       // Convert prices to numbers (handle both number and string types)
-      const open = typeof point.open === 'number' ? point.open : parseFloat(point.open);
-      const high = typeof point.high === 'number' ? point.high : parseFloat(point.high);
-      const low = typeof point.low === 'number' ? point.low : parseFloat(point.low);
-      const close = typeof point.close === 'number' ? point.close : parseFloat(point.close);
+      const open =
+        typeof point.open === "number" ? point.open : parseFloat(point.open);
+      const high =
+        typeof point.high === "number" ? point.high : parseFloat(point.high);
+      const low =
+        typeof point.low === "number" ? point.low : parseFloat(point.low);
+      const close =
+        typeof point.close === "number" ? point.close : parseFloat(point.close);
 
       // Convert Unix timestamp to ISO 8601 string
       const timestamp = new Date(point.timestamp * 1000).toISOString();
@@ -935,35 +1121,47 @@ export class ChartService {
         timeRange,
         data,
         timestamp: new Date(),
-        source: 'api',
+        source: "api",
         metadata: apiMetadata,
       });
 
       const saveResult = await safeDbWrite(
         () => snapshot.save(),
-        'saveOhlcSnapshot',
+        "saveOhlcSnapshot",
         this.logger,
         { itemCode, timeRange },
         true, // Critical - track failures
       );
 
       if (saveResult) {
-        this.logger.log(`📸 Saved OHLC snapshot for ${itemCode} (${timeRange})`);
+        this.logger.log(
+          `📸 Saved OHLC snapshot for ${itemCode} (${timeRange})`,
+        );
         // Reset failure counter on success
-        this.metricsService.resetSnapshotFailureCounter('ohlc', `${itemCode}_${timeRange}`);
+        this.metricsService.resetSnapshotFailureCounter(
+          "ohlc",
+          `${itemCode}_${timeRange}`,
+        );
       } else {
         // Track failure
         this.metricsService.trackSnapshotFailure(
-          'ohlc',
+          "ohlc",
           `${itemCode}_${timeRange}`,
-          'Database write failed during OHLC snapshot save',
+          "Database write failed during OHLC snapshot save",
         );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to save OHLC snapshot for ${itemCode}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to save OHLC snapshot for ${itemCode}: ${errorMessage}`,
+      );
       // Track failure
-      this.metricsService.trackSnapshotFailure('ohlc', `${itemCode}_${timeRange}`, errorMessage);
+      this.metricsService.trackSnapshotFailure(
+        "ohlc",
+        `${itemCode}_${timeRange}`,
+        errorMessage,
+      );
       // Don't fail the request if snapshot saving fails
     }
   }
@@ -975,32 +1173,43 @@ export class ChartService {
   private async getOhlcSnapshotData(
     itemCode: string,
     timeRange: TimeRange,
-  ): Promise<{ data: NavasanOHLCDataPoint[]; timestamp: Date; metadata?: Record<string, unknown> } | null> {
+  ): Promise<{
+    data: NavasanOHLCDataPoint[];
+    timestamp: Date;
+    metadata?: Record<string, unknown>;
+  } | null> {
     try {
       // Get expiry date based on time range retention policy
       const expiryDate = this.getSnapshotExpiryDate(timeRange);
 
       const snapshot = await safeDbRead(
-        () => this.ohlcSnapshotModel
-          .findOne({
-            itemCode,
-            timeRange,
-            timestamp: { $gte: expiryDate },
-          })
-          .sort({ timestamp: -1 }) // Get most recent
-          .exec(),
-        'getOhlcSnapshot',
+        () =>
+          this.ohlcSnapshotModel
+            .findOne({
+              itemCode,
+              timeRange,
+              timestamp: { $gte: expiryDate },
+            })
+            .sort({ timestamp: -1 }) // Get most recent
+            .exec(),
+        "getOhlcSnapshot",
         this.logger,
       );
 
       if (!snapshot) {
-        this.metricsService.trackCacheMiss('ohlc', 'snapshot_db');
+        this.metricsService.trackCacheMiss("ohlc", "snapshot_db");
         return null;
       }
 
       // Validate data structure
-      if (!snapshot.data || !Array.isArray(snapshot.data) || snapshot.data.length === 0) {
-        this.logger.warn(`Invalid OHLC snapshot data for ${itemCode} (${timeRange})`);
+      if (
+        !snapshot.data ||
+        !Array.isArray(snapshot.data) ||
+        snapshot.data.length === 0
+      ) {
+        this.logger.warn(
+          `Invalid OHLC snapshot data for ${itemCode} (${timeRange})`,
+        );
         return null;
       }
 
@@ -1010,8 +1219,11 @@ export class ChartService {
         metadata: snapshot.metadata,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to get OHLC snapshot for ${itemCode}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to get OHLC snapshot for ${itemCode}: ${errorMessage}`,
+      );
       return null;
     }
   }
@@ -1064,11 +1276,11 @@ export class ChartService {
     const ageDays = Math.floor(ageHours / 24);
 
     if (ageDays > 0) {
-      return `${ageDays} day${ageDays > 1 ? 's' : ''}`;
+      return `${ageDays} day${ageDays > 1 ? "s" : ""}`;
     } else if (ageHours > 0) {
-      return `${ageHours} hour${ageHours > 1 ? 's' : ''}`;
+      return `${ageHours} hour${ageHours > 1 ? "s" : ""}`;
     } else {
-      return `${ageMinutes} minute${ageMinutes > 1 ? 's' : ''}`;
+      return `${ageMinutes} minute${ageMinutes > 1 ? "s" : ""}`;
     }
   }
 
@@ -1106,20 +1318,20 @@ export class ChartService {
   ): number | null {
     try {
       // Type guard: check if data is an object
-      if (!snapshot.data || typeof snapshot.data !== 'object') {
+      if (!snapshot.data || typeof snapshot.data !== "object") {
         return null;
       }
 
       // Extract item data with proper type guard
       const itemData = snapshot.data[itemCode];
-      if (!itemData || typeof itemData !== 'object') {
+      if (!itemData || typeof itemData !== "object") {
         return null;
       }
 
       // Type assertion with validation
       const typedItemData = itemData as Record<string, unknown>;
       const valueStr = typedItemData.value;
-      if (typeof valueStr !== 'string') {
+      if (typeof valueStr !== "string") {
         return null;
       }
 
@@ -1135,7 +1347,8 @@ export class ChartService {
 
       return price;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(
@@ -1207,13 +1420,15 @@ export class ChartService {
             })
             .sort({ timestamp: 1 })
             .exec(),
-        'buildChartFromPriceSnapshots',
+        "buildChartFromPriceSnapshots",
         this.logger,
         { itemCode, category, timeRange },
       );
 
       if (!snapshots || snapshots.length === 0) {
-        this.logger.warn(`No price snapshots found for ${itemCode} in requested time range`);
+        this.logger.warn(
+          `No price snapshots found for ${itemCode} in requested time range`,
+        );
         return null;
       }
 
@@ -1274,7 +1489,7 @@ export class ChartService {
         const unixTimestamp = Math.floor(snapshot.timestamp.getTime() / 1000);
         ohlcData.push({
           timestamp: unixTimestamp,
-          date: snapshot.timestamp.toISOString().split('T')[0], // YYYY-MM-DD
+          date: snapshot.timestamp.toISOString().split("T")[0], // YYYY-MM-DD
           open: price,
           high: price,
           low: price,
@@ -1283,7 +1498,9 @@ export class ChartService {
       }
 
       if (ohlcData.length === 0) {
-        this.logger.warn(`Could not extract any valid prices from snapshots for ${itemCode}`);
+        this.logger.warn(
+          `Could not extract any valid prices from snapshots for ${itemCode}`,
+        );
         return null;
       }
 
@@ -1293,7 +1510,8 @@ export class ChartService {
 
       return ohlcData;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(

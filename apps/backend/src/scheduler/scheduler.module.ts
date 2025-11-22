@@ -1,26 +1,43 @@
-import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
-import { NavasanSchedulerService } from './navasan-scheduler.service';
-import { OhlcCleanupSchedulerService } from './ohlc-cleanup-scheduler.service';
-import { ScheduleConfigService } from './schedule-config.service';
-import { SchedulerController } from './scheduler.controller';
-import { NavasanModule } from '../navasan/navasan.module';
+import { Module } from "@nestjs/common";
+import { ScheduleModule } from "@nestjs/schedule";
+import { MongooseModule } from "@nestjs/mongoose";
+import { OhlcAggregationScheduler } from "./ohlc-aggregation.scheduler";
+import { DataRetentionScheduler } from "./data-retention.scheduler";
+import {
+  IntradayOhlc,
+  IntradayOhlcSchema,
+} from "../schemas/intraday-ohlc.schema";
+import {
+  HistoricalOhlc,
+  HistoricalOhlcSchema,
+} from "../schemas/historical-ohlc.schema";
+import {
+  PriceSnapshot,
+  PriceSnapshotSchema,
+} from "../navasan/schemas/price-snapshot.schema";
+import {
+  OhlcSnapshot,
+  OhlcSnapshotSchema,
+} from "../navasan/schemas/ohlc-snapshot.schema";
 
+/**
+ * Scheduler Module
+ *
+ * Manages all scheduled tasks for the application:
+ * - OHLC data aggregation (daily, weekly, monthly)
+ * - Data retention and cleanup
+ */
 @Module({
   imports: [
-    ScheduleModule.forRoot(), // Enable cron functionality
-    NavasanModule, // Import to use NavasanService and OhlcSnapshot model
+    ScheduleModule.forRoot(),
+    MongooseModule.forFeature([
+      { name: IntradayOhlc.name, schema: IntradayOhlcSchema },
+      { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
+      { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
+      { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
+    ]),
   ],
-  controllers: [SchedulerController],
-  providers: [
-    ScheduleConfigService, // Dynamic scheduling configuration
-    NavasanSchedulerService,
-    OhlcCleanupSchedulerService,
-  ],
-  exports: [
-    ScheduleConfigService,
-    NavasanSchedulerService,
-    OhlcCleanupSchedulerService,
-  ], // Export for potential use in other modules
+  providers: [OhlcAggregationScheduler, DataRetentionScheduler],
+  exports: [OhlcAggregationScheduler, DataRetentionScheduler],
 })
 export class SchedulerModule {}

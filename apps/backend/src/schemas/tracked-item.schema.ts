@@ -1,14 +1,14 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type TrackedItemDocument = TrackedItem & Document;
 
-@Schema({ collection: 'tracked_items', timestamps: true })
+@Schema({ collection: "tracked_items", timestamps: true })
 export class TrackedItem {
   @Prop({ required: true })
   code: string; // e.g., 'usd_sell', 'btc', 'gold_18k'
 
-  @Prop({ required: true, enum: ['currency', 'crypto', 'gold', 'coin'] })
+  @Prop({ required: true, enum: ["currency", "crypto", "gold", "coin"] })
   type: string;
 
   @Prop({ required: true })

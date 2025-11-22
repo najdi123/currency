@@ -1,9 +1,9 @@
-import { Controller, Post, Get, Put, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles/roles.guard';
-import { Roles } from '../auth/roles/roles.decorator';
-import { NavasanSchedulerService } from './navasan-scheduler.service';
-import { IsInt, Min, Max } from 'class-validator';
+import { Controller, Post, Get, Put, Body, UseGuards } from "@nestjs/common";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/roles/roles.guard";
+import { Roles } from "../auth/roles/roles.decorator";
+import { NavasanSchedulerService } from "./navasan-scheduler.service";
+import { IsInt, Min, Max } from "class-validator";
 
 // DTO for updating interval
 class UpdateIntervalDto {
@@ -13,12 +13,10 @@ class UpdateIntervalDto {
   intervalMinutes!: number;
 }
 
-@Controller('scheduler')
+@Controller("scheduler")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SchedulerController {
-  constructor(
-    private readonly schedulerService: NavasanSchedulerService,
-  ) {}
+  constructor(private readonly schedulerService: NavasanSchedulerService) {}
 
   /**
    * Trigger manual fetch (admin only)
@@ -28,8 +26,8 @@ export class SchedulerController {
    * curl -X POST http://localhost:4000/scheduler/trigger \
    *   -H "Authorization: Bearer YOUR_ADMIN_JWT"
    */
-  @Post('trigger')
-  @Roles('admin')
+  @Post("trigger")
+  @Roles("admin")
   async triggerManualFetch() {
     return this.schedulerService.triggerManualFetch();
   }
@@ -45,8 +43,8 @@ export class SchedulerController {
    * - timezone: Scheduler timezone
    * - nextRun: Next scheduled execution time
    */
-  @Get('config')
-  @Roles('admin')
+  @Get("config")
+  @Roles("admin")
   getConfig() {
     return this.schedulerService.getSchedulerConfig();
   }
@@ -63,8 +61,8 @@ export class SchedulerController {
    *   -H "Content-Type: application/json" \
    *   -d '{"intervalMinutes": 30}'
    */
-  @Put('interval')
-  @Roles('admin')
+  @Put("interval")
+  @Roles("admin")
   async updateInterval(@Body() dto: UpdateIntervalDto) {
     await this.schedulerService.updateInterval(dto.intervalMinutes);
     return {
@@ -80,8 +78,8 @@ export class SchedulerController {
    *
    * Legacy endpoint - use /scheduler/config instead
    */
-  @Get('next-run')
-  @Roles('admin')
+  @Get("next-run")
+  @Roles("admin")
   getNextRun() {
     return {
       nextRun: this.schedulerService.getNextRunTime(),

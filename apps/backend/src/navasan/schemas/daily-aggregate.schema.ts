@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type DailyAggregateDocument = DailyAggregate & Document;
 
@@ -20,7 +20,7 @@ export type DailyAggregateDocument = DailyAggregate & Document;
  * Storage estimate: ~365 records/year per item = manageable long-term growth
  */
 @Schema({
-  collection: 'daily_aggregates',
+  collection: "daily_aggregates",
   timestamps: true,
 })
 export class DailyAggregate {
@@ -86,10 +86,14 @@ export class DailyAggregate {
   average!: number;
 }
 
-export const DailyAggregateSchema = SchemaFactory.createForClass(DailyAggregate);
+export const DailyAggregateSchema =
+  SchemaFactory.createForClass(DailyAggregate);
 
 // Compound unique index to prevent duplicate daily records
-DailyAggregateSchema.index({ itemType: 1, itemCode: 1, date: 1 }, { unique: true });
+DailyAggregateSchema.index(
+  { itemType: 1, itemCode: 1, date: 1 },
+  { unique: true },
+);
 
 // Index for efficient time-series queries
 DailyAggregateSchema.index({ itemCode: 1, date: -1 });

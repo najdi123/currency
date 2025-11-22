@@ -1,23 +1,23 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type OHLCPermanentDocument = OHLCPermanent & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'ohlc_permanent'
+  collection: "ohlc_permanent",
 })
 export class OHLCPermanent {
   @Prop({ required: true, index: true })
   itemCode!: string;
 
-  @Prop({ required: true, enum: ['currency', 'crypto', 'gold'] })
+  @Prop({ required: true, enum: ["currency", "crypto", "gold"] })
   itemType!: string;
 
   @Prop({ required: true, index: true })
   timestamp!: Date;
 
-  @Prop({ required: true, enum: ['1m', '5m', '15m', '1h', '1d', '1w', '1M'] })
+  @Prop({ required: true, enum: ["1m", "5m", "15m", "1h", "1d", "1w", "1M"] })
   timeframe!: string;
 
   @Prop({ required: true })
@@ -35,7 +35,7 @@ export class OHLCPermanent {
   @Prop({ default: null })
   volume!: number;
 
-  @Prop({ required: true, enum: ['api', 'calculated', 'interpolated'] })
+  @Prop({ required: true, enum: ["api", "calculated", "interpolated"] })
   source!: string;
 
   @Prop({ default: Date.now })
@@ -56,7 +56,7 @@ export const OHLCPermanentSchema = SchemaFactory.createForClass(OHLCPermanent);
 // Create compound unique index
 OHLCPermanentSchema.index(
   { itemCode: 1, itemType: 1, timeframe: 1, timestamp: 1 },
-  { unique: true }
+  { unique: true },
 );
 
 // Additional performance indexes

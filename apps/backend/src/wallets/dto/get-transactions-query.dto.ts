@@ -1,11 +1,11 @@
-import { IsOptional, IsEnum, IsString, Length, Matches } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PaginationDto } from '../../common/dto/pagination.dto';
+import { IsOptional, IsEnum, IsString, Length, Matches } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { PaginationDto } from "../../common/dto/pagination.dto";
 
 export class GetTransactionsQueryDto extends PaginationDto {
   @ApiPropertyOptional({
-    description: 'Filter by currency code',
-    example: 'USD',
+    description: "Filter by currency code",
+    example: "USD",
   })
   @IsOptional()
   @IsString()
@@ -14,11 +14,11 @@ export class GetTransactionsQueryDto extends PaginationDto {
   currencyCode?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by transaction direction',
-    enum: ['credit', 'debit'],
-    example: 'credit',
+    description: "Filter by transaction direction",
+    enum: ["credit", "debit"],
+    example: "credit",
   })
   @IsOptional()
-  @IsEnum(['credit', 'debit'])
-  direction?: 'credit' | 'debit';
+  @IsEnum(["credit", "debit"])
+  direction?: "credit" | "debit";
 }

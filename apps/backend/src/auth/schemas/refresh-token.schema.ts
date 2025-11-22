@@ -1,12 +1,17 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import * as mongoose from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
+import * as mongoose from "mongoose";
 
 export type RefreshTokenDocument = RefreshToken & Document;
 
-@Schema({ timestamps: true, collection: 'refresh_tokens' })
+@Schema({ timestamps: true, collection: "refresh_tokens" })
 export class RefreshToken {
-  @Prop({ required: true, type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true })
+  @Prop({
+    required: true,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    index: true,
+  })
   userId!: mongoose.Types.ObjectId;
 
   @Prop({ required: true, unique: true, index: true })

@@ -5,27 +5,27 @@
 
 export enum PersianAPICategory {
   // Currency categories
-  CURRENCY_FREE = 'ارز آزاد',
-  CURRENCY_OFFICIAL = 'ارز دولتی',
-  CURRENCY_SANA_BUY = 'ارز سنا (اسکناس / خرید)',
-  CURRENCY_SANA_SELL = 'ارز سنا (اسکناس / فروش)',
-  CURRENCY_NIMA_SELL = 'ارز نیما (حواله / فروش)',
+  CURRENCY_FREE = "ارز آزاد",
+  CURRENCY_OFFICIAL = "ارز دولتی",
+  CURRENCY_SANA_BUY = "ارز سنا (اسکناس / خرید)",
+  CURRENCY_SANA_SELL = "ارز سنا (اسکناس / فروش)",
+  CURRENCY_NIMA_SELL = "ارز نیما (حواله / فروش)",
 
   // Gold categories
-  GOLD = 'طلا',
-  GOLD_OUNCE = 'انس های جهانی',
+  GOLD = "طلا",
+  GOLD_OUNCE = "انس های جهانی",
 
   // Coin categories
-  COIN_CASH = 'سکه نقدی',
-  MESGHAL = 'مظنه / مثقال',
-  ABSHODEH = 'آبشده',
+  COIN_CASH = "سکه نقدی",
+  MESGHAL = "مظنه / مثقال",
+  ABSHODEH = "آبشده",
 
   // Other
-  SILVER = 'نقره',
+  SILVER = "نقره",
 }
 
 export interface CategorizedItem {
-  type: 'currency' | 'gold' | 'coin' | 'unknown';
+  type: "currency" | "gold" | "coin" | "unknown";
   item: any;
 }
 
@@ -61,12 +61,15 @@ export class CategoryMatcher {
     const normalized = category.trim();
 
     // Exact match
-    if (this.currencyCategories.some(cat => normalized === cat)) {
+    if (this.currencyCategories.some((cat) => normalized === cat)) {
       return true;
     }
 
     // Partial match
-    if (normalized.includes('ارز') || normalized.toLowerCase().includes('currency')) {
+    if (
+      normalized.includes("ارز") ||
+      normalized.toLowerCase().includes("currency")
+    ) {
       return true;
     }
 
@@ -81,12 +84,15 @@ export class CategoryMatcher {
     const normalized = category.trim();
 
     // Exact match
-    if (this.goldCategories.some(cat => normalized === cat)) {
+    if (this.goldCategories.some((cat) => normalized === cat)) {
       return true;
     }
 
     // Partial match
-    if (normalized.includes('طلا') || normalized.toLowerCase().includes('gold')) {
+    if (
+      normalized.includes("طلا") ||
+      normalized.toLowerCase().includes("gold")
+    ) {
       return true;
     }
 
@@ -101,12 +107,15 @@ export class CategoryMatcher {
     const normalized = category.trim();
 
     // Exact match (consistent with isCurrency and isGold)
-    if (this.coinCategories.some(cat => normalized === cat)) {
+    if (this.coinCategories.some((cat) => normalized === cat)) {
       return true;
     }
 
     // Partial match as fallback
-    if (normalized.includes('سکه') || normalized.toLowerCase().includes('coin')) {
+    if (
+      normalized.includes("سکه") ||
+      normalized.toLowerCase().includes("coin")
+    ) {
       return true;
     }
 
@@ -126,7 +135,7 @@ export class CategoryMatcher {
     const coins: any[] = [];
 
     for (const item of items) {
-      const category = item.category || item.Category || '';
+      const category = item.category || item.Category || "";
 
       if (this.isCurrency(category)) {
         currencies.push(item);
@@ -144,10 +153,12 @@ export class CategoryMatcher {
   /**
    * Get the item type for a given category
    */
-  getItemType(category: string | undefined): 'currency' | 'gold' | 'coin' | 'unknown' {
-    if (this.isCurrency(category)) return 'currency';
-    if (this.isGold(category)) return 'gold';
-    if (this.isCoin(category)) return 'coin';
-    return 'unknown';
+  getItemType(
+    category: string | undefined,
+  ): "currency" | "gold" | "coin" | "unknown" {
+    if (this.isCurrency(category)) return "currency";
+    if (this.isGold(category)) return "gold";
+    if (this.isCoin(category)) return "coin";
+    return "unknown";
   }
 }

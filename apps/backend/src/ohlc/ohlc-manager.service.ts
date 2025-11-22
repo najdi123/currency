@@ -1,8 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { OHLCPermanent, OHLCPermanentDocument } from '../navasan/schemas/ohlc-permanent.schema';
-import { UpdateLog, UpdateLogDocument } from '../navasan/schemas/update-log.schema';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import {
+  OHLCPermanent,
+  OHLCPermanentDocument,
+} from "../navasan/schemas/ohlc-permanent.schema";
+import {
+  UpdateLog,
+  UpdateLogDocument,
+} from "../navasan/schemas/update-log.schema";
 
 @Injectable()
 export class OHLCManagerService {
@@ -24,7 +30,7 @@ export class OHLCManagerService {
     }
 
     const startTime = Date.now();
-    const bulkOps = data.map(item => ({
+    const bulkOps = data.map((item) => ({
       updateOne: {
         filter: {
           itemCode: item.itemCode,
@@ -55,7 +61,7 @@ export class OHLCManagerService {
       const duration = Date.now() - startTime;
 
       this.logger.log(
-        `Saved OHLC data: ${result.upsertedCount} new, ${result.modifiedCount} updated (${duration}ms)`
+        `Saved OHLC data: ${result.upsertedCount} new, ${result.modifiedCount} updated (${duration}ms)`,
       );
 
       // Log the update
@@ -64,16 +70,20 @@ export class OHLCManagerService {
           itemCode: data[0].itemCode,
           itemType: data[0].itemType,
           timeframe: data[0].timeframe,
-          startDate: new Date(Math.min(...data.map(d => d.timestamp?.getTime() || 0))),
-          endDate: new Date(Math.max(...data.map(d => d.timestamp?.getTime() || 0))),
-          updateType: 'realtime',
+          startDate: new Date(
+            Math.min(...data.map((d) => d.timestamp?.getTime() || 0)),
+          ),
+          endDate: new Date(
+            Math.max(...data.map((d) => d.timestamp?.getTime() || 0)),
+          ),
+          updateType: "realtime",
           recordsAffected: result.upsertedCount + result.modifiedCount,
-          status: 'success',
+          status: "success",
           duration,
         });
       }
     } catch (error) {
-      this.logger.error('Failed to save OHLC data', error);
+      this.logger.error("Failed to save OHLC data", error);
       throw error;
     }
   }
@@ -130,7 +140,9 @@ export class OHLCManagerService {
       );
 
       if (sourceData.length === 0) {
-        this.logger.warn(`No source data found for aggregation: ${itemCode} ${sourceTimeframe}`);
+        this.logger.warn(
+          `No source data found for aggregation: ${itemCode} ${sourceTimeframe}`,
+        );
         return;
       }
 
@@ -138,29 +150,34 @@ export class OHLCManagerService {
       const grouped = this.groupByPeriod(sourceData, periodMs);
 
       // Convert grouped data to OHLC format
-      const aggregatedData = Array.from(grouped.entries()).map(([periodStart, points]) => ({
-        itemCode,
-        itemType,
-        timeframe: targetTimeframe,
-        timestamp: new Date(periodStart),
-        open: points[0].open,
-        high: Math.max(...points.map(p => p.high)),
-        low: Math.min(...points.map(p => p.low)),
-        close: points[points.length - 1].close,
-        volume: points.reduce((sum, p) => sum + (p.volume || 0), 0),
-        source: 'calculated' as const,
-        isComplete: true,
-        hasMissingData: points.some(p => p.hasMissingData),
-      }));
+      const aggregatedData = Array.from(grouped.entries()).map(
+        ([periodStart, points]) => ({
+          itemCode,
+          itemType,
+          timeframe: targetTimeframe,
+          timestamp: new Date(periodStart),
+          open: points[0].open,
+          high: Math.max(...points.map((p) => p.high)),
+          low: Math.min(...points.map((p) => p.low)),
+          close: points[points.length - 1].close,
+          volume: points.reduce((sum, p) => sum + (p.volume || 0), 0),
+          source: "calculated" as const,
+          isComplete: true,
+          hasMissingData: points.some((p) => p.hasMissingData),
+        }),
+      );
 
       await this.saveOHLCData(aggregatedData);
 
       const duration = Date.now() - startTime;
       this.logger.log(
-        `Aggregated ${sourceData.length} ${sourceTimeframe} records to ${aggregatedData.length} ${targetTimeframe} records for ${itemCode} (${duration}ms)`
+        `Aggregated ${sourceData.length} ${sourceTimeframe} records to ${aggregatedData.length} ${targetTimeframe} records for ${itemCode} (${duration}ms)`,
       );
     } catch (error) {
-      this.logger.error(`Failed to aggregate timeframes for ${itemCode}`, error);
+      this.logger.error(
+        `Failed to aggregate timeframes for ${itemCode}`,
+        error,
+      );
       throw error;
     }
   }
@@ -193,7 +210,9 @@ export class OHLCManagerService {
       return;
     }
 
-    this.logger.log(`Found ${gaps.length} gaps in ${itemCode} ${timeframe} data`);
+    this.logger.log(
+      `Found ${gaps.length} gaps in ${itemCode} ${timeframe} data`,
+    );
 
     for (const gap of gaps) {
       await this.interpolateGap(
@@ -237,11 +256,26 @@ export class OHLCManagerService {
     coverage: number;
     missingPeriods: Array<{ start: Date; end: Date }>;
   }> {
-    const data = await this.getOHLCData(itemCode, itemType, timeframe, startDate, endDate);
-    const expectedPoints = this.getExpectedDataPoints(startDate, endDate, timeframe);
+    const data = await this.getOHLCData(
+      itemCode,
+      itemType,
+      timeframe,
+      startDate,
+      endDate,
+    );
+    const expectedPoints = this.getExpectedDataPoints(
+      startDate,
+      endDate,
+      timeframe,
+    );
     const actualPoints = data.length;
     const coverage = actualPoints / expectedPoints;
-    const missingPeriods = this.identifyGaps(data, timeframe, startDate, endDate);
+    const missingPeriods = this.identifyGaps(
+      data,
+      timeframe,
+      startDate,
+      endDate,
+    );
 
     return {
       expectedPoints,
@@ -260,7 +294,8 @@ export class OHLCManagerService {
     const grouped = new Map<number, OHLCPermanent[]>();
 
     for (const point of data) {
-      const periodStart = Math.floor(point.timestamp.getTime() / periodMs) * periodMs;
+      const periodStart =
+        Math.floor(point.timestamp.getTime() / periodMs) * periodMs;
 
       if (!grouped.has(periodStart)) {
         grouped.set(periodStart, []);
@@ -282,7 +317,10 @@ export class OHLCManagerService {
     const intervalMs = this.getTimeframeMs(timeframe);
 
     // Check for gap at the beginning
-    if (data.length > 0 && data[0].timestamp.getTime() - startDate.getTime() > intervalMs) {
+    if (
+      data.length > 0 &&
+      data[0].timestamp.getTime() - startDate.getTime() > intervalMs
+    ) {
       gaps.push({
         start: startDate,
         end: new Date(data[0].timestamp.getTime() - intervalMs),
@@ -303,7 +341,10 @@ export class OHLCManagerService {
     }
 
     // Check for gap at the end
-    if (data.length > 0 && endDate.getTime() - data[data.length - 1].timestamp.getTime() > intervalMs) {
+    if (
+      data.length > 0 &&
+      endDate.getTime() - data[data.length - 1].timestamp.getTime() > intervalMs
+    ) {
       gaps.push({
         start: new Date(data[data.length - 1].timestamp.getTime() + intervalMs),
         end: endDate,
@@ -323,11 +364,11 @@ export class OHLCManagerService {
   ): Promise<void> {
     // Find data points before and after the gap
     const before = existingData
-      .filter(d => d.timestamp < gapStart)
+      .filter((d) => d.timestamp < gapStart)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
 
     const after = existingData
-      .filter(d => d.timestamp > gapEnd)
+      .filter((d) => d.timestamp > gapEnd)
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())[0];
 
     if (!before || !after) {
@@ -353,7 +394,7 @@ export class OHLCManagerService {
         low: this.lerp(before.low, after.low, ratio),
         close: this.lerp(before.close, after.close, ratio),
         volume: 0,
-        source: 'interpolated',
+        source: "interpolated",
         isComplete: false,
         hasMissingData: true,
       });
@@ -363,7 +404,9 @@ export class OHLCManagerService {
 
     if (interpolatedData.length > 0) {
       await this.saveOHLCData(interpolatedData);
-      this.logger.log(`Interpolated ${interpolatedData.length} data points for ${itemCode}`);
+      this.logger.log(
+        `Interpolated ${interpolatedData.length} data points for ${itemCode}`,
+      );
     }
   }
 
@@ -373,13 +416,13 @@ export class OHLCManagerService {
 
   private getTimeframeMs(timeframe: string): number {
     const intervals: Record<string, number> = {
-      '1m': 60000,
-      '5m': 300000,
-      '15m': 900000,
-      '1h': 3600000,
-      '1d': 86400000,
-      '1w': 604800000,
-      '1M': 2592000000,
+      "1m": 60000,
+      "5m": 300000,
+      "15m": 900000,
+      "1h": 3600000,
+      "1d": 86400000,
+      "1w": 604800000,
+      "1M": 2592000000,
     };
     return intervals[timeframe] || 60000;
   }
@@ -401,7 +444,7 @@ export class OHLCManagerService {
         timestamp: new Date(),
       });
     } catch (error) {
-      this.logger.error('Failed to log update', error);
+      this.logger.error("Failed to log update", error);
     }
   }
 }

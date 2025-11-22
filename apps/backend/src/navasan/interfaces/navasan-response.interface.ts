@@ -50,18 +50,25 @@ export interface NavasanGoldResponse {
   nim?: NavasanPriceItem;
   rob?: NavasanPriceItem;
   gerami?: NavasanPriceItem;
-  '18ayar'?: NavasanPriceItem;
+  "18ayar"?: NavasanPriceItem;
 }
 
 /**
  * Combined response when fetching all items
  */
-export interface NavasanAllResponse extends NavasanCurrencyResponse, NavasanCryptoResponse, NavasanGoldResponse {}
+export interface NavasanAllResponse
+  extends NavasanCurrencyResponse,
+    NavasanCryptoResponse,
+    NavasanGoldResponse {}
 
 /**
  * Union type for any Navasan response
  */
-export type NavasanResponse = NavasanCurrencyResponse | NavasanCryptoResponse | NavasanGoldResponse | NavasanAllResponse;
+export type NavasanResponse =
+  | NavasanCurrencyResponse
+  | NavasanCryptoResponse
+  | NavasanGoldResponse
+  | NavasanAllResponse;
 
 /**
  * OHLC Data Point from Navasan API

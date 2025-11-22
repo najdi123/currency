@@ -1,9 +1,14 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { SchedulerRegistry, CronExpression } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
-import { CronJob } from 'cron';
-import { NavasanService } from '../navasan/navasan.service';
-import { ScheduleConfigService } from './schedule-config.service';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from "@nestjs/common";
+import { SchedulerRegistry, CronExpression } from "@nestjs/schedule";
+import { ConfigService } from "@nestjs/config";
+import { CronJob } from "cron";
+import { NavasanService } from "../navasan/navasan.service";
+import { ScheduleConfigService } from "./schedule-config.service";
 
 @Injectable()
 export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -43,22 +48,26 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    * Initialize scheduler with dynamic configuration
    */
   private initializeScheduler() {
-    const isEnabled = this.configService.get<string>('SCHEDULER_ENABLED', 'false') === 'true';
+    const isEnabled =
+      this.configService.get<string>("SCHEDULER_ENABLED", "false") === "true";
 
     if (!isEnabled) {
-      this.logger.warn('⚠️  Scheduler is DISABLED (set SCHEDULER_ENABLED=true to enable)');
+      this.logger.warn(
+        "⚠️  Scheduler is DISABLED (set SCHEDULER_ENABLED=true to enable)",
+      );
       return;
     }
 
     // Check if dynamic scheduling is enabled
     this.useDynamicScheduling =
-      this.configService.get<string>('SCHEDULER_USE_DYNAMIC', 'true') === 'true';
+      this.configService.get<string>("SCHEDULER_USE_DYNAMIC", "true") ===
+      "true";
 
     if (this.useDynamicScheduling) {
-      this.logger.log('🌟 Using DYNAMIC scheduling (time-of-day aware)');
+      this.logger.log("🌟 Using DYNAMIC scheduling (time-of-day aware)");
       this.startDynamicScheduler();
     } else {
-      this.logger.log('📅 Using STATIC scheduling (cron-based)');
+      this.logger.log("📅 Using STATIC scheduling (cron-based)");
       this.startStaticScheduler();
     }
   }
@@ -70,7 +79,9 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
     const currentPeriod = this.scheduleConfig.getCurrentSchedulePeriod();
     const intervalMinutes = this.scheduleConfig.getCurrentScheduleInterval();
     const nextRun = this.scheduleConfig.getNextScheduledTime();
-    const tehranTime = this.scheduleConfig.getTehranTime().format('YYYY-MM-DD HH:mm:ss');
+    const tehranTime = this.scheduleConfig
+      .getTehranTime()
+      .format("YYYY-MM-DD HH:mm:ss");
 
     this.logger.log(`✅ Dynamic Scheduler initialized`);
     this.logger.log(`   Current Period: ${currentPeriod}`);
@@ -98,7 +109,7 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(
       `⏰ Next fetch scheduled for ${nextTime.toISOString()} ` +
-      `(${currentPeriod}, ${intervalMinutes}m interval)`
+        `(${currentPeriod}, ${intervalMinutes}m interval)`,
     );
 
     this.dynamicTimeout = setTimeout(async () => {
@@ -113,12 +124,17 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   private startStaticScheduler() {
     // Get configuration
-    const customCron = this.configService.get<string>('SCHEDULER_CRON_EXPRESSION');
-    const intervalMinutes = parseInt(
-      this.configService.get<string>('SCHEDULER_INTERVAL_MINUTES', '60'),
-      10
+    const customCron = this.configService.get<string>(
+      "SCHEDULER_CRON_EXPRESSION",
     );
-    const timezone = this.configService.get<string>('SCHEDULER_TIMEZONE', 'UTC');
+    const intervalMinutes = parseInt(
+      this.configService.get<string>("SCHEDULER_INTERVAL_MINUTES", "60"),
+      10,
+    );
+    const timezone = this.configService.get<string>(
+      "SCHEDULER_TIMEZONE",
+      "UTC",
+    );
 
     // Determine cron expression
     let cronExpression: string;
@@ -127,7 +143,9 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`📅 Using custom cron expression: ${cronExpression}`);
     } else {
       cronExpression = this.intervalToCronExpression(intervalMinutes);
-      this.logger.log(`📅 Using interval-based cron: Every ${intervalMinutes} minute(s)`);
+      this.logger.log(
+        `📅 Using interval-based cron: Every ${intervalMinutes} minute(s)`,
+      );
     }
 
     // Create dynamic cron job
@@ -140,10 +158,12 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
     );
 
     // Register with scheduler registry
-    this.schedulerRegistry.addCronJob('navasan-dynamic-fetch', this.cronJob);
+    this.schedulerRegistry.addCronJob("navasan-dynamic-fetch", this.cronJob);
 
     const nextRun = this.cronJob.nextDate().toJSDate();
-    this.logger.log(`✅ Static Scheduler initialized. Next run: ${nextRun.toISOString()}`);
+    this.logger.log(
+      `✅ Static Scheduler initialized. Next run: ${nextRun.toISOString()}`,
+    );
   }
 
   /**
@@ -151,7 +171,7 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   private intervalToCronExpression(minutes: number): string {
     if (minutes < 1) {
-      this.logger.warn('⚠️  Invalid interval (<1 min), defaulting to 1 hour');
+      this.logger.warn("⚠️  Invalid interval (<1 min), defaulting to 1 hour");
       return CronExpression.EVERY_HOUR;
     }
 
@@ -177,7 +197,9 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   async fetchAllData() {
     if (this.fetchPromise) {
-      this.logger.warn('⚠️  Previous scheduled fetch still running, skipping...');
+      this.logger.warn(
+        "⚠️  Previous scheduled fetch still running, skipping...",
+      );
       return;
     }
 
@@ -195,45 +217,54 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   private async _doFetch() {
     const startTime = Date.now();
-    const intervalMinutes = this.configService.get<string>('SCHEDULER_INTERVAL_MINUTES', '60');
+    const intervalMinutes = this.configService.get<string>(
+      "SCHEDULER_INTERVAL_MINUTES",
+      "60",
+    );
 
     this.logger.log(
-      `⏰ === SCHEDULED FETCH STARTED (interval: ${intervalMinutes}m) ===`
+      `⏰ === SCHEDULED FETCH STARTED (interval: ${intervalMinutes}m) ===`,
     );
 
     try {
       // Use forceFetchAndCache for guaranteed API hits (bypasses fresh cache)
       const results = await Promise.allSettled([
-        this.navasanService.forceFetchAndCache('currencies'),
-        this.navasanService.forceFetchAndCache('crypto'),
-        this.navasanService.forceFetchAndCache('gold'),
+        this.navasanService.forceFetchAndCache("currencies"),
+        this.navasanService.forceFetchAndCache("crypto"),
+        this.navasanService.forceFetchAndCache("gold"),
       ]);
 
       const [currencies, crypto, gold] = results;
-      this.logForceFetchResult('Currencies', currencies);
-      this.logForceFetchResult('Crypto', crypto);
-      this.logForceFetchResult('Gold', gold);
+      this.logForceFetchResult("Currencies", currencies);
+      this.logForceFetchResult("Crypto", crypto);
+      this.logForceFetchResult("Gold", gold);
 
       const successCount = results.filter(
-        r => r.status === 'fulfilled' && r.value.success
+        (r) => r.status === "fulfilled" && r.value.success,
       ).length;
       const failureCount = results.filter(
-        r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)
+        (r) =>
+          r.status === "rejected" ||
+          (r.status === "fulfilled" && !r.value.success),
       ).length;
       const duration = Date.now() - startTime;
 
       this.logger.log(
         `⏰ === FETCH COMPLETED === ` +
-        `Success: ${successCount}/3 | Failed: ${failureCount}/3 | Duration: ${duration}ms`
+          `Success: ${successCount}/3 | Failed: ${failureCount}/3 | Duration: ${duration}ms`,
       );
 
       if (successCount === 0) {
-        this.logger.error('🚨 CRITICAL: All scheduled fetches failed! Check API key and connectivity.');
+        this.logger.error(
+          "🚨 CRITICAL: All scheduled fetches failed! Check API key and connectivity.",
+        );
       }
-
     } catch (error) {
       const err = error as Error;
-      this.logger.error(`❌ Unexpected error in scheduled fetch: ${err.message}`, err.stack);
+      this.logger.error(
+        `❌ Unexpected error in scheduled fetch: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
@@ -242,15 +273,17 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   private logForceFetchResult(
     category: string,
-    result: PromiseSettledResult<{ success: boolean; error?: string }>
+    result: PromiseSettledResult<{ success: boolean; error?: string }>,
   ) {
-    if (result.status === 'fulfilled' && result.value.success) {
+    if (result.status === "fulfilled" && result.value.success) {
       this.logger.log(`✅ ${category} force fetched successfully`);
-    } else if (result.status === 'fulfilled' && !result.value.success) {
-      this.logger.error(`❌ ${category} force fetch failed: ${result.value.error}`);
-    } else if (result.status === 'rejected') {
+    } else if (result.status === "fulfilled" && !result.value.success) {
       this.logger.error(
-        `❌ ${category} force fetch rejected: ${result.reason?.message || result.reason}`
+        `❌ ${category} force fetch failed: ${result.value.error}`,
+      );
+    } else if (result.status === "rejected") {
+      this.logger.error(
+        `❌ ${category} force fetch rejected: ${result.reason?.message || result.reason}`,
       );
     }
   }
@@ -259,10 +292,10 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    * Manual trigger for testing or admin panel
    */
   async triggerManualFetch(): Promise<{ success: boolean; message: string }> {
-    this.logger.log('🔧 Manual fetch triggered');
+    this.logger.log("🔧 Manual fetch triggered");
     try {
       await this.fetchAllData();
-      return { success: true, message: 'Manual fetch completed' };
+      return { success: true, message: "Manual fetch completed" };
     } catch (error) {
       const err = error as Error;
       return { success: false, message: `Manual fetch failed: ${err.message}` };
@@ -284,7 +317,7 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   getSchedulerConfig() {
     const baseConfig = {
-      enabled: this.configService.get<string>('SCHEDULER_ENABLED') === 'true',
+      enabled: this.configService.get<string>("SCHEDULER_ENABLED") === "true",
       useDynamicScheduling: this.useDynamicScheduling,
       nextRun: this.getNextRunTime(),
     };
@@ -292,21 +325,28 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
     if (this.useDynamicScheduling) {
       return {
         ...baseConfig,
-        type: 'dynamic',
+        type: "dynamic",
         currentPeriod: this.scheduleConfig.getCurrentSchedulePeriod(),
         currentInterval: this.scheduleConfig.getCurrentScheduleInterval(),
-        tehranTime: this.scheduleConfig.getTehranTime().format('YYYY-MM-DD HH:mm:ss'),
+        tehranTime: this.scheduleConfig
+          .getTehranTime()
+          .format("YYYY-MM-DD HH:mm:ss"),
         isPeakHours: this.scheduleConfig.isCurrentlyPeakHours(),
         isWeekend: this.scheduleConfig.isCurrentlyWeekend(),
-        minutesUntilPeriodChange: this.scheduleConfig.getMinutesUntilNextPeriodChange(),
+        minutesUntilPeriodChange:
+          this.scheduleConfig.getMinutesUntilNextPeriodChange(),
       };
     } else {
       return {
         ...baseConfig,
-        type: 'static',
-        intervalMinutes: this.configService.get<string>('SCHEDULER_INTERVAL_MINUTES'),
-        cronExpression: this.configService.get<string>('SCHEDULER_CRON_EXPRESSION'),
-        timezone: this.configService.get<string>('SCHEDULER_TIMEZONE'),
+        type: "static",
+        intervalMinutes: this.configService.get<string>(
+          "SCHEDULER_INTERVAL_MINUTES",
+        ),
+        cronExpression: this.configService.get<string>(
+          "SCHEDULER_CRON_EXPRESSION",
+        ),
+        timezone: this.configService.get<string>("SCHEDULER_TIMEZONE"),
       };
     }
   }
@@ -315,16 +355,21 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
    * Update scheduler interval at runtime (admin feature)
    */
   async updateInterval(newIntervalMinutes: number): Promise<void> {
-    this.logger.log(`🔧 Updating scheduler interval to ${newIntervalMinutes} minutes`);
+    this.logger.log(
+      `🔧 Updating scheduler interval to ${newIntervalMinutes} minutes`,
+    );
 
     // Remove old job
     if (this.cronJob) {
       this.cronJob.stop();
-      this.schedulerRegistry.deleteCronJob('navasan-dynamic-fetch');
+      this.schedulerRegistry.deleteCronJob("navasan-dynamic-fetch");
     }
 
     // Create new job with new interval
-    const timezone = this.configService.get<string>('SCHEDULER_TIMEZONE', 'UTC');
+    const timezone = this.configService.get<string>(
+      "SCHEDULER_TIMEZONE",
+      "UTC",
+    );
     const cronExpression = this.intervalToCronExpression(newIntervalMinutes);
 
     this.cronJob = new CronJob(
@@ -335,8 +380,10 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
       timezone,
     );
 
-    this.schedulerRegistry.addCronJob('navasan-dynamic-fetch', this.cronJob);
+    this.schedulerRegistry.addCronJob("navasan-dynamic-fetch", this.cronJob);
 
-    this.logger.log(`✅ Scheduler updated. Next run: ${this.getNextRunTime()?.toISOString()}`);
+    this.logger.log(
+      `✅ Scheduler updated. Next run: ${this.getNextRunTime()?.toISOString()}`,
+    );
   }
 }

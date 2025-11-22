@@ -1,10 +1,18 @@
-import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model, Types } from 'mongoose';
-import { Wallet, WalletDocument } from './schemas/wallet.schema';
-import { WalletTransaction, WalletTransactionDocument } from './schemas/wallet-transaction.schema';
-import { CurrencyType, TransactionDirection, TransactionReason } from './types';
-import { decimal128ToNumber, toDecimal128 } from '../common/utils/decimal';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from "@nestjs/common";
+import { InjectConnection, InjectModel } from "@nestjs/mongoose";
+import { Connection, Model, Types } from "mongoose";
+import { Wallet, WalletDocument } from "./schemas/wallet.schema";
+import {
+  WalletTransaction,
+  WalletTransactionDocument,
+} from "./schemas/wallet-transaction.schema";
+import { CurrencyType, TransactionDirection, TransactionReason } from "./types";
+import { decimal128ToNumber, toDecimal128 } from "../common/utils/decimal";
 
 @Injectable()
 export class WalletsService {
@@ -12,7 +20,8 @@ export class WalletsService {
 
   constructor(
     @InjectConnection() private readonly connection: Connection,
-    @InjectModel(Wallet.name) private readonly walletModel: Model<WalletDocument>,
+    @InjectModel(Wallet.name)
+    private readonly walletModel: Model<WalletDocument>,
     @InjectModel(WalletTransaction.name)
     private readonly txModel: Model<WalletTransactionDocument>,
   ) {}
@@ -21,7 +30,8 @@ export class WalletsService {
    * Get all wallets for a user
    */
   async getUserWallet(userId: string | Types.ObjectId) {
-    const uid = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+    const uid =
+      typeof userId === "string" ? new Types.ObjectId(userId) : userId;
     const docs = await this.walletModel.find({ userId: uid }).lean().exec();
     return docs.map((d) => ({
       ...d,
@@ -35,20 +45,24 @@ export class WalletsService {
    * This ensures every user has wallets ready for transactions
    */
   async createDefaultWallets(userId: string | Types.ObjectId): Promise<void> {
-    const uid = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+    const uid =
+      typeof userId === "string" ? new Types.ObjectId(userId) : userId;
 
     // Define default currencies to create wallets for
     // These are the most commonly used currencies in the system
-    const defaultCurrencies: Array<{ currencyType: CurrencyType; currencyCode: string }> = [
+    const defaultCurrencies: Array<{
+      currencyType: CurrencyType;
+      currencyCode: string;
+    }> = [
       // Fiat currencies
-      { currencyType: 'fiat' as CurrencyType, currencyCode: 'USD' },
-      { currencyType: 'fiat' as CurrencyType, currencyCode: 'EUR' },
+      { currencyType: "fiat" as CurrencyType, currencyCode: "USD" },
+      { currencyType: "fiat" as CurrencyType, currencyCode: "EUR" },
       // Cryptocurrencies
-      { currencyType: 'crypto' as CurrencyType, currencyCode: 'BTC' },
-      { currencyType: 'crypto' as CurrencyType, currencyCode: 'ETH' },
-      { currencyType: 'crypto' as CurrencyType, currencyCode: 'USDT' },
+      { currencyType: "crypto" as CurrencyType, currencyCode: "BTC" },
+      { currencyType: "crypto" as CurrencyType, currencyCode: "ETH" },
+      { currencyType: "crypto" as CurrencyType, currencyCode: "USDT" },
       // Gold (most popular)
-      { currencyType: 'gold' as CurrencyType, currencyCode: 'SEKKEH' },
+      { currencyType: "gold" as CurrencyType, currencyCode: "SEKKEH" },
     ];
 
     // Create wallet documents with 0 balance
@@ -64,7 +78,9 @@ export class WalletsService {
       // Use insertMany with ordered: false to insert as many as possible
       // even if some already exist (duplicate key errors)
       await this.walletModel.insertMany(wallets, { ordered: false });
-      this.logger.log(`Created ${wallets.length} default wallets for user ${userId}`);
+      this.logger.log(
+        `Created ${wallets.length} default wallets for user ${userId}`,
+      );
     } catch (error: any) {
       // If some wallets already exist (duplicate key error code 11000), that's okay
       // We only want to create the ones that don't exist yet
@@ -76,7 +92,9 @@ export class WalletsService {
             `Created ${insertedCount} default wallets for user ${userId} (${error.writeErrors?.length || 0} already existed)`,
           );
         } else {
-          this.logger.warn(`All default wallets already exist for user ${userId}`);
+          this.logger.warn(
+            `All default wallets already exist for user ${userId}`,
+          );
         }
       } else {
         // For other errors, log and re-throw
@@ -106,12 +124,16 @@ export class WalletsService {
     meta?: Record<string, unknown>;
   }) {
     const uid = new Types.ObjectId(params.userId);
-    const pid = params.processedBy ? new Types.ObjectId(params.processedBy) : undefined;
-    const rid = params.requestId ? new Types.ObjectId(params.requestId) : undefined;
+    const pid = params.processedBy
+      ? new Types.ObjectId(params.processedBy)
+      : undefined;
+    const rid = params.requestId
+      ? new Types.ObjectId(params.requestId)
+      : undefined;
 
     const positiveAmount = Number(params.amount);
     if (!Number.isFinite(positiveAmount) || positiveAmount <= 0) {
-      throw new BadRequestException('amount must be a positive number');
+      throw new BadRequestException("amount must be a positive number");
     }
 
     // Idempotency check (standalone-safe)
@@ -121,7 +143,9 @@ export class WalletsService {
         idempotencyKey: params.idempotencyKey,
       });
       if (dup) {
-        this.logger.log(`Skipping duplicate operation: ${params.idempotencyKey}`);
+        this.logger.log(
+          `Skipping duplicate operation: ${params.idempotencyKey}`,
+        );
         return dup.toJSON();
       }
     }
@@ -133,12 +157,13 @@ export class WalletsService {
     };
 
     // For debits, ensure sufficient balance atomically
-    if (params.direction === 'debit') {
+    if (params.direction === "debit") {
       query.amount = { $gte: toDecimal128(positiveAmount) };
     }
 
     // Calculate the delta for $inc operation
-    const delta = params.direction === 'credit' ? positiveAmount : -positiveAmount;
+    const delta =
+      params.direction === "credit" ? positiveAmount : -positiveAmount;
 
     // Attempt atomic update
     let wallet = await this.walletModel.findOneAndUpdate(
@@ -154,7 +179,7 @@ export class WalletsService {
 
     // Handle cases where atomic update failed
     if (!wallet) {
-      if (params.direction === 'debit') {
+      if (params.direction === "debit") {
         // Debit failed - either wallet doesn't exist or insufficient balance
         const existingWallet = await this.walletModel.findOne({
           userId: uid,
@@ -165,7 +190,7 @@ export class WalletsService {
             `Wallet not found for currency ${params.currencyCode}`,
           );
         }
-        throw new ForbiddenException('Insufficient balance');
+        throw new ForbiddenException("Insufficient balance");
       } else {
         // Credit failed - wallet doesn't exist, create it
         try {
@@ -191,7 +216,9 @@ export class WalletsService {
               { new: true },
             );
             if (!wallet) {
-              throw new BadRequestException('Failed to update wallet after retry');
+              throw new BadRequestException(
+                "Failed to update wallet after retry",
+              );
             }
           } else {
             throw error;
@@ -231,10 +258,11 @@ export class WalletsService {
       page: number;
       pageSize: number;
       currencyCode?: string;
-      direction?: 'credit' | 'debit';
+      direction?: "credit" | "debit";
     },
   ) {
-    const uid = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+    const uid =
+      typeof userId === "string" ? new Types.ObjectId(userId) : userId;
 
     const filter: any = { userId: uid };
     if (options.currencyCode) {

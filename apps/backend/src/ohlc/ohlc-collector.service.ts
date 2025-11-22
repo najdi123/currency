@@ -1,13 +1,13 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { ConfigService } from '@nestjs/config';
-import { NavasanService } from '../navasan/navasan.service';
-import { ChartService } from '../chart/chart.service';
-import { OHLCManagerService } from './ohlc-manager.service';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { ConfigService } from "@nestjs/config";
+import { NavasanService } from "../navasan/navasan.service";
+import { ChartService } from "../chart/chart.service";
+import { OHLCManagerService } from "./ohlc-manager.service";
 
 interface TrackedItem {
   code: string;
-  type: 'currency' | 'crypto' | 'gold';
+  type: "currency" | "crypto" | "gold";
   navasanKey?: string; // Optional: if the key in navasan response is different
 }
 
@@ -20,72 +20,92 @@ export class OHLCCollectorService implements OnModuleInit {
 
   private readonly ITEMS_TO_TRACK: TrackedItem[] = [
     // Currencies
-    { code: 'USD_SELL', type: 'currency', navasanKey: 'usd_sell' },
-    { code: 'USD_BUY', type: 'currency', navasanKey: 'usd_buy' },
-    { code: 'EUR', type: 'currency', navasanKey: 'eur' },
-    { code: 'GBP', type: 'currency', navasanKey: 'gbp' },
-    { code: 'CAD', type: 'currency', navasanKey: 'cad' },
-    { code: 'AUD', type: 'currency', navasanKey: 'aud' },
-    { code: 'AED', type: 'currency', navasanKey: 'aed' },
-    { code: 'AED_SELL', type: 'currency', navasanKey: 'aed_sell' },
-    { code: 'CNY', type: 'currency', navasanKey: 'cny' },
-    { code: 'TRY', type: 'currency', navasanKey: 'try' },
-    { code: 'CHF', type: 'currency', navasanKey: 'chf' },
-    { code: 'JPY', type: 'currency', navasanKey: 'jpy' },
-    { code: 'RUB', type: 'currency', navasanKey: 'rub' },
-    { code: 'INR', type: 'currency', navasanKey: 'inr' },
-    { code: 'PKR', type: 'currency', navasanKey: 'pkr' },
-    { code: 'IQD', type: 'currency', navasanKey: 'iqd' },
-    { code: 'KWD', type: 'currency', navasanKey: 'kwd' },
-    { code: 'SAR', type: 'currency', navasanKey: 'sar' },
-    { code: 'QAR', type: 'currency', navasanKey: 'qar' },
-    { code: 'OMR', type: 'currency', navasanKey: 'omr' },
-    { code: 'BHD', type: 'currency', navasanKey: 'bhd' },
+    { code: "USD_SELL", type: "currency", navasanKey: "usd_sell" },
+    { code: "USD_BUY", type: "currency", navasanKey: "usd_buy" },
+    { code: "EUR", type: "currency", navasanKey: "eur" },
+    { code: "GBP", type: "currency", navasanKey: "gbp" },
+    { code: "CAD", type: "currency", navasanKey: "cad" },
+    { code: "AUD", type: "currency", navasanKey: "aud" },
+    { code: "AED", type: "currency", navasanKey: "aed" },
+    { code: "AED_SELL", type: "currency", navasanKey: "aed_sell" },
+    { code: "CNY", type: "currency", navasanKey: "cny" },
+    { code: "TRY", type: "currency", navasanKey: "try" },
+    { code: "CHF", type: "currency", navasanKey: "chf" },
+    { code: "JPY", type: "currency", navasanKey: "jpy" },
+    { code: "RUB", type: "currency", navasanKey: "rub" },
+    { code: "INR", type: "currency", navasanKey: "inr" },
+    { code: "PKR", type: "currency", navasanKey: "pkr" },
+    { code: "IQD", type: "currency", navasanKey: "iqd" },
+    { code: "KWD", type: "currency", navasanKey: "kwd" },
+    { code: "SAR", type: "currency", navasanKey: "sar" },
+    { code: "QAR", type: "currency", navasanKey: "qar" },
+    { code: "OMR", type: "currency", navasanKey: "omr" },
+    { code: "BHD", type: "currency", navasanKey: "bhd" },
 
     // USD Variants
-    { code: 'USD_HARAT_SELL', type: 'currency', navasanKey: 'usd_harat_sell' },
-    { code: 'USD_HARAT_CASH_SELL', type: 'currency', navasanKey: 'usd_harat_cash_sell' },
-    { code: 'USD_HARAT_CASH_BUY', type: 'currency', navasanKey: 'usd_harat_cash_buy' },
-    { code: 'USD_FARDA_SELL', type: 'currency', navasanKey: 'usd_farda_sell' },
-    { code: 'USD_FARDA_BUY', type: 'currency', navasanKey: 'usd_farda_buy' },
-    { code: 'USD_SHAKHS', type: 'currency', navasanKey: 'usd_shakhs' },
-    { code: 'USD_SHERKAT', type: 'currency', navasanKey: 'usd_sherkat' },
-    { code: 'USD_PP', type: 'currency', navasanKey: 'usd_pp' },
-    { code: 'USD_MASHAD_SELL', type: 'currency', navasanKey: 'usd_mashad_sell' },
-    { code: 'USD_KORDESTAN_SELL', type: 'currency', navasanKey: 'usd_kordestan_sell' },
-    { code: 'USD_SOLEIMANIE_SELL', type: 'currency', navasanKey: 'usd_soleimanie_sell' },
+    { code: "USD_HARAT_SELL", type: "currency", navasanKey: "usd_harat_sell" },
+    {
+      code: "USD_HARAT_CASH_SELL",
+      type: "currency",
+      navasanKey: "usd_harat_cash_sell",
+    },
+    {
+      code: "USD_HARAT_CASH_BUY",
+      type: "currency",
+      navasanKey: "usd_harat_cash_buy",
+    },
+    { code: "USD_FARDA_SELL", type: "currency", navasanKey: "usd_farda_sell" },
+    { code: "USD_FARDA_BUY", type: "currency", navasanKey: "usd_farda_buy" },
+    { code: "USD_SHAKHS", type: "currency", navasanKey: "usd_shakhs" },
+    { code: "USD_SHERKAT", type: "currency", navasanKey: "usd_sherkat" },
+    { code: "USD_PP", type: "currency", navasanKey: "usd_pp" },
+    {
+      code: "USD_MASHAD_SELL",
+      type: "currency",
+      navasanKey: "usd_mashad_sell",
+    },
+    {
+      code: "USD_KORDESTAN_SELL",
+      type: "currency",
+      navasanKey: "usd_kordestan_sell",
+    },
+    {
+      code: "USD_SOLEIMANIE_SELL",
+      type: "currency",
+      navasanKey: "usd_soleimanie_sell",
+    },
 
     // Other currency variants
-    { code: 'DIRHAM_DUBAI', type: 'currency', navasanKey: 'dirham_dubai' },
-    { code: 'EUR_HAV', type: 'currency', navasanKey: 'eur_hav' },
-    { code: 'GBP_HAV', type: 'currency', navasanKey: 'gbp_hav' },
-    { code: 'GBP_WHT', type: 'currency', navasanKey: 'gbp_wht' },
-    { code: 'CAD_HAV', type: 'currency', navasanKey: 'cad_hav' },
-    { code: 'CAD_CASH', type: 'currency', navasanKey: 'cad_cash' },
-    { code: 'AUD_HAV', type: 'currency', navasanKey: 'aud_hav' },
-    { code: 'AUD_WHT', type: 'currency', navasanKey: 'aud_wht' },
+    { code: "DIRHAM_DUBAI", type: "currency", navasanKey: "dirham_dubai" },
+    { code: "EUR_HAV", type: "currency", navasanKey: "eur_hav" },
+    { code: "GBP_HAV", type: "currency", navasanKey: "gbp_hav" },
+    { code: "GBP_WHT", type: "currency", navasanKey: "gbp_wht" },
+    { code: "CAD_HAV", type: "currency", navasanKey: "cad_hav" },
+    { code: "CAD_CASH", type: "currency", navasanKey: "cad_cash" },
+    { code: "AUD_HAV", type: "currency", navasanKey: "aud_hav" },
+    { code: "AUD_WHT", type: "currency", navasanKey: "aud_wht" },
 
     // Cryptocurrencies
-    { code: 'USDT', type: 'crypto', navasanKey: 'usdt' },
-    { code: 'BTC', type: 'crypto', navasanKey: 'btc' },
-    { code: 'ETH', type: 'crypto', navasanKey: 'eth' },
-    { code: 'BNB', type: 'crypto', navasanKey: 'bnb' },
-    { code: 'XRP', type: 'crypto', navasanKey: 'xrp' },
-    { code: 'ADA', type: 'crypto', navasanKey: 'ada' },
-    { code: 'DOGE', type: 'crypto', navasanKey: 'doge' },
-    { code: 'SOL', type: 'crypto', navasanKey: 'sol' },
-    { code: 'MATIC', type: 'crypto', navasanKey: 'matic' },
-    { code: 'DOT', type: 'crypto', navasanKey: 'dot' },
-    { code: 'LTC', type: 'crypto', navasanKey: 'ltc' },
+    { code: "USDT", type: "crypto", navasanKey: "usdt" },
+    { code: "BTC", type: "crypto", navasanKey: "btc" },
+    { code: "ETH", type: "crypto", navasanKey: "eth" },
+    { code: "BNB", type: "crypto", navasanKey: "bnb" },
+    { code: "XRP", type: "crypto", navasanKey: "xrp" },
+    { code: "ADA", type: "crypto", navasanKey: "ada" },
+    { code: "DOGE", type: "crypto", navasanKey: "doge" },
+    { code: "SOL", type: "crypto", navasanKey: "sol" },
+    { code: "MATIC", type: "crypto", navasanKey: "matic" },
+    { code: "DOT", type: "crypto", navasanKey: "dot" },
+    { code: "LTC", type: "crypto", navasanKey: "ltc" },
 
     // Gold Items
-    { code: 'SEKKEH', type: 'gold', navasanKey: 'sekkeh' },
-    { code: 'BAHAR', type: 'gold', navasanKey: 'bahar' },
-    { code: 'NIM', type: 'gold', navasanKey: 'nim' },
-    { code: 'ROB', type: 'gold', navasanKey: 'rob' },
-    { code: 'GERAMI', type: 'gold', navasanKey: 'gerami' },
-    { code: '18AYAR', type: 'gold', navasanKey: '18ayar' },
-    { code: 'ABSHODEH', type: 'gold', navasanKey: 'abshodeh' },
+    { code: "SEKKEH", type: "gold", navasanKey: "sekkeh" },
+    { code: "BAHAR", type: "gold", navasanKey: "bahar" },
+    { code: "NIM", type: "gold", navasanKey: "nim" },
+    { code: "ROB", type: "gold", navasanKey: "rob" },
+    { code: "GERAMI", type: "gold", navasanKey: "gerami" },
+    { code: "18AYAR", type: "gold", navasanKey: "18ayar" },
+    { code: "ABSHODEH", type: "gold", navasanKey: "abshodeh" },
   ];
 
   constructor(
@@ -94,21 +114,31 @@ export class OHLCCollectorService implements OnModuleInit {
     private readonly ohlcManager: OHLCManagerService,
     private readonly configService: ConfigService,
   ) {
-    this.isEnabled = this.configService.get<string>('OHLC_COLLECTION_ENABLED', 'true') === 'true';
-    this.realtimeEnabled = this.configService.get<string>('OHLC_REALTIME_ENABLED', 'true') === 'true';
-    this.aggregationEnabled = this.configService.get<string>('OHLC_AGGREGATION_ENABLED', 'true') === 'true';
+    this.isEnabled =
+      this.configService.get<string>("OHLC_COLLECTION_ENABLED", "true") ===
+      "true";
+    this.realtimeEnabled =
+      this.configService.get<string>("OHLC_REALTIME_ENABLED", "true") ===
+      "true";
+    this.aggregationEnabled =
+      this.configService.get<string>("OHLC_AGGREGATION_ENABLED", "true") ===
+      "true";
 
     if (!this.isEnabled) {
-      this.logger.warn('OHLC collection is DISABLED');
+      this.logger.warn("OHLC collection is DISABLED");
     } else {
-      this.logger.log('OHLC collection is ENABLED');
+      this.logger.log("OHLC collection is ENABLED");
       this.logger.log(`Tracking ${this.ITEMS_TO_TRACK.length} items`);
     }
   }
 
   async onModuleInit() {
-    if (this.isEnabled && this.configService.get<string>('OHLC_BACKFILL_ON_STARTUP', 'false') === 'true') {
-      this.logger.log('Starting initial backfill...');
+    if (
+      this.isEnabled &&
+      this.configService.get<string>("OHLC_BACKFILL_ON_STARTUP", "false") ===
+        "true"
+    ) {
+      this.logger.log("Starting initial backfill...");
       await this.backfillRecentData();
     }
   }
@@ -123,14 +153,14 @@ export class OHLCCollectorService implements OnModuleInit {
     }
 
     const startTime = Date.now();
-    this.logger.debug('Starting minute OHLC collection');
+    this.logger.debug("Starting minute OHLC collection");
 
     try {
       // Get current prices from Navasan
       const response = await this.navasanService.getLatestRates();
 
       if (!response || !response.data) {
-        this.logger.warn('No data received from Navasan');
+        this.logger.warn("No data received from Navasan");
         return;
       }
 
@@ -150,7 +180,7 @@ export class OHLCCollectorService implements OnModuleInit {
           const existing = await this.ohlcManager.getOHLCData(
             item.code,
             item.type,
-            '1m',
+            "1m",
             timestamp,
             new Date(timestamp.getTime() + 59999), // End of the same minute
           );
@@ -160,14 +190,14 @@ export class OHLCCollectorService implements OnModuleInit {
             ohlcData.push({
               itemCode: item.code,
               itemType: item.type,
-              timeframe: '1m',
+              timeframe: "1m",
               timestamp,
               open: existing[0].open, // Keep original open
               high: Math.max(existing[0].high, price),
               low: Math.min(existing[0].low, price),
               close: price, // Update close
               volume: 0,
-              source: 'api',
+              source: "api",
               isComplete: false, // Will be true after minute ends
               hasMissingData: false,
             });
@@ -176,14 +206,14 @@ export class OHLCCollectorService implements OnModuleInit {
             ohlcData.push({
               itemCode: item.code,
               itemType: item.type,
-              timeframe: '1m',
+              timeframe: "1m",
               timestamp,
               open: price,
               high: price,
               low: price,
               close: price,
               volume: 0,
-              source: 'api',
+              source: "api",
               isComplete: false,
               hasMissingData: false,
             });
@@ -194,12 +224,14 @@ export class OHLCCollectorService implements OnModuleInit {
       if (ohlcData.length > 0) {
         await this.ohlcManager.saveOHLCData(ohlcData);
         const duration = Date.now() - startTime;
-        this.logger.log(`Collected ${ohlcData.length} minute OHLC records (${duration}ms)`);
+        this.logger.log(
+          `Collected ${ohlcData.length} minute OHLC records (${duration}ms)`,
+        );
       } else {
-        this.logger.warn('No valid price data to collect');
+        this.logger.warn("No valid price data to collect");
       }
     } catch (error) {
-      this.logger.error('Failed to collect minute data', error);
+      this.logger.error("Failed to collect minute data", error);
     }
   }
 
@@ -212,7 +244,7 @@ export class OHLCCollectorService implements OnModuleInit {
       return;
     }
 
-    this.logger.debug('Starting timeframe aggregation');
+    this.logger.debug("Starting timeframe aggregation");
     const startTime = Date.now();
 
     const endDate = new Date();
@@ -227,8 +259,8 @@ export class OHLCCollectorService implements OnModuleInit {
           await this.ohlcManager.aggregateTimeframes(
             item.code,
             item.type,
-            '1m',
-            '5m',
+            "1m",
+            "5m",
             startDate,
             endDate,
           );
@@ -237,8 +269,8 @@ export class OHLCCollectorService implements OnModuleInit {
           await this.ohlcManager.aggregateTimeframes(
             item.code,
             item.type,
-            '5m',
-            '15m',
+            "5m",
+            "15m",
             new Date(endDate.getTime() - 7200000), // Last 2 hours
             endDate,
           );
@@ -250,9 +282,11 @@ export class OHLCCollectorService implements OnModuleInit {
       }
 
       const duration = Date.now() - startTime;
-      this.logger.log(`Aggregated timeframes for ${totalAggregated} items (${duration}ms)`);
+      this.logger.log(
+        `Aggregated timeframes for ${totalAggregated} items (${duration}ms)`,
+      );
     } catch (error) {
-      this.logger.error('Failed to aggregate timeframes', error);
+      this.logger.error("Failed to aggregate timeframes", error);
     }
   }
 
@@ -265,7 +299,7 @@ export class OHLCCollectorService implements OnModuleInit {
       return;
     }
 
-    this.logger.debug('Starting hourly aggregation');
+    this.logger.debug("Starting hourly aggregation");
     const startTime = Date.now();
 
     const endDate = new Date();
@@ -278,20 +312,23 @@ export class OHLCCollectorService implements OnModuleInit {
           await this.ohlcManager.aggregateTimeframes(
             item.code,
             item.type,
-            '15m',
-            '1h',
+            "15m",
+            "1h",
             startDate,
             endDate,
           );
         } catch (error) {
-          this.logger.error(`Failed hourly aggregation for ${item.code}`, error);
+          this.logger.error(
+            `Failed hourly aggregation for ${item.code}`,
+            error,
+          );
         }
       }
 
       const duration = Date.now() - startTime;
       this.logger.log(`Completed hourly aggregation (${duration}ms)`);
     } catch (error) {
-      this.logger.error('Failed hourly aggregation', error);
+      this.logger.error("Failed hourly aggregation", error);
     }
   }
 
@@ -304,7 +341,7 @@ export class OHLCCollectorService implements OnModuleInit {
       return;
     }
 
-    this.logger.log('Starting daily aggregation');
+    this.logger.log("Starting daily aggregation");
     const startTime = Date.now();
 
     const endDate = new Date();
@@ -318,8 +355,8 @@ export class OHLCCollectorService implements OnModuleInit {
           await this.ohlcManager.aggregateTimeframes(
             item.code,
             item.type,
-            '1h',
-            '1d',
+            "1h",
+            "1d",
             startDate,
             endDate,
           );
@@ -328,7 +365,7 @@ export class OHLCCollectorService implements OnModuleInit {
           await this.ohlcManager.fillMissingData(
             item.code,
             item.type,
-            '1d',
+            "1d",
             new Date(endDate.getTime() - 30 * 86400000),
             endDate,
           );
@@ -340,7 +377,7 @@ export class OHLCCollectorService implements OnModuleInit {
       const duration = Date.now() - startTime;
       this.logger.log(`Completed daily aggregation (${duration}ms)`);
     } catch (error) {
-      this.logger.error('Failed daily aggregation', error);
+      this.logger.error("Failed daily aggregation", error);
     }
   }
 
@@ -349,20 +386,29 @@ export class OHLCCollectorService implements OnModuleInit {
    */
   async backfillHistoricalData(
     itemCode: string,
-    itemType: 'currency' | 'crypto' | 'gold',
+    itemType: "currency" | "crypto" | "gold",
     timeRange: string,
   ): Promise<void> {
     this.logger.log(`Backfilling ${itemCode} for ${timeRange}`);
 
     try {
       // Import TimeRange and ItemType from chart module
-      const { TimeRange, ItemType } = await import('../chart/dto/chart-query.dto');
+      const { TimeRange, ItemType } = await import(
+        "../chart/dto/chart-query.dto"
+      );
 
       // Convert string timeRange to TimeRange enum
-      const timeRangeEnum = TimeRange[timeRange.toUpperCase().replace(/(\d)([A-Z])/g, '$1_$2') as keyof typeof TimeRange] || TimeRange.ONE_MONTH;
+      const timeRangeEnum =
+        TimeRange[
+          timeRange
+            .toUpperCase()
+            .replace(/(\d)([A-Z])/g, "$1_$2") as keyof typeof TimeRange
+        ] || TimeRange.ONE_MONTH;
 
       // Convert itemType to ItemType enum
-      const itemTypeEnum = ItemType[itemType.toUpperCase() as keyof typeof ItemType] || ItemType.CURRENCY;
+      const itemTypeEnum =
+        ItemType[itemType.toUpperCase() as keyof typeof ItemType] ||
+        ItemType.CURRENCY;
 
       // Fetch from Navasan API via ChartService
       const chartData = await this.chartService.getChartData(
@@ -388,7 +434,7 @@ export class OHLCCollectorService implements OnModuleInit {
         low: point.low || point.value,
         close: point.close || point.value,
         volume: point.volume || 0,
-        source: 'api' as const,
+        source: "api" as const,
         isComplete: !!(point.open && point.high && point.low && point.close),
         hasMissingData: false,
       }));
@@ -396,7 +442,9 @@ export class OHLCCollectorService implements OnModuleInit {
       // Save to database
       await this.ohlcManager.saveOHLCData(ohlcData);
 
-      this.logger.log(`Backfilled ${ohlcData.length} records for ${itemCode} ${timeRange}`);
+      this.logger.log(
+        `Backfilled ${ohlcData.length} records for ${itemCode} ${timeRange}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to backfill ${itemCode} ${timeRange}`, error);
       throw error;
@@ -407,7 +455,7 @@ export class OHLCCollectorService implements OnModuleInit {
    * Backfill recent data for all items (last 7 days)
    */
   async backfillRecentData(): Promise<void> {
-    this.logger.log('Starting recent data backfill');
+    this.logger.log("Starting recent data backfill");
     const startTime = Date.now();
 
     let successCount = 0;
@@ -415,11 +463,11 @@ export class OHLCCollectorService implements OnModuleInit {
 
     for (const item of this.ITEMS_TO_TRACK) {
       try {
-        await this.backfillHistoricalData(item.code, item.type, '1w');
+        await this.backfillHistoricalData(item.code, item.type, "1w");
         successCount++;
 
         // Rate limiting - wait 500ms between requests
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
         failCount++;
         this.logger.error(`Failed to backfill ${item.code}`, error);
@@ -428,7 +476,7 @@ export class OHLCCollectorService implements OnModuleInit {
 
     const duration = Date.now() - startTime;
     this.logger.log(
-      `Backfill completed: ${successCount} success, ${failCount} failed (${duration}ms)`
+      `Backfill completed: ${successCount} success, ${failCount} failed (${duration}ms)`,
     );
   }
 
@@ -443,7 +491,7 @@ export class OHLCCollectorService implements OnModuleInit {
         return null;
       }
 
-      const price = typeof value === 'string' ? parseFloat(value) : value;
+      const price = typeof value === "string" ? parseFloat(value) : value;
 
       if (isNaN(price)) {
         return null;
@@ -451,20 +499,22 @@ export class OHLCCollectorService implements OnModuleInit {
 
       return price;
     } catch (error) {
-      this.logger.warn(`Failed to extract price for ${item.code}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Failed to extract price for ${item.code}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return null;
     }
   }
 
   private determineTimeframe(timeRange: string): string {
     const mapping: Record<string, string> = {
-      '1d': '15m',
-      '1w': '1h',
-      '1m': '1h',
-      '3m': '1d',
-      '1y': '1d',
-      'all': '1w',
+      "1d": "15m",
+      "1w": "1h",
+      "1m": "1h",
+      "3m": "1d",
+      "1y": "1d",
+      all: "1w",
     };
-    return mapping[timeRange] || '1h';
+    return mapping[timeRange] || "1h";
   }
 }

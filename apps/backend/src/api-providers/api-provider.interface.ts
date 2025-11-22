@@ -9,7 +9,7 @@
 export interface FetchParams {
   limit?: number;
   page?: number;
-  format?: 'json' | 'xml';
+  format?: "json" | "xml";
 }
 
 export interface RateLimitStatus {
@@ -19,45 +19,45 @@ export interface RateLimitStatus {
 }
 
 export interface CurrencyData {
-  code: string;           // e.g., 'usd_sell'
-  name: string;           // Display name
-  price: number;          // Current price
-  change?: number;        // 24h change amount
+  code: string; // e.g., 'usd_sell'
+  name: string; // Display name
+  price: number; // Current price
+  change?: number; // 24h change amount
   changePercent?: number; // 24h change percentage
-  high?: number;          // 24h high
-  low?: number;           // 24h low
-  updatedAt: Date;        // Last update timestamp
-  category?: string;      // e.g., 'major', 'minor'
+  high?: number; // 24h high
+  low?: number; // 24h low
+  updatedAt: Date; // Last update timestamp
+  category?: string; // e.g., 'major', 'minor'
 }
 
 export interface CryptoData {
-  code: string;           // e.g., 'btc'
-  name: string;           // e.g., 'Bitcoin'
-  symbol: string;         // e.g., 'BTC'
-  price: number;          // Current price in USD
-  priceIrt: number;       // Price in Iranian Rial
+  code: string; // e.g., 'btc'
+  name: string; // e.g., 'Bitcoin'
+  symbol: string; // e.g., 'BTC'
+  price: number; // Current price in USD
+  priceIrt: number; // Price in Iranian Rial
   high24h?: number;
   low24h?: number;
-  change1h?: number;      // 1 hour change %
-  change24h?: number;     // 24 hour change %
-  change7d?: number;      // 7 day change %
+  change1h?: number; // 1 hour change %
+  change24h?: number; // 24 hour change %
+  change7d?: number; // 7 day change %
   marketCap?: number;
   volume24h?: number;
   updatedAt: Date;
 }
 
 export interface GoldData {
-  code: string;           // e.g., 'sekkeh'
-  name: string;           // e.g., 'سکه امامی'
-  price: number;          // Current price
-  high?: number;          // Daily high
-  low?: number;           // Daily low
+  code: string; // e.g., 'sekkeh'
+  name: string; // e.g., 'سکه امامی'
+  price: number; // Current price
+  high?: number; // Daily high
+  low?: number; // Daily low
   updatedAt: Date;
-  category?: string;      // e.g., 'coin', 'bar'
+  category?: string; // e.g., 'coin', 'bar'
 }
 
 export interface CoinData {
-  code: string;           // e.g., 'bahar'
+  code: string; // e.g., 'bahar'
   name: string;
   price: number;
   high?: number;
@@ -68,7 +68,7 @@ export interface CoinData {
 export interface AvailableItem {
   code: string;
   name: string;
-  type: 'currency' | 'crypto' | 'gold' | 'coin';
+  type: "currency" | "crypto" | "gold" | "coin";
   category?: string;
 }
 
@@ -155,6 +155,6 @@ export class ApiProviderError extends Error {
     public retryable?: boolean,
   ) {
     super(message);
-    this.name = 'ApiProviderError';
+    this.name = "ApiProviderError";
   }
 }

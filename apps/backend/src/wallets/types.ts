@@ -1,9 +1,9 @@
-export type CurrencyType = 'fiat' | 'crypto' | 'gold';
+export type CurrencyType = "fiat" | "crypto" | "gold";
 
 export type TransactionReason =
-  | 'deposit'
-  | 'withdrawal'
-  | 'transfer'
-  | 'adjustment';
+  | "deposit"
+  | "withdrawal"
+  | "transfer"
+  | "adjustment";
 
-export type TransactionDirection = 'credit' | 'debit';
+export type TransactionDirection = "credit" | "debit";

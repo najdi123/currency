@@ -1,11 +1,11 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type AggregationRuleDocument = AggregationRule & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'ohlc_aggregation_rules'
+  collection: "ohlc_aggregation_rules",
 })
 export class AggregationRule {
   @Prop({ required: true })
@@ -14,7 +14,11 @@ export class AggregationRule {
   @Prop({ required: true })
   targetTimeframe!: string;
 
-  @Prop({ required: true, enum: ['standard', 'weighted', 'custom'], default: 'standard' })
+  @Prop({
+    required: true,
+    enum: ["standard", "weighted", "custom"],
+    default: "standard",
+  })
   aggregationMethod!: string;
 
   @Prop({ required: true, default: 1 })
@@ -36,9 +40,13 @@ export class AggregationRule {
   metadata!: Record<string, any>;
 }
 
-export const AggregationRuleSchema = SchemaFactory.createForClass(AggregationRule);
+export const AggregationRuleSchema =
+  SchemaFactory.createForClass(AggregationRule);
 
 // Create indexes
-AggregationRuleSchema.index({ sourceTimeframe: 1, targetTimeframe: 1 }, { unique: true });
+AggregationRuleSchema.index(
+  { sourceTimeframe: 1, targetTimeframe: 1 },
+  { unique: true },
+);
 AggregationRuleSchema.index({ enabled: 1 });
 AggregationRuleSchema.index({ lastExecuted: 1 });

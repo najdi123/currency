@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import moment from 'moment-timezone';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import moment from "moment-timezone";
 
 /**
  * Schedule Configuration for Dynamic Scheduling
@@ -49,13 +49,17 @@ export class ScheduleConfigService {
 
   constructor(private readonly configService: ConfigService) {
     this.config = this.loadConfiguration();
-    this.logger.log('📅 Schedule Configuration loaded:');
+    this.logger.log("📅 Schedule Configuration loaded:");
     this.logger.log(`   Timezone: ${this.config.timezone}`);
     this.logger.log(
-      `   Peak Hours: Mon-Wed ${this.config.peakHours.startHour}:00-${this.config.peakHours.endHour}:00 (${this.config.peakHours.interval}m)`
+      `   Peak Hours: Mon-Wed ${this.config.peakHours.startHour}:00-${this.config.peakHours.endHour}:00 (${this.config.peakHours.interval}m)`,
     );
-    this.logger.log(`   Normal Hours: Mon-Wed (${this.config.normalHours.interval}m)`);
-    this.logger.log(`   Weekends: Thu-Fri (${this.config.weekendHours.interval}m)`);
+    this.logger.log(
+      `   Normal Hours: Mon-Wed (${this.config.normalHours.interval}m)`,
+    );
+    this.logger.log(
+      `   Weekends: Thu-Fri (${this.config.weekendHours.interval}m)`,
+    );
   }
 
   /**
@@ -65,19 +69,34 @@ export class ScheduleConfigService {
     return {
       peakHours: {
         days: [1, 2, 3], // Monday, Tuesday, Wednesday
-        startHour: parseInt(this.configService.get('SCHEDULER_PEAK_START_HOUR', '8'), 10),
-        endHour: parseInt(this.configService.get('SCHEDULER_PEAK_END_HOUR', '14'), 10),
-        interval: parseInt(this.configService.get('SCHEDULER_PEAK_INTERVAL', '10'), 10),
+        startHour: parseInt(
+          this.configService.get("SCHEDULER_PEAK_START_HOUR", "8"),
+          10,
+        ),
+        endHour: parseInt(
+          this.configService.get("SCHEDULER_PEAK_END_HOUR", "14"),
+          10,
+        ),
+        interval: parseInt(
+          this.configService.get("SCHEDULER_PEAK_INTERVAL", "10"),
+          10,
+        ),
       },
       normalHours: {
         days: [1, 2, 3], // Monday, Tuesday, Wednesday
-        interval: parseInt(this.configService.get('SCHEDULER_NORMAL_INTERVAL', '60'), 10),
+        interval: parseInt(
+          this.configService.get("SCHEDULER_NORMAL_INTERVAL", "60"),
+          10,
+        ),
       },
       weekendHours: {
         days: [4, 5], // Thursday, Friday (Iranian weekend)
-        interval: parseInt(this.configService.get('SCHEDULER_WEEKEND_INTERVAL', '120'), 10),
+        interval: parseInt(
+          this.configService.get("SCHEDULER_WEEKEND_INTERVAL", "120"),
+          10,
+        ),
       },
-      timezone: this.configService.get('SCHEDULER_TIMEZONE', 'Asia/Tehran'),
+      timezone: this.configService.get("SCHEDULER_TIMEZONE", "Asia/Tehran"),
     };
   }
 
@@ -94,7 +113,7 @@ export class ScheduleConfigService {
     // Check if it's a weekend day
     if (this.config.weekendHours.days.includes(dayOfWeek)) {
       this.logger.debug(
-        `🌴 Weekend detected (day ${dayOfWeek}), using ${this.config.weekendHours.interval}m interval`
+        `🌴 Weekend detected (day ${dayOfWeek}), using ${this.config.weekendHours.interval}m interval`,
       );
       return this.config.weekendHours.interval;
     }
@@ -106,14 +125,14 @@ export class ScheduleConfigService {
       hour < this.config.peakHours.endHour
     ) {
       this.logger.debug(
-        `⚡ Peak hours detected (${hour}:00), using ${this.config.peakHours.interval}m interval`
+        `⚡ Peak hours detected (${hour}:00), using ${this.config.peakHours.interval}m interval`,
       );
       return this.config.peakHours.interval;
     }
 
     // Normal hours (weekday, non-peak)
     this.logger.debug(
-      `🕐 Normal hours (day ${dayOfWeek}, ${hour}:00), using ${this.config.normalHours.interval}m interval`
+      `🕐 Normal hours (day ${dayOfWeek}, ${hour}:00), using ${this.config.normalHours.interval}m interval`,
     );
     return this.config.normalHours.interval;
   }
@@ -127,7 +146,7 @@ export class ScheduleConfigService {
     const intervalMinutes = this.getCurrentScheduleInterval();
     return moment()
       .tz(this.config.timezone)
-      .add(intervalMinutes, 'minutes')
+      .add(intervalMinutes, "minutes")
       .toDate();
   }
 
@@ -142,7 +161,7 @@ export class ScheduleConfigService {
     const dayOfWeek = now.day();
 
     if (this.config.weekendHours.days.includes(dayOfWeek)) {
-      return 'Weekend';
+      return "Weekend";
     }
 
     if (
@@ -150,10 +169,10 @@ export class ScheduleConfigService {
       hour >= this.config.peakHours.startHour &&
       hour < this.config.peakHours.endHour
     ) {
-      return 'Peak Hours';
+      return "Peak Hours";
     }
 
-    return 'Normal Hours';
+    return "Normal Hours";
   }
 
   /**
@@ -181,9 +200,9 @@ export class ScheduleConfigService {
    * @param newConfig Partial configuration to update
    */
   updateConfiguration(newConfig: Partial<ScheduleConfig>): void {
-    this.logger.warn('⚠️  Updating schedule configuration at runtime');
+    this.logger.warn("⚠️  Updating schedule configuration at runtime");
     this.config = { ...this.config, ...newConfig };
-    this.logger.log('✅ Schedule configuration updated successfully');
+    this.logger.log("✅ Schedule configuration updated successfully");
   }
 
   /**
@@ -232,7 +251,7 @@ export class ScheduleConfigService {
         .minute(0)
         .second(0);
 
-      return peakEndTime.diff(now, 'minutes');
+      return peakEndTime.diff(now, "minutes");
     }
 
     // If on weekend, calculate minutes until Monday
@@ -246,10 +265,10 @@ export class ScheduleConfigService {
 
       // If Monday is in the past, add 7 days
       if (nextMonday.isBefore(now)) {
-        nextMonday.add(7, 'days');
+        nextMonday.add(7, "days");
       }
 
-      return nextMonday.diff(now, 'minutes');
+      return nextMonday.diff(now, "minutes");
     }
 
     // Normal hours on weekday - calculate minutes until peak hours start
@@ -261,9 +280,9 @@ export class ScheduleConfigService {
 
     // If peak start is in the past today, calculate for tomorrow
     if (nextPeakStart.isBefore(now)) {
-      nextPeakStart.add(1, 'day');
+      nextPeakStart.add(1, "day");
     }
 
-    return nextPeakStart.diff(now, 'minutes');
+    return nextPeakStart.diff(now, "minutes");
   }
 }

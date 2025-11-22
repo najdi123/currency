@@ -1,4 +1,4 @@
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
 /**
  * Decorator to skip rate limiting for specific routes
@@ -12,5 +12,5 @@ import { SetMetadata } from '@nestjs/common';
  * }
  * ```
  */
-export const SKIP_RATE_LIMIT_KEY = 'skipRateLimit';
+export const SKIP_RATE_LIMIT_KEY = "skipRateLimit";
 export const SkipRateLimit = () => SetMetadata(SKIP_RATE_LIMIT_KEY, true);

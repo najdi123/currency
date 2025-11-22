@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 
 /**
  * Metrics Service
@@ -41,7 +41,11 @@ export class MetricsService {
   /**
    * Track a snapshot save failure
    */
-  trackSnapshotFailure(itemType: string, itemCode: string, error: string): void {
+  trackSnapshotFailure(
+    itemType: string,
+    itemCode: string,
+    error: string,
+  ): void {
     const key = `${itemType}:${itemCode}`;
     const now = new Date();
 
@@ -65,12 +69,14 @@ export class MetricsService {
     const metric = this.snapshotFailures.get(key)!;
 
     // Log warning if threshold exceeded
-    if (metric.consecutiveFailures === this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+    if (
+      metric.consecutiveFailures === this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD
+    ) {
       this.logger.warn(
         `⚠️  ALERT: ${metric.consecutiveFailures} consecutive snapshot save failures for ${itemType}:${itemCode}`,
         {
           metric,
-          recommendation: 'Check database connection and disk space',
+          recommendation: "Check database connection and disk space",
         },
       );
     }
@@ -81,7 +87,8 @@ export class MetricsService {
         `🚨 CRITICAL ALERT: ${metric.consecutiveFailures} consecutive snapshot save failures for ${itemType}:${itemCode}`,
         {
           metric,
-          recommendation: 'Immediate investigation required - historical data may be lost',
+          recommendation:
+            "Immediate investigation required - historical data may be lost",
         },
       );
     }
@@ -114,7 +121,11 @@ export class MetricsService {
   /**
    * Track a database operation failure
    */
-  trackDbOperationFailure(operation: string, context: string, error: string): void {
+  trackDbOperationFailure(
+    operation: string,
+    context: string,
+    error: string,
+  ): void {
     const key = `${operation}:${context}`;
     const now = new Date();
 
@@ -138,12 +149,14 @@ export class MetricsService {
     const metric = this.dbOperationFailures.get(key)!;
 
     // Log warning if threshold exceeded
-    if (metric.consecutiveFailures === this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+    if (
+      metric.consecutiveFailures === this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD
+    ) {
       this.logger.warn(
         `⚠️  ALERT: ${metric.consecutiveFailures} consecutive DB operation failures for ${operation}`,
         {
           metric,
-          recommendation: 'Check database connection and credentials',
+          recommendation: "Check database connection and credentials",
         },
       );
     }
@@ -154,7 +167,8 @@ export class MetricsService {
         `🚨 CRITICAL ALERT: ${metric.consecutiveFailures} consecutive DB operation failures for ${operation}`,
         {
           metric,
-          recommendation: 'Database may be unavailable - immediate investigation required',
+          recommendation:
+            "Database may be unavailable - immediate investigation required",
         },
       );
     }
@@ -206,7 +220,9 @@ export class MetricsService {
         criticalIssues.push(
           `Critical: ${metric.consecutiveFailures} consecutive snapshot save failures for ${metric.itemType}:${metric.itemCode}`,
         );
-      } else if (metric.consecutiveFailures >= this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+      } else if (
+        metric.consecutiveFailures >= this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD
+      ) {
         warnings.push(
           `Warning: ${metric.consecutiveFailures} consecutive snapshot save failures for ${metric.itemType}:${metric.itemCode}`,
         );
@@ -219,7 +235,9 @@ export class MetricsService {
         criticalIssues.push(
           `Critical: ${metric.consecutiveFailures} consecutive DB operation failures for ${metric.operation}`,
         );
-      } else if (metric.consecutiveFailures >= this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+      } else if (
+        metric.consecutiveFailures >= this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD
+      ) {
         warnings.push(
           `Warning: ${metric.consecutiveFailures} consecutive DB operation failures for ${metric.operation}`,
         );
@@ -260,7 +278,7 @@ export class MetricsService {
     endpoint?: string,
     itemType?: string,
   ): void {
-    const key = `${identifier}:${endpoint || 'unknown'}:${itemType || 'unknown'}`;
+    const key = `${identifier}:${endpoint || "unknown"}:${itemType || "unknown"}`;
     const current = this.rateLimitQuotaConsumed.get(key) || 0;
     this.rateLimitQuotaConsumed.set(key, current + 1);
 
@@ -289,7 +307,8 @@ export class MetricsService {
       this.logger.warn(
         `⚠️  ALERT: ${this.rateLimitErrors} rate limit service errors detected`,
         {
-          recommendation: 'Check database connection and rate limit configuration',
+          recommendation:
+            "Check database connection and rate limit configuration",
         },
       );
     }
@@ -308,7 +327,7 @@ export class MetricsService {
     // Aggregate by identifier (remove endpoint/itemType breakdown)
     const consumedByIdentifier = new Map<string, number>();
     for (const [key, count] of this.rateLimitQuotaConsumed.entries()) {
-      const identifier = key.split(':')[0];
+      const identifier = key.split(":")[0];
       const current = consumedByIdentifier.get(identifier) || 0;
       consumedByIdentifier.set(identifier, current + count);
     }
@@ -329,10 +348,9 @@ export class MetricsService {
       (sum, count) => sum + count,
       0,
     );
-    const totalQuotaExhausted = Array.from(this.rateLimitQuotaExhausted.values()).reduce(
-      (sum, count) => sum + count,
-      0,
-    );
+    const totalQuotaExhausted = Array.from(
+      this.rateLimitQuotaExhausted.values(),
+    ).reduce((sum, count) => sum + count, 0);
 
     return {
       totalQuotaConsumed,
@@ -352,6 +370,6 @@ export class MetricsService {
     this.rateLimitQuotaConsumed.clear();
     this.rateLimitQuotaExhausted.clear();
     this.rateLimitErrors = 0;
-    this.logger.log('All metrics cleared');
+    this.logger.log("All metrics cleared");
   }
 }

@@ -1,18 +1,33 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { NavasanController } from './navasan.controller';
-import { NavasanService } from './navasan.service';
-import { IntradayOhlcService } from './services/intraday-ohlc.service';
-import { Cache, CacheSchema } from './schemas/cache.schema';
-import { PriceSnapshot, PriceSnapshotSchema } from './schemas/price-snapshot.schema';
-import { OhlcSnapshot, OhlcSnapshotSchema } from './schemas/ohlc-snapshot.schema';
-import { IntradayOhlc, IntradayOhlcSchema } from './schemas/intraday-ohlc.schema';
-import { OHLCPermanent, OHLCPermanentSchema } from './schemas/ohlc-permanent.schema';
-import { AggregationRule, AggregationRuleSchema } from './schemas/aggregation-rule.schema';
-import { UpdateLog, UpdateLogSchema } from './schemas/update-log.schema';
-import { MetricsModule } from '../metrics/metrics.module';
-import { ApiProvidersModule } from '../api-providers/api-providers.module';
-import { RateLimitModule } from '../rate-limit/rate-limit.module';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { NavasanController } from "./navasan.controller";
+import { NavasanService } from "./navasan.service";
+import { IntradayOhlcService } from "./services/intraday-ohlc.service";
+import { Cache, CacheSchema } from "./schemas/cache.schema";
+import {
+  PriceSnapshot,
+  PriceSnapshotSchema,
+} from "./schemas/price-snapshot.schema";
+import {
+  OhlcSnapshot,
+  OhlcSnapshotSchema,
+} from "./schemas/ohlc-snapshot.schema";
+import {
+  IntradayOhlc,
+  IntradayOhlcSchema,
+} from "./schemas/intraday-ohlc.schema";
+import {
+  OHLCPermanent,
+  OHLCPermanentSchema,
+} from "./schemas/ohlc-permanent.schema";
+import {
+  AggregationRule,
+  AggregationRuleSchema,
+} from "./schemas/aggregation-rule.schema";
+import { UpdateLog, UpdateLogSchema } from "./schemas/update-log.schema";
+import { MetricsModule } from "../metrics/metrics.module";
+import { ApiProvidersModule } from "../api-providers/api-providers.module";
+import { RateLimitModule } from "../rate-limit/rate-limit.module";
 
 @Module({
   imports: [

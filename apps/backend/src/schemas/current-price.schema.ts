@@ -1,9 +1,9 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type CurrentPriceDocument = CurrentPrice & Document;
 
-@Schema({ collection: 'current_prices', timestamps: true })
+@Schema({ collection: "current_prices", timestamps: true })
 export class CurrentPrice {
   @Prop({ required: true })
   itemCode: string; // References TrackedItem.code

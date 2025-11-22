@@ -1,12 +1,18 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { ConfigModule } from '@nestjs/config';
-import { ChartController } from './chart.controller';
-import { ChartService } from './chart.service';
-import { Cache, CacheSchema } from '../navasan/schemas/cache.schema';
-import { OhlcSnapshot, OhlcSnapshotSchema } from '../navasan/schemas/ohlc-snapshot.schema';
-import { PriceSnapshot, PriceSnapshotSchema } from '../navasan/schemas/price-snapshot.schema';
-import { MetricsModule } from '../metrics/metrics.module';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { ConfigModule } from "@nestjs/config";
+import { ChartController } from "./chart.controller";
+import { ChartService } from "./chart.service";
+import { Cache, CacheSchema } from "../navasan/schemas/cache.schema";
+import {
+  OhlcSnapshot,
+  OhlcSnapshotSchema,
+} from "../navasan/schemas/ohlc-snapshot.schema";
+import {
+  PriceSnapshot,
+  PriceSnapshotSchema,
+} from "../navasan/schemas/price-snapshot.schema";
+import { MetricsModule } from "../metrics/metrics.module";
 
 @Module({
   imports: [

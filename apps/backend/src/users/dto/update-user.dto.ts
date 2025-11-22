@@ -1,26 +1,26 @@
-import { IsOptional, IsString, IsEnum } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole, UserStatus } from '../schemas/user.schema';
+import { IsOptional, IsString, IsEnum } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { UserRole, UserStatus } from "../schemas/user.schema";
 
 export class UpdateUserDto {
   @ApiPropertyOptional({
-    description: 'User first name',
-    example: 'John',
+    description: "User first name",
+    example: "John",
   })
   @IsOptional()
   @IsString()
   firstName?: string;
 
   @ApiPropertyOptional({
-    description: 'User last name',
-    example: 'Doe',
+    description: "User last name",
+    example: "Doe",
   })
   @IsOptional()
   @IsString()
   lastName?: string;
 
   @ApiPropertyOptional({
-    description: 'User account status',
+    description: "User account status",
     enum: UserStatus,
     example: UserStatus.ACTIVE,
   })
@@ -29,7 +29,7 @@ export class UpdateUserDto {
   status?: UserStatus;
 
   @ApiPropertyOptional({
-    description: 'User role',
+    description: "User role",
     enum: UserRole,
     example: UserRole.USER,
   })

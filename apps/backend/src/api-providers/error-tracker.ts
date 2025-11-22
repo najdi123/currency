@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from "@nestjs/common";
 
 /**
  * Error statistics for a specific context
@@ -22,8 +22,10 @@ export class CircuitBreakerError extends Error {
     public readonly errorCount: number,
     public readonly threshold: number,
   ) {
-    super(`Circuit breaker triggered for ${context}: ${errorCount} errors (threshold: ${threshold})`);
-    this.name = 'CircuitBreakerError';
+    super(
+      `Circuit breaker triggered for ${context}: ${errorCount} errors (threshold: ${threshold})`,
+    );
+    this.name = "CircuitBreakerError";
   }
 }
 
@@ -33,12 +35,15 @@ export class CircuitBreakerError extends Error {
  */
 export class ErrorTracker {
   private readonly logger = new Logger(ErrorTracker.name);
-  private errors = new Map<string, {
-    count: number;
-    lastError: Error;
-    lastOccurrence: Date;
-    firstOccurrence: Date;
-  }>();
+  private errors = new Map<
+    string,
+    {
+      count: number;
+      lastError: Error;
+      lastOccurrence: Date;
+      firstOccurrence: Date;
+    }
+  >();
 
   // Circuit breaker threshold (consecutive errors before tripping)
   private readonly circuitBreakerThreshold: number;
@@ -85,16 +90,20 @@ export class ErrorTracker {
         if (existing.count >= this.circuitBreakerThreshold) {
           this.logger.error(
             `🔴 Circuit breaker TRIGGERED for "${context}": ` +
-            `${existing.count} consecutive errors in ${timeSinceFirst}ms ` +
-            `(threshold: ${this.circuitBreakerThreshold})`
+              `${existing.count} consecutive errors in ${timeSinceFirst}ms ` +
+              `(threshold: ${this.circuitBreakerThreshold})`,
           );
-          throw new CircuitBreakerError(context, existing.count, this.circuitBreakerThreshold);
+          throw new CircuitBreakerError(
+            context,
+            existing.count,
+            this.circuitBreakerThreshold,
+          );
         }
 
         if (existing.count >= 3) {
           this.logger.warn(
             `⚠️ Multiple errors for "${context}": ${existing.count} errors, ` +
-            `last: ${error.message}`
+              `last: ${error.message}`,
           );
         }
       }
@@ -115,7 +124,9 @@ export class ErrorTracker {
   resetError(context: string): void {
     const existing = this.errors.get(context);
     if (existing && existing.count > 1) {
-      this.logger.log(`✅ Recovered from errors in "${context}" (had ${existing.count} errors)`);
+      this.logger.log(
+        `✅ Recovered from errors in "${context}" (had ${existing.count} errors)`,
+      );
     }
     this.errors.delete(context);
   }
@@ -160,8 +171,8 @@ export class ErrorTracker {
       totalContexts: allStats.length,
       totalErrors: allStats.reduce((sum, s) => sum + s.count, 0),
       criticalContexts: allStats
-        .filter(s => s.count >= 3)
-        .map(s => s.context),
+        .filter((s) => s.count >= 3)
+        .map((s) => s.context),
       recentErrors: allStats
         .sort((a, b) => b.lastOccurrence.getTime() - a.lastOccurrence.getTime())
         .slice(0, 5),
@@ -173,7 +184,7 @@ export class ErrorTracker {
    */
   clear(): void {
     this.errors.clear();
-    this.logger.debug('Error tracking data cleared');
+    this.logger.debug("Error tracking data cleared");
   }
 
   /**

@@ -1,11 +1,27 @@
-import { Controller, Get, Logger, Res, Query, Param, NotFoundException, InternalServerErrorException, BadRequestException, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
-import { NavasanService } from './navasan.service';
-import { IntradayOhlcService } from './services/intraday-ohlc.service';
-import { parseTehranDate, getTehranToday, validateDateAge, formatTehranDate } from '../common/utils/date-utils';
-import { RateLimitGuard } from '../rate-limit/rate-limit.guard';
+import {
+  Controller,
+  Get,
+  Logger,
+  Res,
+  Query,
+  Param,
+  NotFoundException,
+  InternalServerErrorException,
+  BadRequestException,
+  UseGuards,
+} from "@nestjs/common";
+import { Response } from "express";
+import { NavasanService } from "./navasan.service";
+import { IntradayOhlcService } from "./services/intraday-ohlc.service";
+import {
+  parseTehranDate,
+  getTehranToday,
+  validateDateAge,
+  formatTehranDate,
+} from "../common/utils/date-utils";
+import { RateLimitGuard } from "../rate-limit/rate-limit.guard";
 
-@Controller('navasan')
+@Controller("navasan")
 @UseGuards(RateLimitGuard) // Apply rate limiting to all endpoints
 export class NavasanController {
   private readonly logger = new Logger(NavasanController.name);
@@ -20,32 +36,41 @@ export class NavasanController {
    * SECURITY FIX: Removes newlines, carriage returns, and control characters
    */
   private sanitizeHeaderValue(value: string): string {
-    if (!value) return '';
+    if (!value) return "";
     // Remove newlines, carriage returns, and other control characters
-    return value.replace(/[\r\n\x00-\x1f\x7f]/g, '');
+    return value.replace(/[\r\n\x00-\x1f\x7f]/g, "");
   }
 
   /**
    * GET /api/navasan/latest
    * Returns all latest prices (currencies, crypto, and gold)
    */
-  @Get('latest')
+  @Get("latest")
   async getLatest(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/latest - Fetching all latest rates');
+      this.logger.log("GET /api/navasan/latest - Fetching all latest rates");
 
       const response = await this.navasanService.getLatestRates();
 
       // Add metadata headers to communicate data freshness
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       // Return data with metadata
@@ -65,9 +90,9 @@ export class NavasanController {
    * @private
    */
   private async handleHistoricalRequest(
-    category: 'currencies' | 'crypto' | 'gold',
+    category: "currencies" | "crypto" | "gold",
     dateStr: string,
-    res: Response
+    res: Response,
   ) {
     try {
       let targetDate: Date;
@@ -88,22 +113,27 @@ export class NavasanController {
       }
 
       const formattedDate = formatTehranDate(targetDate);
-      this.logger.log(`GET /api/navasan/${category}/historical - Fetching ${category} data for ${formattedDate}`);
+      this.logger.log(
+        `GET /api/navasan/${category}/historical - Fetching ${category} data for ${formattedDate}`,
+      );
 
       // Fetch data from OHLC snapshots
-      const response = await this.navasanService.getHistoricalDataFromOHLC(category, targetDate);
+      const response = await this.navasanService.getHistoricalDataFromOHLC(
+        category,
+        targetDate,
+      );
 
       if (!response || !response.data) {
         throw new NotFoundException(
-          `No historical data available for ${formattedDate}`
+          `No historical data available for ${formattedDate}`,
         );
       }
 
       // Add metadata headers
-      res.setHeader('X-Data-Source', 'ohlc-snapshot');
-      res.setHeader('X-Is-Historical', 'true');
-      res.setHeader('X-Historical-Date', targetDate.toISOString());
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      res.setHeader("X-Data-Source", "ohlc-snapshot");
+      res.setHeader("X-Is-Historical", "true");
+      res.setHeader("X-Historical-Date", targetDate.toISOString());
+      res.setHeader("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
 
       return res.json({
         ...response.data,
@@ -111,8 +141,8 @@ export class NavasanController {
           ...response.metadata,
           isHistorical: true,
           historicalDate: targetDate.toISOString(),
-          source: 'ohlc-snapshot'
-        }
+          source: "ohlc-snapshot",
+        },
       });
     } catch (error) {
       this.logger.error(`Error fetching historical ${category} data:`, error);
@@ -129,16 +159,19 @@ export class NavasanController {
 
       // Database connection errors (503)
       if (error instanceof Error) {
-        if (error.name === 'MongoError' || error.message.includes('connection')) {
+        if (
+          error.name === "MongoError" ||
+          error.message.includes("connection")
+        ) {
           return res.status(503).json({
-            error: 'Database temporarily unavailable. Please try again later.'
+            error: "Database temporarily unavailable. Please try again later.",
           });
         }
       }
 
       // Generic 500 for unexpected errors
       return res.status(500).json({
-        error: 'Internal server error while fetching historical data'
+        error: "Internal server error while fetching historical data",
       });
     }
   }
@@ -152,9 +185,12 @@ export class NavasanController {
    * This endpoint queries OHLC snapshots stored in our MongoDB database.
    * No external API calls to Navasan are made - all data comes from our DB.
    */
-  @Get('currencies/historical')
-  async getCurrenciesHistorical(@Query('date') dateStr: string, @Res() res: Response) {
-    return this.handleHistoricalRequest('currencies', dateStr, res);
+  @Get("currencies/historical")
+  async getCurrenciesHistorical(
+    @Query("date") dateStr: string,
+    @Res() res: Response,
+  ) {
+    return this.handleHistoricalRequest("currencies", dateStr, res);
   }
 
   /**
@@ -191,30 +227,43 @@ export class NavasanController {
    * 3. Falls back to OHLC API if no valid snapshot found
    * 4. Returns 404 if neither source has data
    */
-  @Get('currencies/yesterday')
+  @Get("currencies/yesterday")
   async getCurrenciesYesterday(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/currencies/yesterday - Fetching yesterday\'s currency rates');
+      this.logger.log(
+        "GET /api/navasan/currencies/yesterday - Fetching yesterday's currency rates",
+      );
 
-      const response = await this.navasanService.getHistoricalData('currencies');
+      const response =
+        await this.navasanService.getHistoricalData("currencies");
 
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
-      res.setHeader('X-Is-Historical', 'true');
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
+      res.setHeader("X-Is-Historical", "true");
 
       if (response.metadata.historicalDate) {
-        const dateStr = response.metadata.historicalDate instanceof Date
-          ? response.metadata.historicalDate.toISOString()
-          : response.metadata.historicalDate;
-        res.setHeader('X-Historical-Date', dateStr);
+        const dateStr =
+          response.metadata.historicalDate instanceof Date
+            ? response.metadata.historicalDate.toISOString()
+            : response.metadata.historicalDate;
+        res.setHeader("X-Historical-Date", dateStr);
       }
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       return res.json({
@@ -230,22 +279,31 @@ export class NavasanController {
    * GET /api/navasan/currencies
    * Returns only currency rates (USD, EUR, GBP, CAD, AUD)
    */
-  @Get('currencies')
+  @Get("currencies")
   async getCurrencies(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/currencies - Fetching currency rates');
+      this.logger.log("GET /api/navasan/currencies - Fetching currency rates");
 
       const response = await this.navasanService.getCurrencies();
 
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       return res.json({
@@ -263,9 +321,12 @@ export class NavasanController {
    *
    * @param date - Optional date in YYYY-MM-DD format. Defaults to yesterday if not provided.
    */
-  @Get('crypto/historical')
-  async getCryptoHistorical(@Query('date') dateStr: string, @Res() res: Response) {
-    return this.handleHistoricalRequest('crypto', dateStr, res);
+  @Get("crypto/historical")
+  async getCryptoHistorical(
+    @Query("date") dateStr: string,
+    @Res() res: Response,
+  ) {
+    return this.handleHistoricalRequest("crypto", dateStr, res);
   }
 
   /**
@@ -273,30 +334,42 @@ export class NavasanController {
    * Returns yesterday's cryptocurrency rates from price snapshots or OHLC API
    * IMPORTANT: This must come BEFORE the /crypto route for proper route matching
    */
-  @Get('crypto/yesterday')
+  @Get("crypto/yesterday")
   async getCryptoYesterday(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/crypto/yesterday - Fetching yesterday\'s crypto rates');
+      this.logger.log(
+        "GET /api/navasan/crypto/yesterday - Fetching yesterday's crypto rates",
+      );
 
-      const response = await this.navasanService.getHistoricalData('crypto');
+      const response = await this.navasanService.getHistoricalData("crypto");
 
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
-      res.setHeader('X-Is-Historical', 'true');
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
+      res.setHeader("X-Is-Historical", "true");
 
       if (response.metadata.historicalDate) {
-        const dateStr = response.metadata.historicalDate instanceof Date
-          ? response.metadata.historicalDate.toISOString()
-          : response.metadata.historicalDate;
-        res.setHeader('X-Historical-Date', dateStr);
+        const dateStr =
+          response.metadata.historicalDate instanceof Date
+            ? response.metadata.historicalDate.toISOString()
+            : response.metadata.historicalDate;
+        res.setHeader("X-Historical-Date", dateStr);
       }
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       return res.json({
@@ -312,22 +385,31 @@ export class NavasanController {
    * GET /api/navasan/crypto
    * Returns only cryptocurrency rates (USDT, BTC, ETH)
    */
-  @Get('crypto')
+  @Get("crypto")
   async getCrypto(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/crypto - Fetching crypto rates');
+      this.logger.log("GET /api/navasan/crypto - Fetching crypto rates");
 
       const response = await this.navasanService.getCrypto();
 
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       return res.json({
@@ -345,9 +427,12 @@ export class NavasanController {
    *
    * @param date - Optional date in YYYY-MM-DD format. Defaults to yesterday if not provided.
    */
-  @Get('gold/historical')
-  async getGoldHistorical(@Query('date') dateStr: string, @Res() res: Response) {
-    return this.handleHistoricalRequest('gold', dateStr, res);
+  @Get("gold/historical")
+  async getGoldHistorical(
+    @Query("date") dateStr: string,
+    @Res() res: Response,
+  ) {
+    return this.handleHistoricalRequest("gold", dateStr, res);
   }
 
   /**
@@ -355,30 +440,42 @@ export class NavasanController {
    * Returns yesterday's gold prices from price snapshots or OHLC API
    * IMPORTANT: This must come BEFORE the /gold route for proper route matching
    */
-  @Get('gold/yesterday')
+  @Get("gold/yesterday")
   async getGoldYesterday(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/gold/yesterday - Fetching yesterday\'s gold prices');
+      this.logger.log(
+        "GET /api/navasan/gold/yesterday - Fetching yesterday's gold prices",
+      );
 
-      const response = await this.navasanService.getHistoricalData('gold');
+      const response = await this.navasanService.getHistoricalData("gold");
 
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
-      res.setHeader('X-Is-Historical', 'true');
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
+      res.setHeader("X-Is-Historical", "true");
 
       if (response.metadata.historicalDate) {
-        const dateStr = response.metadata.historicalDate instanceof Date
-          ? response.metadata.historicalDate.toISOString()
-          : response.metadata.historicalDate;
-        res.setHeader('X-Historical-Date', dateStr);
+        const dateStr =
+          response.metadata.historicalDate instanceof Date
+            ? response.metadata.historicalDate.toISOString()
+            : response.metadata.historicalDate;
+        res.setHeader("X-Historical-Date", dateStr);
       }
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       return res.json({
@@ -394,22 +491,31 @@ export class NavasanController {
    * GET /api/navasan/gold
    * Returns gold coin and gold prices (Sekkeh, Bahar, Nim, Rob, Gerami, 18 Karat)
    */
-  @Get('gold')
+  @Get("gold")
   async getGold(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/gold - Fetching gold prices');
+      this.logger.log("GET /api/navasan/gold - Fetching gold prices");
 
       const response = await this.navasanService.getGold();
 
-      res.setHeader('X-Data-Fresh', String(response.metadata.isFresh));
-      res.setHeader('X-Data-Stale', String(response.metadata.isStale));
-      res.setHeader('X-Data-Age-Minutes', String(response.metadata.dataAge || 0));
-      res.setHeader('X-Data-Source', response.metadata.source);
-      res.setHeader('X-Last-Updated', response.metadata.lastUpdated.toISOString());
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
 
       // SECURITY FIX: Sanitize warning message to prevent header injection
       if (response.metadata.warning) {
-        res.setHeader('X-Data-Warning', this.sanitizeHeaderValue(response.metadata.warning));
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
       }
 
       return res.json({
@@ -425,20 +531,25 @@ export class NavasanController {
    * GET /api/navasan/ohlc/today/:itemCode
    * Returns today's OHLC (Open, High, Low, Close) data and daily change for a specific item
    */
-  @Get('ohlc/today/:itemCode')
-  async getTodayOhlc(@Param('itemCode') itemCode: string, @Res() res: Response) {
+  @Get("ohlc/today/:itemCode")
+  async getTodayOhlc(
+    @Param("itemCode") itemCode: string,
+    @Res() res: Response,
+  ) {
     try {
       // SECURITY FIX: Validate itemCode to prevent NoSQL injection
-      if (!itemCode || typeof itemCode !== 'string') {
-        throw new BadRequestException('Invalid item code');
+      if (!itemCode || typeof itemCode !== "string") {
+        throw new BadRequestException("Invalid item code");
       }
 
       const safePattern = /^[a-zA-Z0-9_-]{1,50}$/;
       if (!safePattern.test(itemCode)) {
-        throw new BadRequestException('Item code contains invalid characters');
+        throw new BadRequestException("Item code contains invalid characters");
       }
 
-      this.logger.log(`GET /api/navasan/ohlc/today/${itemCode} - Fetching today's OHLC data`);
+      this.logger.log(
+        `GET /api/navasan/ohlc/today/${itemCode} - Fetching today's OHLC data`,
+      );
 
       const ohlc = await this.intradayOhlcService.getTodayOhlc(itemCode);
 
@@ -446,7 +557,8 @@ export class NavasanController {
         throw new NotFoundException(`No OHLC data found for item: ${itemCode}`);
       }
 
-      const changePercent = await this.intradayOhlcService.getDailyChangePercent(itemCode);
+      const changePercent =
+        await this.intradayOhlcService.getDailyChangePercent(itemCode);
 
       return res.json({
         itemCode: ohlc.itemCode,
@@ -467,8 +579,11 @@ export class NavasanController {
         throw error;
       }
       const err = error as Error;
-      this.logger.error(`Error fetching OHLC for ${itemCode}: ${err.message}`, err.stack);
-      throw new InternalServerErrorException('Failed to fetch OHLC data');
+      this.logger.error(
+        `Error fetching OHLC for ${itemCode}: ${err.message}`,
+        err.stack,
+      );
+      throw new InternalServerErrorException("Failed to fetch OHLC data");
     }
   }
 
@@ -476,15 +591,17 @@ export class NavasanController {
    * GET /api/navasan/ohlc/all
    * Returns today's OHLC data for all items
    */
-  @Get('ohlc/all')
+  @Get("ohlc/all")
   async getAllTodayOhlc(@Res() res: Response) {
     try {
-      this.logger.log('GET /api/navasan/ohlc/all - Fetching all today\'s OHLC data');
+      this.logger.log(
+        "GET /api/navasan/ohlc/all - Fetching all today's OHLC data",
+      );
 
       const allOhlc = await this.intradayOhlcService.getAllTodayOhlc();
 
       // Calculate change percentages for each item
-      const ohlcWithChanges = allOhlc.map(ohlc => ({
+      const ohlcWithChanges = allOhlc.map((ohlc) => ({
         itemCode: ohlc.itemCode,
         date: ohlc.date,
         dateJalali: ohlc.dateJalali,
@@ -492,7 +609,7 @@ export class NavasanController {
         high: ohlc.high,
         low: ohlc.low,
         close: ohlc.close,
-        change: ((ohlc.close - ohlc.open) / ohlc.open * 100).toFixed(2),
+        change: (((ohlc.close - ohlc.open) / ohlc.open) * 100).toFixed(2),
         dataPoints: ohlc.dataPoints,
         updateCount: ohlc.updateCount,
         lastUpdate: ohlc.lastUpdate,
@@ -505,7 +622,7 @@ export class NavasanController {
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Error fetching all OHLC: ${err.message}`, err.stack);
-      throw new InternalServerErrorException('Failed to fetch OHLC data');
+      throw new InternalServerErrorException("Failed to fetch OHLC data");
     }
   }
 }

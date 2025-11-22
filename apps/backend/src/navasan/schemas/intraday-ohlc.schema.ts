@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type IntradayOhlcDocument = IntradayOhlc & Document;
 
@@ -26,7 +26,7 @@ export interface DataPoint {
  * TTL: 2 days (172,800 seconds) - keeps today and yesterday only
  */
 @Schema({
-  collection: 'intraday_ohlc',
+  collection: "intraday_ohlc",
   timestamps: true,
 })
 export class IntradayOhlc {

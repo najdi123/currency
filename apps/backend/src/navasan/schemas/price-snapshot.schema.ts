@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type PriceSnapshotDocument = PriceSnapshot & Document;
 
@@ -15,7 +15,7 @@ export type PriceSnapshotDocument = PriceSnapshot & Document;
  * Storage estimate: ~10-20 MB per month
  */
 @Schema({
-  collection: 'price_snapshots',
+  collection: "price_snapshots",
   timestamps: true,
 })
 export class PriceSnapshot {
@@ -41,7 +41,7 @@ export class PriceSnapshot {
   /**
    * Source of the data (api, manual, etc.)
    */
-  @Prop({ default: 'api' })
+  @Prop({ default: "api" })
   source!: string;
 
   /**

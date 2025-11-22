@@ -1,6 +1,9 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import { NavasanResponse, NavasanOHLCDataPoint } from '../interfaces/navasan-response.interface';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
+import {
+  NavasanResponse,
+  NavasanOHLCDataPoint,
+} from "../interfaces/navasan-response.interface";
 
 export type CacheDocument = Cache & Document;
 
@@ -25,8 +28,12 @@ export class Cache {
   expiresAt!: Date; // Auto-cleanup: when this cache entry should expire
 
   // Cache tier - 'fresh' for recent data, 'stale' for fallback data
-  @Prop({ required: true, enum: ['fresh', 'stale', 'archived'], default: 'fresh' })
-  cacheType!: 'fresh' | 'stale' | 'archived';
+  @Prop({
+    required: true,
+    enum: ["fresh", "stale", "archived"],
+    default: "fresh",
+  })
+  cacheType!: "fresh" | "stale" | "archived";
 
   // Track if this data was served as a fallback
   @Prop({ default: false })

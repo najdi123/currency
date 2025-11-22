@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ChartService } from '../chart/chart.service';
-import { TimeRange, ItemType } from '../chart/dto/chart-query.dto';
+import { Injectable, Logger } from "@nestjs/common";
+import { ChartService } from "../chart/chart.service";
+import { TimeRange, ItemType } from "../chart/dto/chart-query.dto";
 
 export interface HistoryDataPoint {
   date: string; // ISO 8601 date (YYYY-MM-DD)
@@ -25,7 +25,7 @@ export class HistoryService {
    */
   async getHistory(
     itemCode: string,
-    itemType: 'currency' | 'digital-currency' | 'gold',
+    itemType: "currency" | "digital-currency" | "gold",
     days: number = 7,
   ): Promise<HistoryDataPoint[]> {
     try {
@@ -93,14 +93,14 @@ export class HistoryService {
    * Map item type string to ChartService ItemType enum
    */
   private mapItemTypeToChartType(
-    itemType: 'currency' | 'digital-currency' | 'gold',
+    itemType: "currency" | "digital-currency" | "gold",
   ): ItemType {
     switch (itemType) {
-      case 'currency':
+      case "currency":
         return ItemType.CURRENCY;
-      case 'digital-currency':
+      case "digital-currency":
         return ItemType.CRYPTO;
-      case 'gold':
+      case "gold":
         return ItemType.GOLD;
       default:
         return ItemType.CURRENCY;
@@ -111,7 +111,7 @@ export class HistoryService {
    * Extract date (YYYY-MM-DD) from ISO 8601 timestamp
    */
   private extractDate(timestamp: string): string {
-    return timestamp.split('T')[0];
+    return timestamp.split("T")[0];
   }
 
   /**

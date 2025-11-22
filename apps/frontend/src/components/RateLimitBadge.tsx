@@ -38,29 +38,25 @@ export function RateLimitBadge() {
   };
 
   const getTierColor = () => {
-    const colors = {
-      free: 'bg-gray-500/20 text-gray-500',
-      premium: 'bg-blue-500/20 text-blue-500',
-      enterprise: 'bg-purple-500/20 text-purple-500',
-    };
-
-    return colors[status.tier] || 'bg-gray-500/20 text-gray-500';
+    // Default to free tier as tier information isn't available from API
+    return 'bg-gray-500/20 text-gray-500';
   };
 
   const getTierLabel = () => {
-    return status.tier.toUpperCase();
+    // Default to free tier as tier information isn't available from API
+    return 'FREE';
   };
 
   return (
     <div
       className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 dark:bg-white/5 backdrop-blur-sm border border-white/10"
       role="status"
-      aria-label={`${t('apiUsage')}: ${status.remaining} of ${status.limit} ${t('requests')}`}
+      aria-label={`${t('apiUsage')}: ${status.remaining} of ${status.maxRequestsPerWindow} ${t('requests')}`}
     >
       {/* Tier Badge */}
       <span
         className={`px-2 py-0.5 text-xs font-semibold rounded ${getTierColor()}`}
-        aria-label={`${t('plan')}: ${status.tier}`}
+        aria-label={`${t('plan')}: free`}
       >
         {getTierLabel()}
       </span>
@@ -74,7 +70,7 @@ export function RateLimitBadge() {
           aria-hidden="true"
         />
         <span className={`text-sm font-medium ${getUsageColor()}`}>
-          {status.remaining}/{status.limit}
+          {status.remaining}/{status.maxRequestsPerWindow}
         </span>
       </div>
     </div>

@@ -6,25 +6,48 @@ import {
   RequestTimeoutException,
   NotFoundException,
   ServiceUnavailableException,
-} from '@nestjs/common';
-import pLimit from 'p-limit';
-import { InjectModel } from '@nestjs/mongoose';
-import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
-import axios from 'axios';
-import { Cache, CacheDocument } from './schemas/cache.schema';
-import { PriceSnapshot, PriceSnapshotDocument } from './schemas/price-snapshot.schema';
-import { OhlcSnapshot, OhlcSnapshotDocument } from './schemas/ohlc-snapshot.schema';
-import { ApiResponse } from './interfaces/api-response.interface';
-import { NavasanResponse, NavasanPriceItem } from './interfaces/navasan-response.interface';
-import { isCurrencyResponse, isCryptoResponse, isGoldResponse } from './utils/type-guards';
-import { safeDbRead, safeDbWrite } from '../common/utils/db-error-handler';
-import { sanitizeUrl, sanitizeErrorMessage } from '../common/utils/sanitize-url';
-import { getTehranDayBoundaries, formatTehranDate } from '../common/utils/date-utils';
-import { MetricsService } from '../metrics/metrics.service';
-import { ApiProviderFactory } from '../api-providers/api-provider.factory';
-import { CurrencyData, CryptoData, GoldData } from '../api-providers/api-provider.interface';
-import { IntradayOhlcService } from './services/intraday-ohlc.service';
+} from "@nestjs/common";
+import pLimit from "p-limit";
+import { InjectModel } from "@nestjs/mongoose";
+import { ConfigService } from "@nestjs/config";
+import { Model } from "mongoose";
+import axios from "axios";
+import { Cache, CacheDocument } from "./schemas/cache.schema";
+import {
+  PriceSnapshot,
+  PriceSnapshotDocument,
+} from "./schemas/price-snapshot.schema";
+import {
+  OhlcSnapshot,
+  OhlcSnapshotDocument,
+} from "./schemas/ohlc-snapshot.schema";
+import { ApiResponse } from "./interfaces/api-response.interface";
+import {
+  NavasanResponse,
+  NavasanPriceItem,
+} from "./interfaces/navasan-response.interface";
+import {
+  isCurrencyResponse,
+  isCryptoResponse,
+  isGoldResponse,
+} from "./utils/type-guards";
+import { safeDbRead, safeDbWrite } from "../common/utils/db-error-handler";
+import {
+  sanitizeUrl,
+  sanitizeErrorMessage,
+} from "../common/utils/sanitize-url";
+import {
+  getTehranDayBoundaries,
+  formatTehranDate,
+} from "../common/utils/date-utils";
+import { MetricsService } from "../metrics/metrics.service";
+import { ApiProviderFactory } from "../api-providers/api-provider.factory";
+import {
+  CurrencyData,
+  CryptoData,
+  GoldData,
+} from "../api-providers/api-provider.interface";
+import { IntradayOhlcService } from "./services/intraday-ohlc.service";
 
 /**
  * FIX #5: TYPE SAFETY - Define proper interfaces instead of using 'any'
@@ -46,7 +69,7 @@ interface HistoryApiResponse {
 export class NavasanService {
   private readonly logger = new Logger(NavasanService.name);
   private readonly apiKey: string;
-  private readonly baseUrl = 'http://api.navasan.tech/latest/';
+  private readonly baseUrl = "http://api.navasan.tech/latest/";
   private readonly internalApiBaseUrl: string;
 
   // CACHE CONFIGURATION
@@ -60,25 +83,35 @@ export class NavasanService {
 
   // Define items to fetch from Navasan API
   private readonly items = {
-    all: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_kordestan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht,usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc,sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
-    currencies: 'usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_kordestan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht',
-    crypto: 'usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc',
-    gold: 'sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh',
+    all: "usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_kordestan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht,usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc,sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh",
+    currencies:
+      "usd_sell,eur,gbp,cad,aud,aed,aed_sell,dirham_dubai,cny,try,chf,jpy,rub,inr,pkr,iqd,kwd,sar,qar,omr,bhd,usd_buy,dolar_harat_sell,harat_naghdi_sell,harat_naghdi_buy,usd_farda_sell,usd_farda_buy,usd_shakhs,usd_sherkat,usd_pp,dolar_mashad_sell,dolar_kordestan_sell,dolar_soleimanie_sell,eur_hav,gbp_hav,gbp_wht,cad_hav,cad_cash,hav_cad_my,hav_cad_cheque,hav_cad_cash,aud_hav,aud_wht",
+    crypto: "usdt,btc,eth,bnb,xrp,ada,doge,sol,matic,dot,ltc",
+    gold: "sekkeh,bahar,nim,rob,gerami,18ayar,abshodeh",
   };
 
   // PERFORMANCE OPTIMIZATIONS
-  private ohlcCache = new Map<string, { data: NavasanResponse; expiry: number }>();
-  private pendingRequests = new Map<string, Promise<ApiResponse<NavasanResponse>>>();
+  private ohlcCache = new Map<
+    string,
+    { data: NavasanResponse; expiry: number }
+  >();
+  private pendingRequests = new Map<
+    string,
+    Promise<ApiResponse<NavasanResponse>>
+  >();
   private readonly ohlcCacheDuration = 3600000; // 1 hour in milliseconds
 
   // FIX #1: RATE LIMITING - Prevent API overload by limiting concurrent requests
   private readonly requestLimit = pLimit(5); // Max 5 concurrent requests
 
   // FIX #2: HISTORICAL DATA CACHING - Cache immutable historical data for 24 hours
-  private historicalCache = new Map<string, {
-    data: any;
-    timestamp: number;
-  }>();
+  private historicalCache = new Map<
+    string,
+    {
+      data: any;
+      timestamp: number;
+    }
+  >();
   private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
   // FIX #4: CIRCUIT BREAKER - Fast failure recovery pattern
@@ -87,25 +120,29 @@ export class NavasanService {
     lastFailureTime: 0,
     isOpen: false,
     threshold: 10, // Open circuit after 10 failures
-    resetTimeout: 60000 // Reset after 1 minute
+    resetTimeout: 60000, // Reset after 1 minute
   };
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
-    @InjectModel(PriceSnapshot.name) private priceSnapshotModel: Model<PriceSnapshotDocument>,
-    @InjectModel(OhlcSnapshot.name) private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
+    @InjectModel(PriceSnapshot.name)
+    private priceSnapshotModel: Model<PriceSnapshotDocument>,
+    @InjectModel(OhlcSnapshot.name)
+    private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
     private apiProviderFactory: ApiProviderFactory, // Inject PersianAPI provider
     private intradayOhlcService: IntradayOhlcService, // Inject Intraday OHLC service
   ) {
-    this.apiKey = this.configService.get<string>('NAVASAN_API_KEY') || '';
+    this.apiKey = this.configService.get<string>("NAVASAN_API_KEY") || "";
     if (!this.apiKey) {
-      this.logger.warn('NAVASAN_API_KEY is not set - using PersianAPI instead');
+      this.logger.warn("NAVASAN_API_KEY is not set - using PersianAPI instead");
     }
 
     // Get internal API base URL from config or fallback to localhost
-    this.internalApiBaseUrl = this.configService.get<string>('INTERNAL_API_URL') || 'http://localhost:4000';
+    this.internalApiBaseUrl =
+      this.configService.get<string>("INTERNAL_API_URL") ||
+      "http://localhost:4000";
 
     // FIX #3: URL VALIDATION - Validate internal API URL for security (SSRF prevention)
     this.validateInternalApiUrl(this.internalApiBaseUrl);
@@ -144,19 +181,25 @@ export class NavasanService {
       const parsed = new URL(url);
 
       // Only allow localhost for security
-      const allowedHosts = ['localhost', '127.0.0.1', '::1'];
+      const allowedHosts = ["localhost", "127.0.0.1", "::1"];
       if (!allowedHosts.includes(parsed.hostname)) {
-        throw new Error(`INTERNAL_API_URL must point to localhost, got: ${parsed.hostname}`);
+        throw new Error(
+          `INTERNAL_API_URL must point to localhost, got: ${parsed.hostname}`,
+        );
       }
 
       // Only allow http/https protocols
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        throw new Error(`INTERNAL_API_URL must use http or https protocol, got: ${parsed.protocol}`);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        throw new Error(
+          `INTERNAL_API_URL must use http or https protocol, got: ${parsed.protocol}`,
+        );
       }
 
       this.logger.log(`✅ Internal API URL validated: ${url}`);
     } catch (error) {
-      this.logger.error(`❌ Invalid INTERNAL_API_URL: ${url} - ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `❌ Invalid INTERNAL_API_URL: ${url} - ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
@@ -166,18 +209,18 @@ export class NavasanService {
    * Only allows alphanumeric characters, underscores, hyphens, and reasonable length
    */
   private validateCategory(category: string): void {
-    if (!category || typeof category !== 'string') {
-      throw new BadRequestException('Category must be a non-empty string');
+    if (!category || typeof category !== "string") {
+      throw new BadRequestException("Category must be a non-empty string");
     }
 
     if (category.length > 50) {
-      throw new BadRequestException('Category name too long');
+      throw new BadRequestException("Category name too long");
     }
 
     // Only allow alphanumeric, underscore, hyphen
     const safePattern = /^[a-zA-Z0-9_-]+$/;
     if (!safePattern.test(category)) {
-      throw new BadRequestException('Category contains invalid characters');
+      throw new BadRequestException("Category contains invalid characters");
     }
   }
 
@@ -185,21 +228,21 @@ export class NavasanService {
    * Get latest rates for all items (currencies, crypto, gold)
    */
   async getLatestRates(): Promise<ApiResponse<NavasanResponse>> {
-    return this.fetchWithCache('all', this.items.all);
+    return this.fetchWithCache("all", this.items.all);
   }
 
   /**
    * Get latest currency rates only
    */
   async getCurrencies(): Promise<ApiResponse<NavasanResponse>> {
-    return this.fetchWithCache('currencies', this.items.currencies);
+    return this.fetchWithCache("currencies", this.items.currencies);
   }
 
   /**
    * Get latest cryptocurrency rates only
    */
   async getCrypto(): Promise<ApiResponse<NavasanResponse>> {
-    return this.fetchWithCache('crypto', this.items.crypto);
+    return this.fetchWithCache("crypto", this.items.crypto);
   }
 
   /**
@@ -209,20 +252,26 @@ export class NavasanService {
    * 18ayar is already in tomans, so we don't multiply it
    */
   async getGold(): Promise<ApiResponse<NavasanResponse>> {
-    const response = await this.fetchWithCache('gold', this.items.gold);
+    const response = await this.fetchWithCache("gold", this.items.gold);
 
     // Gold coins that need to be multiplied by 1000 (returned in thousands)
-    const coinsToMultiply = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami'] as const;
+    const coinsToMultiply = [
+      "sekkeh",
+      "bahar",
+      "nim",
+      "rob",
+      "gerami",
+    ] as const;
 
     // Multiply coin values by 1000 - cast to Record for safe indexing
     const transformedData = { ...response.data } as Record<string, unknown>;
     for (const coin of coinsToMultiply) {
-      if (transformedData[coin] && typeof transformedData[coin] === 'object') {
+      if (transformedData[coin] && typeof transformedData[coin] === "object") {
         const coinData = transformedData[coin] as Record<string, unknown>;
-        if (typeof coinData.value === 'string') {
+        if (typeof coinData.value === "string") {
           coinData.value = String(Number(coinData.value) * 1000);
         }
-        if (typeof coinData.change === 'number') {
+        if (typeof coinData.change === "number") {
           coinData.change = coinData.change * 1000;
         }
       }
@@ -243,7 +292,7 @@ export class NavasanService {
    * @returns Success status and optional error message
    */
   async forceFetchAndCache(
-    category: 'currencies' | 'crypto' | 'gold'
+    category: "currencies" | "crypto" | "gold",
   ): Promise<{ success: boolean; error?: string }> {
     this.validateCategory(category);
     const items = this.items[category];
@@ -254,29 +303,46 @@ export class NavasanService {
       const apiResponse = await this.fetchFromApiWithTimeout(items);
 
       // Save to all three cache tiers
-      await this.saveToFreshCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
-      await this.saveToStaleCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
-      await this.savePriceSnapshot(category, apiResponse.data, apiResponse.metadata);
+      await this.saveToFreshCacheWithRetry(
+        category,
+        apiResponse.data,
+        apiResponse.metadata,
+      );
+      await this.saveToStaleCacheWithRetry(
+        category,
+        apiResponse.data,
+        apiResponse.metadata,
+      );
+      await this.savePriceSnapshot(
+        category,
+        apiResponse.data,
+        apiResponse.metadata,
+      );
 
       // 📊 Record intraday OHLC data points with type validation
       if (this.isValidNavasanData(apiResponse.data)) {
         await this.recordIntradayOhlc(category, apiResponse.data);
       } else {
-        this.logger.warn('Invalid Navasan data structure, skipping OHLC recording');
+        this.logger.warn(
+          "Invalid Navasan data structure, skipping OHLC recording",
+        );
       }
 
       this.logger.log(`✅ Force fetch successful for ${category}`);
       return { success: true };
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
-      const errorStack = error instanceof Error && error.stack
-        ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
-        : undefined;
+      const errorMessage =
+        error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const errorStack =
+        error instanceof Error && error.stack
+          ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) =>
+              sanitizeUrl(match),
+            )
+          : undefined;
 
       this.logger.error(
         `❌ Force fetch failed for ${category}: ${errorMessage}`,
-        errorStack
+        errorStack,
       );
 
       return {
@@ -291,7 +357,7 @@ export class NavasanService {
    * Ensures data is a non-null object suitable for OHLC recording
    */
   private isValidNavasanData(data: unknown): data is Record<string, unknown> {
-    if (typeof data !== 'object' || data === null) return false;
+    if (typeof data !== "object" || data === null) return false;
     if (Array.isArray(data)) return false;
     return true;
   }
@@ -301,17 +367,20 @@ export class NavasanService {
    * Transforms Navasan format to standard format and records data points
    */
   private async recordIntradayOhlc(
-    category: 'currencies' | 'crypto' | 'gold',
-    navasanData: Record<string, unknown>
+    category: "currencies" | "crypto" | "gold",
+    navasanData: Record<string, unknown>,
   ): Promise<void> {
     try {
-      const transformedData = this.transformNavasanToStandardFormat(category, navasanData);
+      const transformedData = this.transformNavasanToStandardFormat(
+        category,
+        navasanData,
+      );
       await this.intradayOhlcService.recordDataPoints(transformedData);
     } catch (error) {
       // Log error but don't fail the entire fetch operation
       const err = error as Error;
       this.logger.warn(
-        `Failed to record intraday OHLC for ${category}: ${err.message}`
+        `Failed to record intraday OHLC for ${category}: ${err.message}`,
       );
     }
   }
@@ -320,10 +389,14 @@ export class NavasanService {
    * Transform Navasan API format to standard CurrencyData/CryptoData/GoldData format
    */
   private transformNavasanToStandardFormat(
-    category: 'currencies' | 'crypto' | 'gold',
-    navasanData: Record<string, unknown>
+    category: "currencies" | "crypto" | "gold",
+    navasanData: Record<string, unknown>,
   ): { currencies: CurrencyData[]; crypto: CryptoData[]; gold: GoldData[] } {
-    const result: { currencies: CurrencyData[]; crypto: CryptoData[]; gold: GoldData[] } = {
+    const result: {
+      currencies: CurrencyData[];
+      crypto: CryptoData[];
+      gold: GoldData[];
+    } = {
       currencies: [],
       crypto: [],
       gold: [],
@@ -331,7 +404,7 @@ export class NavasanService {
 
     // Iterate through the response and transform each item
     for (const [code, itemData] of Object.entries(navasanData)) {
-      if (!itemData || typeof itemData !== 'object') continue;
+      if (!itemData || typeof itemData !== "object") continue;
 
       const item = itemData as NavasanPriceItem;
       const price = parseFloat(item.value);
@@ -348,13 +421,13 @@ export class NavasanService {
       };
 
       // Categorize based on category
-      if (category === 'currencies') {
+      if (category === "currencies") {
         result.currencies.push({
           ...baseData,
           name: code, // Use code as name for now
           change: item.change || undefined,
         } as CurrencyData);
-      } else if (category === 'crypto') {
+      } else if (category === "crypto") {
         result.crypto.push({
           ...baseData,
           name: code,
@@ -362,7 +435,7 @@ export class NavasanService {
           priceIrt: price,
           change24h: item.change || undefined,
         } as CryptoData);
-      } else if (category === 'gold') {
+      } else if (category === "gold") {
         result.gold.push({
           ...baseData,
           name: code,
@@ -388,7 +461,9 @@ export class NavasanService {
       // Step 1: Check for fresh cache (< 5 minutes old)
       const freshCache = await this.getFreshCachedData(category);
       if (freshCache) {
-        this.logger.log(`✅ Returning FRESH cached data for category: ${category}`);
+        this.logger.log(
+          `✅ Returning FRESH cached data for category: ${category}`,
+        );
         return {
           data: freshCache.data as Record<string, unknown>,
           metadata: {
@@ -396,24 +471,38 @@ export class NavasanService {
             isStale: false,
             dataAge: this.getDataAgeMinutes(freshCache.timestamp),
             lastUpdated: freshCache.timestamp,
-            source: 'cache',
+            source: "cache",
           },
         };
       }
 
       // Step 2: Try to fetch fresh data from API
-      this.logger.log(`📡 Fetching fresh data from Navasan API for category: ${category}`);
+      this.logger.log(
+        `📡 Fetching fresh data from Navasan API for category: ${category}`,
+      );
       try {
         const apiResponse = await this.fetchFromApiWithTimeout(items);
 
         // Success! Update both fresh and stale caches with error handling
         // Cache save methods already reset apiErrorCount to 0 and clear lastApiError
-        await this.saveToFreshCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
-        await this.saveToStaleCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
+        await this.saveToFreshCacheWithRetry(
+          category,
+          apiResponse.data,
+          apiResponse.metadata,
+        );
+        await this.saveToStaleCacheWithRetry(
+          category,
+          apiResponse.data,
+          apiResponse.metadata,
+        );
 
         // 📸 PERMANENT STORAGE: Save snapshot for historical record
         // This data is never deleted and builds a permanent price history database
-        await this.savePriceSnapshot(category, apiResponse.data, apiResponse.metadata);
+        await this.savePriceSnapshot(
+          category,
+          apiResponse.data,
+          apiResponse.metadata,
+        );
 
         this.logger.log(`✅ API fetch successful for category: ${category}`);
 
@@ -424,7 +513,7 @@ export class NavasanService {
             isStale: false,
             dataAge: 0,
             lastUpdated: new Date(),
-            source: 'api',
+            source: "api",
           },
         };
       } catch (apiError: unknown) {
@@ -434,12 +523,15 @@ export class NavasanService {
         );
 
         // Capture error message for database tracking
-        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+        const errorMessage =
+          apiError instanceof Error ? apiError.message : String(apiError);
 
         // Check if it's a token expiration error
         const isTokenError = this.isTokenExpirationError(apiError);
         if (isTokenError) {
-          this.logger.error(`🔑 TOKEN EXPIRATION detected for category: ${category}`);
+          this.logger.error(
+            `🔑 TOKEN EXPIRATION detected for category: ${category}`,
+          );
         }
 
         // Try to get stale cache (up to 24 hours old)
@@ -453,9 +545,13 @@ export class NavasanService {
           );
 
           // Mark this cache entry as being used as fallback and increment error count
-          await this.markCacheAsFallback(category, errorMessage).catch((err) => {
-            this.logger.error(`Failed to mark cache as fallback: ${err.message}`);
-          });
+          await this.markCacheAsFallback(category, errorMessage).catch(
+            (err) => {
+              this.logger.error(
+                `Failed to mark cache as fallback: ${err.message}`,
+              );
+            },
+          );
 
           return {
             data: staleCache.data as Record<string, unknown>,
@@ -464,7 +560,7 @@ export class NavasanService {
               isStale: true,
               dataAge: dataAgeMinutes,
               lastUpdated: staleCache.timestamp,
-              source: 'fallback',
+              source: "fallback",
               warning: isTokenError
                 ? `API token expired. Showing data from ${dataAgeHours} hours ago.`
                 : `API temporarily unavailable. Showing data from ${dataAgeHours} hours ago.`,
@@ -479,16 +575,20 @@ export class NavasanService {
 
         throw new InternalServerErrorException(
           isTokenError
-            ? 'API authentication failed and no cached data available. Please contact administrator.'
-            : 'Service temporarily unavailable and no cached data available. Please try again later.',
+            ? "API authentication failed and no cached data available. Please contact administrator."
+            : "Service temporarily unavailable and no cached data available. Please try again later.",
         );
       }
     } catch (error: unknown) {
       // Unexpected error - sanitize before logging
-      const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
-      const sanitizedStack = error instanceof Error && error.stack
-        ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
-        : undefined;
+      const sanitizedMessage =
+        error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const sanitizedStack =
+        error instanceof Error && error.stack
+          ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) =>
+              sanitizeUrl(match),
+            )
+          : undefined;
 
       this.logger.error(
         `❌ Unexpected error in fetchWithCache for category ${category}: ${sanitizedMessage}`,
@@ -510,13 +610,13 @@ export class NavasanService {
 
       // Check response body for token-related messages
       const responseData = error.response?.data;
-      if (typeof responseData === 'object' && responseData !== null) {
+      if (typeof responseData === "object" && responseData !== null) {
         const message = JSON.stringify(responseData).toLowerCase();
         return (
-          message.includes('token') ||
-          message.includes('unauthorized') ||
-          message.includes('api key') ||
-          message.includes('authentication')
+          message.includes("token") ||
+          message.includes("unauthorized") ||
+          message.includes("api key") ||
+          message.includes("authentication")
         );
       }
     }
@@ -530,9 +630,11 @@ export class NavasanService {
    */
   private validateNavasanResponse(data: unknown, items: string): void {
     // Check that response data exists and is an object
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      this.logger.error('Invalid PersianAPI response: data is not an object');
-      throw new Error('Invalid API response structure: expected object, received invalid data');
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      this.logger.error("Invalid PersianAPI response: data is not an object");
+      throw new Error(
+        "Invalid API response structure: expected object, received invalid data",
+      );
     }
 
     const responseData = data as Record<string, unknown>;
@@ -540,8 +642,8 @@ export class NavasanService {
     // Check that response has some data
     const keys = Object.keys(responseData);
     if (keys.length === 0) {
-      this.logger.error('PersianAPI response is empty');
-      throw new Error('Invalid API response: no data returned');
+      this.logger.error("PersianAPI response is empty");
+      throw new Error("Invalid API response: no data returned");
     }
 
     // Validate structure of each field in the response
@@ -549,20 +651,32 @@ export class NavasanService {
       const fieldData = responseData[key];
 
       // Validate that the field contains an object with required properties
-      if (!fieldData || typeof fieldData !== 'object' || Array.isArray(fieldData)) {
-        this.logger.error(`Invalid structure for field "${key}" in PersianAPI response`);
-        throw new Error(`Invalid API response: field "${key}" has invalid structure`);
+      if (
+        !fieldData ||
+        typeof fieldData !== "object" ||
+        Array.isArray(fieldData)
+      ) {
+        this.logger.error(
+          `Invalid structure for field "${key}" in PersianAPI response`,
+        );
+        throw new Error(
+          `Invalid API response: field "${key}" has invalid structure`,
+        );
       }
 
       // Validate that the field object contains 'value' property
       const fieldObject = fieldData as Record<string, unknown>;
-      if (!('value' in fieldObject)) {
+      if (!("value" in fieldObject)) {
         this.logger.error(`Missing "value" property in field "${key}"`);
-        throw new Error(`Invalid API response: field "${key}" missing "value" property`);
+        throw new Error(
+          `Invalid API response: field "${key}" missing "value" property`,
+        );
       }
     }
 
-    this.logger.log(`✅ PersianAPI response validation passed: ${keys.length} items received`);
+    this.logger.log(
+      `✅ PersianAPI response validation passed: ${keys.length} items received`,
+    );
   }
 
   /**
@@ -574,8 +688,8 @@ export class NavasanService {
     // For now, we'll format the date as ISO and note it needs proper Jalali conversion
     // TODO: Install moment-jalaali or use proper Jalali conversion library
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     // Approximate Jalali year (Gregorian year - 621 or 622)
     // This is a placeholder - proper conversion requires a library
@@ -588,9 +702,9 @@ export class NavasanService {
    * Convert Date object to time string (HH:mm:ss format)
    */
   private toTimeString(date: Date): string {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
 
     return `${hours}:${minutes}:${seconds}`;
   }
@@ -612,7 +726,7 @@ export class NavasanService {
       // Map to Navasan format with calculated date/dt fields
       result[key] = {
         value: String(item.price || 0),
-        change: ('change' in item && item.change) ? item.change : 0,
+        change: "change" in item && item.change ? item.change : 0,
         utc: timestamp.toISOString(),
         date: this.toJalaliDateString(timestamp),
         dt: this.toTimeString(timestamp),
@@ -626,43 +740,59 @@ export class NavasanService {
    * Determine category from items string using exact matching first, then fallback to contains check
    * More robust and maintainable than fragile string.includes() checks
    */
-  private determineCategoryFromItemsString(items: string): 'currencies' | 'crypto' | 'gold' | 'all' {
+  private determineCategoryFromItemsString(
+    items: string,
+  ): "currencies" | "crypto" | "gold" | "all" {
     // Exact match first (most reliable)
     if (items === this.items.all) {
-      return 'all';
+      return "all";
     }
     if (items === this.items.currencies) {
-      return 'currencies';
+      return "currencies";
     }
     if (items === this.items.crypto) {
-      return 'crypto';
+      return "crypto";
     }
     if (items === this.items.gold) {
-      return 'gold';
+      return "gold";
     }
 
     // Fallback to contains check for partial matches
     // Check for crypto first (most specific keywords)
-    if (items.includes('btc') || items.includes('eth') || items.includes('usdt')) {
-      this.logger.debug('Category detected via contains check: crypto');
-      return 'crypto';
+    if (
+      items.includes("btc") ||
+      items.includes("eth") ||
+      items.includes("usdt")
+    ) {
+      this.logger.debug("Category detected via contains check: crypto");
+      return "crypto";
     }
 
     // Check for gold
-    if (items.includes('sekkeh') || items.includes('bahar') || items.includes('18ayar')) {
-      this.logger.debug('Category detected via contains check: gold');
-      return 'gold';
+    if (
+      items.includes("sekkeh") ||
+      items.includes("bahar") ||
+      items.includes("18ayar")
+    ) {
+      this.logger.debug("Category detected via contains check: gold");
+      return "gold";
     }
 
     // Check for currencies (least specific, so last)
-    if (items.includes('usd') || items.includes('eur') || items.includes('gbp')) {
-      this.logger.debug('Category detected via contains check: currencies');
-      return 'currencies';
+    if (
+      items.includes("usd") ||
+      items.includes("eur") ||
+      items.includes("gbp")
+    ) {
+      this.logger.debug("Category detected via contains check: currencies");
+      return "currencies";
     }
 
     // Default to currencies if no match found
-    this.logger.warn(`Could not determine category for items: ${items.substring(0, 50)}..., defaulting to currencies`);
-    return 'currencies';
+    this.logger.warn(
+      `Could not determine category for items: ${items.substring(0, 50)}..., defaulting to currencies`,
+    );
+    return "currencies";
   }
 
   /**
@@ -673,7 +803,9 @@ export class NavasanService {
   private async fetchFromApiWithTimeout(
     items: string,
   ): Promise<{ data: NavasanResponse; metadata?: Record<string, unknown> }> {
-    this.logger.debug(`📤 Fetching data from PersianAPI for items: ${items.substring(0, 50)}...`);
+    this.logger.debug(
+      `📤 Fetching data from PersianAPI for items: ${items.substring(0, 50)}...`,
+    );
 
     try {
       const provider = this.apiProviderFactory.getActiveProvider();
@@ -682,32 +814,34 @@ export class NavasanService {
       // Use proper category mapping instead of fragile string detection
       const category = this.determineCategoryFromItemsString(items);
 
-      if (category === 'all') {
+      if (category === "all") {
         // Fetch all data
-        this.logger.debug('🌍 Fetching all data from PersianAPI');
+        this.logger.debug("🌍 Fetching all data from PersianAPI");
         const allData = await provider.fetchAll({ limit: 100 });
         responseData = [
           ...allData.currencies,
           ...allData.crypto,
           ...allData.gold,
         ];
-      } else if (category === 'currencies') {
+      } else if (category === "currencies") {
         // Fetch currencies
-        this.logger.debug('📊 Fetching currencies from PersianAPI');
+        this.logger.debug("📊 Fetching currencies from PersianAPI");
         responseData = await provider.fetchCurrencies({ limit: 100 });
-      } else if (category === 'crypto') {
+      } else if (category === "crypto") {
         // Fetch crypto
-        this.logger.debug('💰 Fetching crypto from PersianAPI');
+        this.logger.debug("💰 Fetching crypto from PersianAPI");
         responseData = await provider.fetchCrypto({ limit: 100 });
-      } else if (category === 'gold') {
+      } else if (category === "gold") {
         // Fetch gold
-        this.logger.debug('🪙 Fetching gold from PersianAPI');
+        this.logger.debug("🪙 Fetching gold from PersianAPI");
         try {
           responseData = await provider.fetchGold({ limit: 100 });
         } catch (error: any) {
           // Gold endpoint may be unavailable - log warning but don't fail
           this.logger.warn(`⚠️ Gold endpoint unavailable: ${error.message}`);
-          this.logger.warn('📦 Returning empty gold data - will fallback to cache');
+          this.logger.warn(
+            "📦 Returning empty gold data - will fallback to cache",
+          );
           responseData = [];
         }
       }
@@ -718,12 +852,14 @@ export class NavasanService {
       // Validate the mapped response
       this.validateNavasanResponse(navasanData, items);
 
-      this.logger.debug(`✅ Successfully fetched ${responseData.length} items from PersianAPI`);
+      this.logger.debug(
+        `✅ Successfully fetched ${responseData.length} items from PersianAPI`,
+      );
 
       return {
         data: navasanData,
         metadata: {
-          provider: 'PersianAPI',
+          provider: "PersianAPI",
           itemCount: responseData.length,
           timestamp: new Date(),
         },
@@ -733,11 +869,13 @@ export class NavasanService {
 
       // Re-throw to trigger stale cache fallback
       if (error.statusCode === 401 || error.statusCode === 403) {
-        throw new Error('PersianAPI authentication failed. API key may be expired or invalid.');
+        throw new Error(
+          "PersianAPI authentication failed. API key may be expired or invalid.",
+        );
       }
 
       if (error.statusCode === 429) {
-        throw new Error('PersianAPI rate limit exceeded.');
+        throw new Error("PersianAPI rate limit exceeded.");
       }
 
       // For other errors, re-throw
@@ -749,20 +887,24 @@ export class NavasanService {
    * Get fresh cached data (< 5 minutes old)
    * Now with DB error handling - returns null on DB failure instead of throwing
    */
-  private async getFreshCachedData(category: string): Promise<CacheDocument | null> {
-    const freshExpiry = new Date(Date.now() - this.freshCacheMinutes * 60 * 1000);
+  private async getFreshCachedData(
+    category: string,
+  ): Promise<CacheDocument | null> {
+    const freshExpiry = new Date(
+      Date.now() - this.freshCacheMinutes * 60 * 1000,
+    );
 
     return safeDbRead(
       () =>
         this.cacheModel
           .findOne({
             category,
-            cacheType: 'fresh',
+            cacheType: "fresh",
             timestamp: { $gte: freshExpiry },
           })
           .sort({ timestamp: -1 })
           .exec(),
-      'getFreshCachedData',
+      "getFreshCachedData",
       this.logger,
       { category },
     );
@@ -772,20 +914,24 @@ export class NavasanService {
    * Get stale cached data (up to 24 hours old) for fallback
    * Now with DB error handling - returns null on DB failure instead of throwing
    */
-  private async getStaleCachedData(category: string): Promise<CacheDocument | null> {
-    const staleExpiry = new Date(Date.now() - this.staleCacheHours * 60 * 60 * 1000);
+  private async getStaleCachedData(
+    category: string,
+  ): Promise<CacheDocument | null> {
+    const staleExpiry = new Date(
+      Date.now() - this.staleCacheHours * 60 * 60 * 1000,
+    );
 
     return safeDbRead(
       () =>
         this.cacheModel
           .findOne({
             category,
-            cacheType: { $in: ['fresh', 'stale'] },
+            cacheType: { $in: ["fresh", "stale"] },
             timestamp: { $gte: staleExpiry },
           })
           .sort({ timestamp: -1 })
           .exec(),
-      'getStaleCachedData',
+      "getStaleCachedData",
       this.logger,
       { category },
     );
@@ -802,14 +948,16 @@ export class NavasanService {
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.freshCacheMinutes * 60 * 1000);
+    const expiresAt = new Date(
+      now.getTime() + this.freshCacheMinutes * 60 * 1000,
+    );
 
     // Atomic upsert with DB error handling
     await safeDbWrite(
       () =>
         this.cacheModel
           .findOneAndUpdate(
-            { category, cacheType: 'fresh' },
+            { category, cacheType: "fresh" },
             {
               $set: {
                 data,
@@ -825,7 +973,7 @@ export class NavasanService {
             { upsert: true, new: true },
           )
           .exec(),
-      'saveToFreshCache',
+      "saveToFreshCache",
       this.logger,
       { category },
       false, // Not critical - can continue without fresh cache
@@ -847,14 +995,16 @@ export class NavasanService {
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.staleCacheHours * 60 * 60 * 1000);
+    const expiresAt = new Date(
+      now.getTime() + this.staleCacheHours * 60 * 60 * 1000,
+    );
 
     // Atomic upsert with DB error handling
     await safeDbWrite(
       () =>
         this.cacheModel
           .findOneAndUpdate(
-            { category, cacheType: 'stale' },
+            { category, cacheType: "stale" },
             {
               $set: {
                 data,
@@ -869,7 +1019,7 @@ export class NavasanService {
             { upsert: true, new: true },
           )
           .exec(),
-      'saveToStaleCache',
+      "saveToStaleCache",
       this.logger,
       { category },
       true, // Critical - stale cache needed for fallback
@@ -922,7 +1072,9 @@ export class NavasanService {
         );
 
         if (retries > maxRetries) {
-          this.logger.error(`Gave up saving stale cache for ${category} after ${maxRetries + 1} attempts`);
+          this.logger.error(
+            `Gave up saving stale cache for ${category} after ${maxRetries + 1} attempts`,
+          );
           // Don't fail the request, but log as critical since stale cache is needed for fallback
         }
       }
@@ -934,12 +1086,15 @@ export class NavasanService {
    * Populates isFallback, lastApiError, and increments apiErrorCount
    * DB ERROR HANDLING: Won't throw on DB failure
    */
-  private async markCacheAsFallback(category: string, errorMessage: string): Promise<void> {
+  private async markCacheAsFallback(
+    category: string,
+    errorMessage: string,
+  ): Promise<void> {
     await safeDbWrite(
       () =>
         this.cacheModel
           .updateMany(
-            { category, cacheType: { $in: ['fresh', 'stale'] } },
+            { category, cacheType: { $in: ["fresh", "stale"] } },
             {
               $set: {
                 isFallback: true,
@@ -951,7 +1106,7 @@ export class NavasanService {
             },
           )
           .exec(),
-      'markCacheAsFallback',
+      "markCacheAsFallback",
       this.logger,
       { category, errorMessage },
       false, // Not critical - just metadata update
@@ -979,7 +1134,9 @@ export class NavasanService {
     try {
       // HOURLY SNAPSHOT LOGIC: Only save one snapshot per hour
       const now = new Date();
-      const currentHour = new Date(Math.floor(now.getTime() / 3600000) * 3600000);
+      const currentHour = new Date(
+        Math.floor(now.getTime() / 3600000) * 3600000,
+      );
 
       // Check if we already have a snapshot for this hour
       const existingSnapshot = await safeDbRead(
@@ -990,7 +1147,7 @@ export class NavasanService {
               timestamp: { $gte: currentHour },
             })
             .exec(),
-        'checkExistingSnapshot',
+        "checkExistingSnapshot",
         this.logger,
         { category, currentHour },
       );
@@ -1007,35 +1164,40 @@ export class NavasanService {
         category,
         data,
         timestamp: currentHour, // Use hour-rounded timestamp
-        source: 'api',
+        source: "api",
         metadata: apiMetadata,
       });
 
       const saveResult = await safeDbWrite(
         () => snapshot.save(),
-        'savePriceSnapshot',
+        "savePriceSnapshot",
         this.logger,
         { category },
         true, // Critical - track failures
       );
 
       if (saveResult) {
-        this.logger.log(`📸 Saved hourly price snapshot for category: ${category}`);
+        this.logger.log(
+          `📸 Saved hourly price snapshot for category: ${category}`,
+        );
         // Reset failure counter on success
-        this.metricsService.resetSnapshotFailureCounter('price', category);
+        this.metricsService.resetSnapshotFailureCounter("price", category);
       } else {
         // Track failure
         this.metricsService.trackSnapshotFailure(
-          'price',
+          "price",
           category,
-          'Database write failed during snapshot save',
+          "Database write failed during snapshot save",
         );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to save price snapshot for ${category}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to save price snapshot for ${category}: ${errorMessage}`,
+      );
       // Track failure
-      this.metricsService.trackSnapshotFailure('price', category, errorMessage);
+      this.metricsService.trackSnapshotFailure("price", category, errorMessage);
       // Don't fail the request if snapshot saving fails
     }
   }
@@ -1065,7 +1227,7 @@ export class NavasanService {
           })
           .sort({ timestamp: -1 }) // Get the most recent one in the window
           .exec(),
-      'findClosestSnapshot',
+      "findClosestSnapshot",
       this.logger,
       { category, targetTimestamp },
     );
@@ -1114,7 +1276,7 @@ export class NavasanService {
       }
 
       // Split items into array
-      const itemCodes = items.split(',').map((code) => code.trim());
+      const itemCodes = items.split(",").map((code) => code.trim());
 
       // Fetch OHLC data for each item
       type HistoricalPriceData = Record<string, NavasanPriceItem>;
@@ -1130,7 +1292,11 @@ export class NavasanService {
             validateStatus: (status) => status < 500,
           });
 
-          if (response.status === 200 && Array.isArray(response.data) && response.data.length > 0) {
+          if (
+            response.status === 200 &&
+            Array.isArray(response.data) &&
+            response.data.length > 0
+          ) {
             // Get the last data point (most recent from yesterday)
             const lastPoint = response.data[response.data.length - 1];
 
@@ -1152,7 +1318,7 @@ export class NavasanService {
               change: change,
               utc: timestamp.toISOString(),
               date: lastPoint.date,
-              dt: timestamp.toTimeString().split(' ')[0],
+              dt: timestamp.toTimeString().split(" ")[0],
             };
 
             hasAnyData = true;
@@ -1166,11 +1332,15 @@ export class NavasanService {
       }
 
       if (!hasAnyData) {
-        this.logger.warn(`No OHLC data found for category: ${category} on yesterday`);
+        this.logger.warn(
+          `No OHLC data found for category: ${category} on yesterday`,
+        );
         return null;
       }
 
-      this.logger.log(`✅ Successfully fetched ${Object.keys(result).length} items from OHLC for ${category}`);
+      this.logger.log(
+        `✅ Successfully fetched ${Object.keys(result).length} items from OHLC for ${category}`,
+      );
 
       // Cache the result for 1 hour
       const finalResult = result as NavasanResponse;
@@ -1178,10 +1348,11 @@ export class NavasanService {
         data: finalResult,
         expiry: Date.now() + this.ohlcCacheDuration,
       });
-      this.logger.log(`📦 Cached OHLC data for ${category} (expires in 1 hour)`);
+      this.logger.log(
+        `📦 Cached OHLC data for ${category} (expires in 1 hour)`,
+      );
 
       return finalResult;
-
     } catch (error) {
       this.logger.error(
         `Failed to fetch from OHLC for yesterday: ${error instanceof Error ? error.message : String(error)}`,
@@ -1196,7 +1367,9 @@ export class NavasanService {
    * Falls back to OHLC API if not found
    * Implements request deduplication to prevent multiple simultaneous requests
    */
-  async getHistoricalData(category: string): Promise<ApiResponse<NavasanResponse>> {
+  async getHistoricalData(
+    category: string,
+  ): Promise<ApiResponse<NavasanResponse>> {
     // Validate category to prevent NoSQL injection
     this.validateCategory(category);
 
@@ -1205,7 +1378,9 @@ export class NavasanService {
     const existingRequest = this.pendingRequests.get(requestKey);
 
     if (existingRequest) {
-      this.logger.log(`⏳ Waiting for existing historical data request: ${category}`);
+      this.logger.log(
+        `⏳ Waiting for existing historical data request: ${category}`,
+      );
       return existingRequest;
     }
 
@@ -1226,8 +1401,12 @@ export class NavasanService {
    * Internal method to fetch historical data
    * This is separated to allow request deduplication wrapping
    */
-  private async _getHistoricalDataInternal(category: string): Promise<ApiResponse<NavasanResponse>> {
-    this.logger.log(`📅 Fetching historical data for category: ${category} (yesterday)`);
+  private async _getHistoricalDataInternal(
+    category: string,
+  ): Promise<ApiResponse<NavasanResponse>> {
+    this.logger.log(
+      `📅 Fetching historical data for category: ${category} (yesterday)`,
+    );
 
     try {
       // Calculate yesterday's timestamp (same time as now, but 24 hours ago)
@@ -1241,25 +1420,35 @@ export class NavasanService {
       if (snapshot) {
         // Validate snapshot data before using
         try {
-          if (!snapshot.data || typeof snapshot.data !== 'object') {
-            this.logger.warn(`⚠️ Corrupted snapshot found for ${category} - invalid data structure, skipping to fallback`);
-            throw new Error('Invalid snapshot data structure');
+          if (!snapshot.data || typeof snapshot.data !== "object") {
+            this.logger.warn(
+              `⚠️ Corrupted snapshot found for ${category} - invalid data structure, skipping to fallback`,
+            );
+            throw new Error("Invalid snapshot data structure");
           }
 
           const itemCount = Object.keys(snapshot.data).length;
           if (itemCount === 0) {
-            this.logger.warn(`⚠️ Empty snapshot found for ${category} - no items, skipping to fallback`);
-            throw new Error('Empty snapshot data');
+            this.logger.warn(
+              `⚠️ Empty snapshot found for ${category} - no items, skipping to fallback`,
+            );
+            throw new Error("Empty snapshot data");
           }
 
           // Check if this is weekend/holiday data (timestamp is more than 2 days old from yesterday)
-          const daysDifference = Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) / (1000 * 60 * 60 * 24);
+          const daysDifference =
+            Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) /
+            (1000 * 60 * 60 * 24);
           if (daysDifference > 2) {
-            this.logger.warn(`⚠️ Snapshot for ${category} is ${daysDifference.toFixed(1)} days old - may be weekend/holiday data`);
+            this.logger.warn(
+              `⚠️ Snapshot for ${category} is ${daysDifference.toFixed(1)} days old - may be weekend/holiday data`,
+            );
           }
 
           const dataAgeMinutes = this.getDataAgeMinutes(snapshot.timestamp);
-          const timeDifferenceHours = Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) / (1000 * 60 * 60);
+          const timeDifferenceHours =
+            Math.abs(snapshot.timestamp.getTime() - yesterday.getTime()) /
+            (1000 * 60 * 60);
 
           this.logger.log(
             `✅ Found valid historical snapshot for ${category} from ${snapshot.timestamp.toISOString()} (${timeDifferenceHours.toFixed(1)}h difference, ${itemCount} items)`,
@@ -1272,25 +1461,34 @@ export class NavasanService {
               isStale: true,
               dataAge: dataAgeMinutes,
               lastUpdated: snapshot.timestamp,
-              source: 'snapshot',
+              source: "snapshot",
               isHistorical: true,
               historicalDate: snapshot.timestamp,
-              warning: daysDifference > 2 ? `Data is ${Math.floor(daysDifference)} days old (possible weekend/holiday)` : undefined,
+              warning:
+                daysDifference > 2
+                  ? `Data is ${Math.floor(daysDifference)} days old (possible weekend/holiday)`
+                  : undefined,
             },
           };
         } catch (validationError) {
-          this.logger.error(`❌ Snapshot validation failed for ${category}: ${validationError instanceof Error ? validationError.message : String(validationError)}`);
+          this.logger.error(
+            `❌ Snapshot validation failed for ${category}: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+          );
           // Continue to OHLC fallback
         }
       }
 
       // Step 2: Snapshot not found, try OHLC API fallback
-      this.logger.warn(`No snapshot found for ${category} at ${yesterday.toISOString()}, trying OHLC fallback`);
+      this.logger.warn(
+        `No snapshot found for ${category} at ${yesterday.toISOString()}, trying OHLC fallback`,
+      );
 
       const ohlcData = await this.fetchFromOHLCForYesterday(category);
 
       if (ohlcData) {
-        this.logger.log(`✅ Retrieved yesterday's data from OHLC API for ${category}`);
+        this.logger.log(
+          `✅ Retrieved yesterday's data from OHLC API for ${category}`,
+        );
 
         return {
           data: ohlcData,
@@ -1299,7 +1497,7 @@ export class NavasanService {
             isStale: true,
             dataAge: 1440, // 24 hours in minutes
             lastUpdated: yesterday,
-            source: 'fallback',
+            source: "fallback",
             isHistorical: true,
             historicalDate: yesterday,
           },
@@ -1307,12 +1505,13 @@ export class NavasanService {
       }
 
       // Step 3: No data found in either source
-      this.logger.error(`❌ No historical data found for ${category} on ${yesterday.toISOString()}`);
+      this.logger.error(
+        `❌ No historical data found for ${category} on ${yesterday.toISOString()}`,
+      );
 
       throw new NotFoundException(
         `No historical data available for ${category} on the requested date. Please try a different date.`,
       );
-
     } catch (error) {
       // Re-throw NotFoundException as-is
       if (error instanceof NotFoundException) {
@@ -1320,10 +1519,14 @@ export class NavasanService {
       }
 
       // Unexpected error - sanitize and log
-      const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
-      const sanitizedStack = error instanceof Error && error.stack
-        ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) => sanitizeUrl(match))
-        : undefined;
+      const sanitizedMessage =
+        error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const sanitizedStack =
+        error instanceof Error && error.stack
+          ? error.stack.replace(/(https?:\/\/[^\s]+)/gi, (match) =>
+              sanitizeUrl(match),
+            )
+          : undefined;
 
       this.logger.error(
         `❌ Unexpected error fetching historical data for ${category}: ${sanitizedMessage}`,
@@ -1331,7 +1534,7 @@ export class NavasanService {
       );
 
       throw new InternalServerErrorException(
-        'Failed to retrieve historical data. Please try again later.',
+        "Failed to retrieve historical data. Please try again later.",
       );
     }
   }
@@ -1346,10 +1549,10 @@ export class NavasanService {
       if (timeSinceFailure > this.circuitBreaker.resetTimeout) {
         this.circuitBreaker.isOpen = false;
         this.circuitBreaker.failures = 0;
-        this.logger.log('🔓 Circuit breaker reset - accepting requests again');
+        this.logger.log("🔓 Circuit breaker reset - accepting requests again");
       } else {
         throw new ServiceUnavailableException(
-          `Historical API temporarily unavailable. Retry after ${Math.ceil((this.circuitBreaker.resetTimeout - timeSinceFailure) / 1000)}s`
+          `Historical API temporarily unavailable. Retry after ${Math.ceil((this.circuitBreaker.resetTimeout - timeSinceFailure) / 1000)}s`,
         );
       }
     }
@@ -1364,7 +1567,9 @@ export class NavasanService {
 
     if (this.circuitBreaker.failures >= this.circuitBreaker.threshold) {
       this.circuitBreaker.isOpen = true;
-      this.logger.error(`🔒 Circuit breaker opened after ${this.circuitBreaker.failures} failures`);
+      this.logger.error(
+        `🔒 Circuit breaker opened after ${this.circuitBreaker.failures} failures`,
+      );
     }
   }
 
@@ -1373,7 +1578,10 @@ export class NavasanService {
    */
   private recordCircuitBreakerSuccess(): void {
     if (this.circuitBreaker.failures > 0) {
-      this.circuitBreaker.failures = Math.max(0, this.circuitBreaker.failures - 1);
+      this.circuitBreaker.failures = Math.max(
+        0,
+        this.circuitBreaker.failures - 1,
+      );
     }
   }
 
@@ -1391,7 +1599,7 @@ export class NavasanService {
    */
   async getHistoricalDataFromOHLC(
     category: string,
-    targetDate: Date
+    targetDate: Date,
   ): Promise<ApiResponse<NavasanResponse>> {
     // Validate category
     this.validateCategory(category);
@@ -1400,10 +1608,12 @@ export class NavasanService {
     this.checkCircuitBreaker();
 
     const formattedDate = formatTehranDate(targetDate);
-    this.logger.log(`📊 Fetching historical data for ${category} on ${formattedDate}`);
+    this.logger.log(
+      `📊 Fetching historical data for ${category} on ${formattedDate}`,
+    );
 
     // FIX #2: RESPONSE CACHING - Check cache for historical data (immutable, can cache for 24h)
-    const cacheKey = `${category}-${targetDate.toISOString().split('T')[0]}`;
+    const cacheKey = `${category}-${targetDate.toISOString().split("T")[0]}`;
     const cached = this.historicalCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
@@ -1417,25 +1627,31 @@ export class NavasanService {
       today.setHours(23, 59, 59, 999); // End of today
 
       if (targetDate.getTime() > today.getTime()) {
-        throw new BadRequestException('Target date cannot be in the future');
+        throw new BadRequestException("Target date cannot be in the future");
       }
 
       // Calculate days difference from today
-      const daysDiff = Math.ceil((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.ceil(
+        (today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
 
       // Enforce 90-day limit for historical data
       if (daysDiff > 90) {
-        throw new BadRequestException('Historical data is only available for the last 90 days');
+        throw new BadRequestException(
+          "Historical data is only available for the last 90 days",
+        );
       }
 
       // Map category to item codes
       const itemCodes = this.getCategoryItemCodes(category);
-      const targetDateStr = targetDate.toISOString().split('T')[0];
+      const targetDateStr = targetDate.toISOString().split("T")[0];
 
       // Cap daysToFetch at 92 (target day + 2 buffer days) as per specification
       const daysToFetch = Math.min(Math.max(daysDiff + 2, 7), 92);
 
-      this.logger.log(`🔍 Fetching ${daysToFetch} days of history for ${itemCodes.length} items in parallel (max 5 concurrent)`);
+      this.logger.log(
+        `🔍 Fetching ${daysToFetch} days of history for ${itemCodes.length} items in parallel (max 5 concurrent)`,
+      );
 
       // FIX #1: RATE LIMITING - Wrap parallel fetching in rate limiter to prevent API overload
       // This limits concurrent requests to 5, preventing server overload from 22+ simultaneous requests
@@ -1447,11 +1663,11 @@ export class NavasanService {
 
             // Build the correct endpoint URL based on category
             let url: string;
-            if (category === 'currencies') {
+            if (category === "currencies") {
               url = `${this.internalApiBaseUrl}/api/currencies/code/${encodedItemCode}/history?days=${daysToFetch}`;
-            } else if (category === 'crypto') {
+            } else if (category === "crypto") {
               url = `${this.internalApiBaseUrl}/api/digital-currencies/symbol/${encodedItemCode}/history?days=${daysToFetch}`;
-            } else if (category === 'gold') {
+            } else if (category === "gold") {
               url = `${this.internalApiBaseUrl}/api/gold/code/${encodedItemCode}/history?days=${daysToFetch}`;
             } else {
               throw new Error(`Unknown category: ${category}`);
@@ -1466,10 +1682,10 @@ export class NavasanService {
             return {
               itemCode,
               success: false,
-              error: error instanceof Error ? error.message : String(error)
+              error: error instanceof Error ? error.message : String(error),
             };
           }
-        })
+        }),
       );
 
       // Wait for all requests to complete
@@ -1482,37 +1698,45 @@ export class NavasanService {
       const failedItems: string[] = [];
 
       for (const result of results) {
-        if (result.status === 'fulfilled') {
+        if (result.status === "fulfilled") {
           const { itemCode, success, data, error } = result.value;
 
           if (success && data?.success && data?.data) {
             // FIX #5: TYPE SAFETY - Use proper type instead of 'any'
             // SORT DATA: Sort by date to ensure correct ordering for change calculation
-            const sortedData = [...(data.data as HistoryDataPoint[])].sort((a, b) => {
-              const dateA = new Date(a.date).getTime();
-              const dateB = new Date(b.date).getTime();
-              return dateA - dateB;
-            });
+            const sortedData = [...(data.data as HistoryDataPoint[])].sort(
+              (a, b) => {
+                const dateA = new Date(a.date).getTime();
+                const dateB = new Date(b.date).getTime();
+                return dateA - dateB;
+              },
+            );
 
             // Find the data point for the target date
-            const pointIndex = sortedData.findIndex((point) => point.date === targetDateStr);
+            const pointIndex = sortedData.findIndex(
+              (point) => point.date === targetDateStr,
+            );
 
             if (pointIndex !== -1) {
               const dataPoint = sortedData[pointIndex];
 
               if (dataPoint && dataPoint.price !== undefined) {
                 // CHANGE CALCULATION: Use null instead of 0 for missing previous data
-                const previousPoint = pointIndex > 0 ? sortedData[pointIndex - 1] : null;
-                const change = previousPoint && previousPoint.price !== undefined
-                  ? dataPoint.price - previousPoint.price
-                  : null; // Use null instead of 0 when no previous data exists
+                const previousPoint =
+                  pointIndex > 0 ? sortedData[pointIndex - 1] : null;
+                const change =
+                  previousPoint && previousPoint.price !== undefined
+                    ? dataPoint.price - previousPoint.price
+                    : null; // Use null instead of 0 when no previous data exists
 
                 // TIMESTAMP CONVERSION: Validate and convert timestamp properly
                 let timestamp = dataPoint.timestamp;
 
                 // Validate timestamp exists and is a number
                 if (timestamp === undefined || timestamp === null) {
-                  this.logger.warn(`Missing timestamp for ${itemCode} on ${targetDateStr}`);
+                  this.logger.warn(
+                    `Missing timestamp for ${itemCode} on ${targetDateStr}`,
+                  );
                   timestamp = targetDate.getTime() / 1000; // Fallback to target date
                 } else {
                   timestamp = Number(timestamp);
@@ -1532,7 +1756,9 @@ export class NavasanService {
                   const maxTimestamp = 4102444800; // Jan 1, 2100
 
                   if (timestamp < minTimestamp || timestamp > maxTimestamp) {
-                    this.logger.warn(`Invalid timestamp ${timestamp} for ${itemCode}, using target date`);
+                    this.logger.warn(
+                      `Invalid timestamp ${timestamp} for ${itemCode}, using target date`,
+                    );
                     timestamp = targetDate.getTime() / 1000;
                   }
                 }
@@ -1545,24 +1771,32 @@ export class NavasanService {
                   change: change,
                   utc: dateObj.toISOString(),
                   date: targetDateStr,
-                  dt: dateObj.toTimeString().split(' ')[0]
+                  dt: dateObj.toTimeString().split(" ")[0],
                 };
                 successCount++;
-                this.logger.debug(`✅ Got history for ${itemCode}: ${dataPoint.price}`);
+                this.logger.debug(
+                  `✅ Got history for ${itemCode}: ${dataPoint.price}`,
+                );
               } else {
                 errorCount++;
                 failedItems.push(itemCode);
-                this.logger.debug(`No price data for ${itemCode} on ${targetDateStr}`);
+                this.logger.debug(
+                  `No price data for ${itemCode} on ${targetDateStr}`,
+                );
               }
             } else {
               errorCount++;
               failedItems.push(itemCode);
-              this.logger.debug(`No data point found for ${itemCode} on ${targetDateStr}`);
+              this.logger.debug(
+                `No data point found for ${itemCode} on ${targetDateStr}`,
+              );
             }
           } else {
             errorCount++;
             failedItems.push(itemCode);
-            this.logger.debug(`Failed to fetch history for ${itemCode}: ${error}`);
+            this.logger.debug(
+              `Failed to fetch history for ${itemCode}: ${error}`,
+            );
           }
         } else {
           // Promise was rejected
@@ -1576,27 +1810,37 @@ export class NavasanService {
       const failureRate = errorCount / totalItems;
 
       if (failureRate > 0.5) {
-        this.logger.error(`📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`);
+        this.logger.error(
+          `📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`,
+        );
         // FIX #4: CIRCUIT BREAKER - Record failure for high failure rates
         this.recordCircuitBreakerFailure();
       } else if (failureRate > 0.1) {
-        this.logger.warn(`📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`);
+        this.logger.warn(
+          `📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`,
+        );
       } else {
-        this.logger.log(`📊 History fetch complete: ${successCount}/${totalItems} success, ${errorCount} errors`);
+        this.logger.log(
+          `📊 History fetch complete: ${successCount}/${totalItems} success, ${errorCount} errors`,
+        );
         // FIX #4: CIRCUIT BREAKER - Record success for low failure rates
         this.recordCircuitBreakerSuccess();
       }
 
       // If we have no data at all, throw 404
       if (Object.keys(priceData).length === 0) {
-        this.logger.warn(`No history data found for ${category} on ${targetDateStr}`);
+        this.logger.warn(
+          `No history data found for ${category} on ${targetDateStr}`,
+        );
         throw new NotFoundException(
-          `No historical data available for ${targetDateStr}`
+          `No historical data available for ${targetDateStr}`,
         );
       }
 
       // METADATA: Add completeness information and warning if needed
-      const completenessPercentage = Math.round((successCount / totalItems) * 100);
+      const completenessPercentage = Math.round(
+        (successCount / totalItems) * 100,
+      );
       const hasWarning = failureRate > 0.1;
 
       // Build response object
@@ -1606,7 +1850,7 @@ export class NavasanService {
           isFresh: false, // Historical data is never "fresh"
           isStale: false, // But it's not stale either - it's historical
           dataAge: Math.round((Date.now() - targetDate.getTime()) / 60000), // Age in minutes
-          source: 'api' as const,
+          source: "api" as const,
           lastUpdated: targetDate,
           isHistorical: true,
           historicalDate: targetDate,
@@ -1616,32 +1860,37 @@ export class NavasanService {
             percentage: completenessPercentage,
             failedItems: failedItems.length > 0 ? failedItems : undefined,
           },
-          warning: hasWarning ? `Only ${completenessPercentage}% of items retrieved successfully` : undefined,
+          warning: hasWarning
+            ? `Only ${completenessPercentage}% of items retrieved successfully`
+            : undefined,
         },
       };
 
       // FIX #2: RESPONSE CACHING - Store response in cache for 24 hours (historical data is immutable)
       this.historicalCache.set(cacheKey, {
         data: response,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       this.logger.log(`💾 Cached ${cacheKey} for 24 hours`);
 
       // Return the response in the expected format with enhanced metadata
       return response;
-
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
 
-      const sanitizedMessage = error instanceof Error ? sanitizeErrorMessage(error) : String(error);
+      const sanitizedMessage =
+        error instanceof Error ? sanitizeErrorMessage(error) : String(error);
       this.logger.error(
-        `❌ Error fetching historical data for ${category}: ${sanitizedMessage}`
+        `❌ Error fetching historical data for ${category}: ${sanitizedMessage}`,
       );
 
       throw new InternalServerErrorException(
-        'Failed to retrieve historical data'
+        "Failed to retrieve historical data",
       );
     }
   }
@@ -1652,26 +1901,56 @@ export class NavasanService {
    */
   private getCategoryItemCodes(category: string): string[] {
     switch (category.toLowerCase()) {
-      case 'currencies':
+      case "currencies":
         return [
-          'usd_sell', 'usd_buy',
-          'eur', 'gbp', 'cad', 'aud',
-          'aed', 'aed_sell', 'dirham_dubai',
-          'cny_hav', 'try_hav', 'chf', 'jpy_hav',
-          'rub', 'inr', 'pkr', 'iqd', 'kwd',
-          'sar', 'qar', 'omr', 'bhd'
+          "usd_sell",
+          "usd_buy",
+          "eur",
+          "gbp",
+          "cad",
+          "aud",
+          "aed",
+          "aed_sell",
+          "dirham_dubai",
+          "cny_hav",
+          "try_hav",
+          "chf",
+          "jpy_hav",
+          "rub",
+          "inr",
+          "pkr",
+          "iqd",
+          "kwd",
+          "sar",
+          "qar",
+          "omr",
+          "bhd",
         ];
 
-      case 'crypto':
+      case "crypto":
         return [
-          'usdt', 'btc', 'eth', 'bnb', 'xrp',
-          'ada', 'doge', 'sol', 'matic', 'dot', 'ltc'
+          "usdt",
+          "btc",
+          "eth",
+          "bnb",
+          "xrp",
+          "ada",
+          "doge",
+          "sol",
+          "matic",
+          "dot",
+          "ltc",
         ];
 
-      case 'gold':
+      case "gold":
         return [
-          'sekkeh', 'bahar', 'nim', 'rob', 'gerami',
-          '18ayar', 'abshodeh'
+          "sekkeh",
+          "bahar",
+          "nim",
+          "rob",
+          "gerami",
+          "18ayar",
+          "abshodeh",
         ];
 
       default:
@@ -1679,4 +1958,3 @@ export class NavasanService {
     }
   }
 }
-

@@ -1,9 +1,18 @@
-import { Controller, Get, Post, Param, Query, Body, HttpException, HttpStatus } from '@nestjs/common';
-import { OHLCManagerService } from './ohlc-manager.service';
-import { OHLCCollectorService } from './ohlc-collector.service';
-import { OHLCUpdateService } from './ohlc-update.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Body,
+  HttpException,
+  HttpStatus,
+} from "@nestjs/common";
+import { OHLCManagerService } from "./ohlc-manager.service";
+import { OHLCCollectorService } from "./ohlc-collector.service";
+import { OHLCUpdateService } from "./ohlc-update.service";
 
-@Controller('api/ohlc')
+@Controller("api/ohlc")
 export class OHLCController {
   constructor(
     private readonly ohlcManager: OHLCManagerService,
@@ -14,12 +23,12 @@ export class OHLCController {
   /**
    * Get OHLC data for a specific item
    */
-  @Get(':itemCode')
+  @Get(":itemCode")
   async getOHLCData(
-    @Param('itemCode') itemCode: string,
-    @Query('itemType') itemType: string = 'currency',
-    @Query('timeframe') timeframe: string = '1h',
-    @Query('days') days: string = '30',
+    @Param("itemCode") itemCode: string,
+    @Query("itemType") itemType: string = "currency",
+    @Query("timeframe") timeframe: string = "1h",
+    @Query("days") days: string = "30",
   ) {
     try {
       const endDate = new Date();
@@ -28,7 +37,7 @@ export class OHLCController {
 
       const data = await this.ohlcManager.getOHLCData(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         timeframe,
         startDate,
         endDate,
@@ -54,12 +63,12 @@ export class OHLCController {
   /**
    * Get data coverage report
    */
-  @Get(':itemCode/coverage')
+  @Get(":itemCode/coverage")
   async getDataCoverage(
-    @Param('itemCode') itemCode: string,
-    @Query('itemType') itemType: string = 'currency',
-    @Query('timeframe') timeframe: string = '1h',
-    @Query('days') days: string = '30',
+    @Param("itemCode") itemCode: string,
+    @Query("itemType") itemType: string = "currency",
+    @Query("timeframe") timeframe: string = "1h",
+    @Query("days") days: string = "30",
   ) {
     try {
       const endDate = new Date();
@@ -68,7 +77,7 @@ export class OHLCController {
 
       const coverage = await this.ohlcManager.getDataCoverage(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         timeframe,
         startDate,
         endDate,
@@ -93,19 +102,19 @@ export class OHLCController {
   /**
    * Get data quality report
    */
-  @Get(':itemCode/quality')
+  @Get(":itemCode/quality")
   async getDataQuality(
-    @Param('itemCode') itemCode: string,
-    @Query('itemType') itemType: string = 'currency',
-    @Query('timeframe') timeframe: string = '1h',
-    @Query('days') days: string = '30',
+    @Param("itemCode") itemCode: string,
+    @Query("itemType") itemType: string = "currency",
+    @Query("timeframe") timeframe: string = "1h",
+    @Query("days") days: string = "30",
   ) {
     try {
       const daysNum = parseInt(days, 10) || 30;
 
       const quality = await this.ohlcUpdate.getDataQualityReport(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         timeframe,
         daysNum,
       );
@@ -129,16 +138,16 @@ export class OHLCController {
   /**
    * Trigger backfill for an item (Admin only - add authentication in production)
    */
-  @Post('backfill/:itemCode')
+  @Post("backfill/:itemCode")
   async triggerBackfill(
-    @Param('itemCode') itemCode: string,
-    @Query('itemType') itemType: string = 'currency',
-    @Query('timeRange') timeRange: string = '1m',
+    @Param("itemCode") itemCode: string,
+    @Query("itemType") itemType: string = "currency",
+    @Query("timeRange") timeRange: string = "1m",
   ) {
     try {
       await this.ohlcCollector.backfillHistoricalData(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         timeRange,
       );
 
@@ -160,17 +169,17 @@ export class OHLCController {
   /**
    * Trigger backfill for all items (Admin only - add authentication in production)
    */
-  @Post('backfill-all')
+  @Post("backfill-all")
   async triggerBackfillAll() {
     try {
       // Run in background
-      this.ohlcCollector.backfillRecentData().catch(error => {
-        console.error('Backfill failed:', error);
+      this.ohlcCollector.backfillRecentData().catch((error) => {
+        console.error("Backfill failed:", error);
       });
 
       return {
         success: true,
-        message: 'Backfill initiated for all items (running in background)',
+        message: "Backfill initiated for all items (running in background)",
       };
     } catch (error) {
       throw new HttpException(
@@ -183,14 +192,14 @@ export class OHLCController {
   /**
    * Manually trigger data collection (Admin only)
    */
-  @Post('collect-now')
+  @Post("collect-now")
   async collectNow() {
     try {
       await this.ohlcCollector.collectMinuteData();
 
       return {
         success: true,
-        message: 'Data collection completed',
+        message: "Data collection completed",
         timestamp: new Date(),
       };
     } catch (error) {
@@ -204,14 +213,14 @@ export class OHLCController {
   /**
    * Manually trigger aggregation (Admin only)
    */
-  @Post('aggregate-now')
+  @Post("aggregate-now")
   async aggregateNow() {
     try {
       await this.ohlcCollector.aggregateTimeframes();
 
       return {
         success: true,
-        message: 'Aggregation completed',
+        message: "Aggregation completed",
         timestamp: new Date(),
       };
     } catch (error) {
@@ -225,21 +234,21 @@ export class OHLCController {
   /**
    * Update OHLC data with current price (used by other services)
    */
-  @Post('update/:itemCode')
+  @Post("update/:itemCode")
   async updateOHLC(
-    @Param('itemCode') itemCode: string,
+    @Param("itemCode") itemCode: string,
     @Body() body: { price: number; itemType?: string },
   ) {
     try {
-      const { price, itemType = 'currency' } = body;
+      const { price, itemType = "currency" } = body;
 
       if (!price || price <= 0) {
-        throw new HttpException('Invalid price', HttpStatus.BAD_REQUEST);
+        throw new HttpException("Invalid price", HttpStatus.BAD_REQUEST);
       }
 
       await this.ohlcUpdate.updateTodayData(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         price,
       );
 
@@ -260,23 +269,23 @@ export class OHLCController {
   /**
    * Get latest OHLC record
    */
-  @Get(':itemCode/latest')
+  @Get(":itemCode/latest")
   async getLatestOHLC(
-    @Param('itemCode') itemCode: string,
-    @Query('itemType') itemType: string = 'currency',
-    @Query('timeframe') timeframe: string = '1h',
+    @Param("itemCode") itemCode: string,
+    @Query("itemType") itemType: string = "currency",
+    @Query("timeframe") timeframe: string = "1h",
   ) {
     try {
       const latest = await this.ohlcManager.getLatestOHLC(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         timeframe,
       );
 
       if (!latest) {
         return {
           success: false,
-          message: 'No data found',
+          message: "No data found",
           itemCode,
           itemType,
           timeframe,
@@ -301,12 +310,12 @@ export class OHLCController {
   /**
    * Fill missing data for an item
    */
-  @Post('fill-gaps/:itemCode')
+  @Post("fill-gaps/:itemCode")
   async fillGaps(
-    @Param('itemCode') itemCode: string,
-    @Query('itemType') itemType: string = 'currency',
-    @Query('timeframe') timeframe: string = '1h',
-    @Query('days') days: string = '30',
+    @Param("itemCode") itemCode: string,
+    @Query("itemType") itemType: string = "currency",
+    @Query("timeframe") timeframe: string = "1h",
+    @Query("days") days: string = "30",
   ) {
     try {
       const endDate = new Date();
@@ -315,7 +324,7 @@ export class OHLCController {
 
       await this.ohlcManager.fillMissingData(
         itemCode,
-        itemType as 'currency' | 'crypto' | 'gold',
+        itemType as "currency" | "crypto" | "gold",
         timeframe,
         startDate,
         endDate,

@@ -1,30 +1,31 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
-import { JwtStrategy } from './jwt.strategy';
-import { UsersService } from '../../users/users.service';
-import { JwtPayload } from '../types/jwt-payload';
-import { UserRole, UserStatus } from '../../users/schemas/user.schema';
-import { Types } from 'mongoose';
+import { Test, TestingModule } from "@nestjs/testing";
+import { UnauthorizedException } from "@nestjs/common";
+import { JwtStrategy } from "./jwt.strategy";
+import { UsersService } from "../../users/users.service";
+import { JwtPayload } from "../types/jwt-payload";
+import { UserRole, UserStatus } from "../../users/schemas/user.schema";
+import { Types } from "mongoose";
 
-describe('JwtStrategy', () => {
+describe("JwtStrategy", () => {
   let strategy: JwtStrategy;
   let usersService: jest.Mocked<UsersService>;
 
   const mockUserId = new Types.ObjectId();
   const mockUser = {
     _id: mockUserId,
-    email: 'test@example.com',
+    email: "test@example.com",
     role: UserRole.USER,
     status: UserStatus.ACTIVE,
-    firstName: 'John',
-    lastName: 'Doe',
+    firstName: "John",
+    lastName: "Doe",
   };
 
   const originalEnv = process.env.JWT_SECRET;
 
   beforeAll(() => {
     // Set JWT_SECRET for tests
-    process.env.JWT_SECRET = 'test-jwt-secret-with-at-least-32-characters-for-security';
+    process.env.JWT_SECRET =
+      "test-jwt-secret-with-at-least-32-characters-for-security";
   });
 
   afterAll(() => {
@@ -56,11 +57,11 @@ describe('JwtStrategy', () => {
     jest.clearAllMocks();
   });
 
-  describe('validate', () => {
-    it('should return payload for valid active user', async () => {
+  describe("validate", () => {
+    it("should return payload for valid active user", async () => {
       const payload: JwtPayload = {
         sub: mockUserId.toString(),
-        email: 'test@example.com',
+        email: "test@example.com",
         role: UserRole.USER,
       };
 
@@ -72,23 +73,27 @@ describe('JwtStrategy', () => {
       expect(usersService.findById).toHaveBeenCalledWith(payload.sub);
     });
 
-    it('should throw UnauthorizedException for non-existent user', async () => {
+    it("should throw UnauthorizedException for non-existent user", async () => {
       const payload: JwtPayload = {
-        sub: 'non-existent-id',
-        email: 'test@example.com',
+        sub: "non-existent-id",
+        email: "test@example.com",
         role: UserRole.USER,
       };
 
-      usersService.findById.mockRejectedValue(new Error('User not found'));
+      usersService.findById.mockRejectedValue(new Error("User not found"));
 
-      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
-      await expect(strategy.validate(payload)).rejects.toThrow('User not found');
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        "User not found",
+      );
     });
 
-    it('should throw UnauthorizedException for suspended user', async () => {
+    it("should throw UnauthorizedException for suspended user", async () => {
       const payload: JwtPayload = {
         sub: mockUserId.toString(),
-        email: 'test@example.com',
+        email: "test@example.com",
         role: UserRole.USER,
       };
 
@@ -99,14 +104,18 @@ describe('JwtStrategy', () => {
 
       usersService.findById.mockResolvedValue(suspendedUser as any);
 
-      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
-      await expect(strategy.validate(payload)).rejects.toThrow('Account is not active');
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        "Account is not active",
+      );
     });
 
-    it('should throw UnauthorizedException for pending user', async () => {
+    it("should throw UnauthorizedException for pending user", async () => {
       const payload: JwtPayload = {
         sub: mockUserId.toString(),
-        email: 'test@example.com',
+        email: "test@example.com",
         role: UserRole.USER,
       };
 
@@ -117,20 +126,24 @@ describe('JwtStrategy', () => {
 
       usersService.findById.mockResolvedValue(pendingUser as any);
 
-      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
-      await expect(strategy.validate(payload)).rejects.toThrow('Account is not active');
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(strategy.validate(payload)).rejects.toThrow(
+        "Account is not active",
+      );
     });
 
-    it('should work for admin users', async () => {
+    it("should work for admin users", async () => {
       const payload: JwtPayload = {
         sub: mockUserId.toString(),
-        email: 'admin@example.com',
+        email: "admin@example.com",
         role: UserRole.ADMIN,
       };
 
       const adminUser = {
         ...mockUser,
-        email: 'admin@example.com',
+        email: "admin@example.com",
         role: UserRole.ADMIN,
       };
 
@@ -143,32 +156,32 @@ describe('JwtStrategy', () => {
     });
   });
 
-  describe('constructor', () => {
-    it('should throw error if JWT_SECRET is not set', () => {
+  describe("constructor", () => {
+    it("should throw error if JWT_SECRET is not set", () => {
       const originalSecret = process.env.JWT_SECRET;
       delete process.env.JWT_SECRET;
 
       expect(() => {
         new JwtStrategy(usersService);
-      }).toThrow('JWT_SECRET environment variable is not set');
+      }).toThrow("JWT_SECRET environment variable is not set");
 
       process.env.JWT_SECRET = originalSecret;
     });
 
-    it('should throw error if JWT_SECRET is too short', () => {
+    it("should throw error if JWT_SECRET is too short", () => {
       const originalSecret = process.env.JWT_SECRET;
-      process.env.JWT_SECRET = 'short';
+      process.env.JWT_SECRET = "short";
 
       expect(() => {
         new JwtStrategy(usersService);
-      }).toThrow('JWT_SECRET must be at least 32 characters long');
+      }).toThrow("JWT_SECRET must be at least 32 characters long");
 
       process.env.JWT_SECRET = originalSecret;
     });
 
-    it('should accept JWT_SECRET with exactly 32 characters', () => {
+    it("should accept JWT_SECRET with exactly 32 characters", () => {
       const originalSecret = process.env.JWT_SECRET;
-      process.env.JWT_SECRET = '12345678901234567890123456789012'; // exactly 32 chars
+      process.env.JWT_SECRET = "12345678901234567890123456789012"; // exactly 32 chars
 
       expect(() => {
         new JwtStrategy(usersService);

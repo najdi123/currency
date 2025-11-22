@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 
 @Injectable()
 export class EmailService {
@@ -8,8 +8,11 @@ export class EmailService {
    * Send email verification email to user
    * TODO: Integrate with actual email service (SendGrid, AWS SES, Mailgun, etc.)
    */
-  async sendVerificationEmail(email: string, token: string): Promise<{ success: boolean }> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  async sendVerificationEmail(
+    email: string,
+    token: string,
+  ): Promise<{ success: boolean }> {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const verificationLink = `${frontendUrl}/verify-email?token=${token}`;
 
     this.logger.log(`[STUB] Verification email would be sent to: ${email}`);
@@ -32,8 +35,11 @@ export class EmailService {
    * Send password reset email to user
    * TODO: Integrate with actual email service
    */
-  async sendPasswordResetEmail(email: string, token: string): Promise<{ success: boolean }> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  async sendPasswordResetEmail(
+    email: string,
+    token: string,
+  ): Promise<{ success: boolean }> {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
     this.logger.log(`[STUB] Password reset email would be sent to: ${email}`);
@@ -49,7 +55,10 @@ export class EmailService {
    * Send welcome email to new user
    * TODO: Integrate with actual email service
    */
-  async sendWelcomeEmail(email: string, firstName?: string): Promise<{ success: boolean }> {
+  async sendWelcomeEmail(
+    email: string,
+    firstName?: string,
+  ): Promise<{ success: boolean }> {
     this.logger.log(`[STUB] Welcome email would be sent to: ${email}`);
     if (firstName) {
       this.logger.log(`[STUB] User name: ${firstName}`);

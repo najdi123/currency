@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { TrackedItem, TrackedItemSchema } from './tracked-item.schema';
-import { CurrentPrice, CurrentPriceSchema } from './current-price.schema';
-import { IntradayOhlc, IntradayOhlcSchema } from './intraday-ohlc.schema';
-import { HistoricalOhlc, HistoricalOhlcSchema } from './historical-ohlc.schema';
-import { UserRateLimit, UserRateLimitSchema } from './user-rate-limit.schema';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { TrackedItem, TrackedItemSchema } from "./tracked-item.schema";
+import { CurrentPrice, CurrentPriceSchema } from "./current-price.schema";
+import { IntradayOhlc, IntradayOhlcSchema } from "./intraday-ohlc.schema";
+import { HistoricalOhlc, HistoricalOhlcSchema } from "./historical-ohlc.schema";
+import { UserRateLimit, UserRateLimitSchema } from "./user-rate-limit.schema";
 
 /**
  * Schemas Module

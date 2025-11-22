@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 
 export interface AuditEventData {
   action: string;
@@ -64,9 +64,14 @@ export class AuditService {
   /**
    * Log a successful authentication event
    */
-  async logSuccessfulLogin(userId: string, email: string, ipAddress?: string, userAgent?: string): Promise<void> {
+  async logSuccessfulLogin(
+    userId: string,
+    email: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<void> {
     await this.logEvent({
-      action: 'USER_LOGIN_SUCCESS',
+      action: "USER_LOGIN_SUCCESS",
       userId,
       performedBy: email,
       ipAddress,
@@ -79,9 +84,14 @@ export class AuditService {
   /**
    * Log a failed authentication attempt
    */
-  async logFailedLogin(email: string, reason: string, ipAddress?: string, userAgent?: string): Promise<void> {
+  async logFailedLogin(
+    email: string,
+    reason: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<void> {
     await this.logEvent({
-      action: 'USER_LOGIN_FAILED',
+      action: "USER_LOGIN_FAILED",
       performedBy: email,
       ipAddress,
       userAgent,
@@ -94,9 +104,15 @@ export class AuditService {
   /**
    * Log user registration
    */
-  async logUserRegistration(userId: string, email: string, role: string, performedBy?: string, ipAddress?: string): Promise<void> {
+  async logUserRegistration(
+    userId: string,
+    email: string,
+    role: string,
+    performedBy?: string,
+    ipAddress?: string,
+  ): Promise<void> {
     await this.logEvent({
-      action: 'USER_REGISTRATION',
+      action: "USER_REGISTRATION",
       userId,
       performedBy: performedBy || email,
       ipAddress,
@@ -108,9 +124,13 @@ export class AuditService {
   /**
    * Log password change
    */
-  async logPasswordChange(userId: string, email: string, ipAddress?: string): Promise<void> {
+  async logPasswordChange(
+    userId: string,
+    email: string,
+    ipAddress?: string,
+  ): Promise<void> {
     await this.logEvent({
-      action: 'PASSWORD_CHANGE',
+      action: "PASSWORD_CHANGE",
       userId,
       performedBy: email,
       ipAddress,
@@ -122,9 +142,15 @@ export class AuditService {
   /**
    * Log user profile update
    */
-  async logUserUpdate(userId: string, email: string, changedFields: string[], performedBy: string, ipAddress?: string): Promise<void> {
+  async logUserUpdate(
+    userId: string,
+    email: string,
+    changedFields: string[],
+    performedBy: string,
+    ipAddress?: string,
+  ): Promise<void> {
     await this.logEvent({
-      action: 'USER_UPDATE',
+      action: "USER_UPDATE",
       userId,
       performedBy,
       ipAddress,
@@ -140,9 +166,14 @@ export class AuditService {
   /**
    * Log sensitive data access (e.g., admin viewing user details)
    */
-  async logUserAccess(userId: string, email: string, accessedBy: string, ipAddress?: string): Promise<void> {
+  async logUserAccess(
+    userId: string,
+    email: string,
+    accessedBy: string,
+    ipAddress?: string,
+  ): Promise<void> {
     await this.logEvent({
-      action: 'USER_DATA_ACCESS',
+      action: "USER_DATA_ACCESS",
       userId,
       performedBy: accessedBy,
       ipAddress,
@@ -154,11 +185,10 @@ export class AuditService {
   /**
    * Format audit entry as a readable log message
    */
-  private formatLogMessage(entry: AuditEventData & { timestamp: Date; success: boolean }): string {
-    const parts: string[] = [
-      `[AUDIT]`,
-      `Action: ${entry.action}`,
-    ];
+  private formatLogMessage(
+    entry: AuditEventData & { timestamp: Date; success: boolean },
+  ): string {
+    const parts: string[] = [`[AUDIT]`, `Action: ${entry.action}`];
 
     if (entry.userId) {
       parts.push(`UserId: ${entry.userId}`);
@@ -182,6 +212,6 @@ export class AuditService {
 
     parts.push(`Timestamp: ${entry.timestamp.toISOString()}`);
 
-    return parts.join(' | ');
+    return parts.join(" | ");
   }
 }

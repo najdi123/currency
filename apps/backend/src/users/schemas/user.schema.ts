@@ -1,20 +1,20 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type UserDocument = User & Document;
 
 export enum UserStatus {
-  ACTIVE = 'active',
-  SUSPENDED = 'suspended',
-  PENDING = 'pending',
+  ACTIVE = "active",
+  SUSPENDED = "suspended",
+  PENDING = "pending",
 }
 
 export enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
+  USER = "user",
+  ADMIN = "admin",
 }
 
-@Schema({ timestamps: true, collection: 'users' })
+@Schema({ timestamps: true, collection: "users" })
 export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;

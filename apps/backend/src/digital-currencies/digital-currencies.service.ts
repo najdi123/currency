@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { HistoryService } from '../history/history.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { HistoryService } from "../history/history.service";
 
 @Injectable()
 export class DigitalCurrenciesService {
@@ -10,10 +10,16 @@ export class DigitalCurrenciesService {
   async getHistory(symbol: string, days: number = 7) {
     try {
       this.logger.log(`Fetching real historical data for ${symbol}`);
-      const realHistoryData = await this.historyService.getHistory(symbol, 'digital-currency', days);
+      const realHistoryData = await this.historyService.getHistory(
+        symbol,
+        "digital-currency",
+        days,
+      );
 
       if (realHistoryData && realHistoryData.length > 0) {
-        this.logger.log(`Successfully fetched ${realHistoryData.length} real data points for ${symbol}`);
+        this.logger.log(
+          `Successfully fetched ${realHistoryData.length} real data points for ${symbol}`,
+        );
         return {
           success: true,
           data: realHistoryData,

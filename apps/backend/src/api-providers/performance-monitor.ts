@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from "@nestjs/common";
 
 /**
  * Performance metrics for a specific operation
@@ -23,15 +23,18 @@ export interface PerformanceMetrics {
  */
 export class PerformanceMonitor {
   private readonly logger = new Logger(PerformanceMonitor.name);
-  private metrics = new Map<string, {
-    totalCalls: number;
-    totalDuration: number;
-    minDuration: number;
-    maxDuration: number;
-    lastDuration: number;
-    lastCallTime: Date;
-    durations: number[]; // For percentile calculations
-  }>();
+  private metrics = new Map<
+    string,
+    {
+      totalCalls: number;
+      totalDuration: number;
+      minDuration: number;
+      maxDuration: number;
+      lastDuration: number;
+      lastCallTime: Date;
+      durations: number[]; // For percentile calculations
+    }
+  >();
 
   // Maximum number of duration samples to keep per operation
   private readonly maxSamples: number;
@@ -121,7 +124,7 @@ export class PerformanceMonitor {
     // Log slow operations (> 1 second)
     if (durationMs > 1000) {
       this.logger.warn(
-        `⏱️ Slow operation detected: "${operation}" took ${durationMs.toFixed(2)}ms`
+        `⏱️ Slow operation detected: "${operation}" took ${durationMs.toFixed(2)}ms`,
       );
     }
   }
@@ -157,7 +160,9 @@ export class PerformanceMonitor {
    * Get all performance metrics
    */
   getAllMetrics(): PerformanceMetrics[] {
-    return Array.from(this.metrics.keys()).map(operation => this.getMetrics(operation)!);
+    return Array.from(this.metrics.keys()).map(
+      (operation) => this.getMetrics(operation)!,
+    );
   }
 
   /**
@@ -171,18 +176,24 @@ export class PerformanceMonitor {
   } {
     const allMetrics = this.getAllMetrics();
 
-    const sortedByAvg = [...allMetrics].sort((a, b) => b.averageDuration - a.averageDuration);
+    const sortedByAvg = [...allMetrics].sort(
+      (a, b) => b.averageDuration - a.averageDuration,
+    );
 
     return {
       totalOperations: allMetrics.length,
       totalCalls: allMetrics.reduce((sum, m) => sum + m.totalCalls, 0),
-      slowestOperations: sortedByAvg
-        .slice(0, 5)
-        .map(m => ({ operation: m.operation, avgDuration: m.averageDuration })),
+      slowestOperations: sortedByAvg.slice(0, 5).map((m) => ({
+        operation: m.operation,
+        avgDuration: m.averageDuration,
+      })),
       fastestOperations: sortedByAvg
         .slice(-5)
         .reverse()
-        .map(m => ({ operation: m.operation, avgDuration: m.averageDuration })),
+        .map((m) => ({
+          operation: m.operation,
+          avgDuration: m.averageDuration,
+        })),
     };
   }
 
@@ -198,15 +209,19 @@ export class PerformanceMonitor {
 
     if (summary.slowestOperations.length > 0) {
       this.logger.log(`   🐌 Slowest Operations:`);
-      summary.slowestOperations.forEach(op => {
-        this.logger.log(`      - ${op.operation}: ${op.avgDuration.toFixed(2)}ms avg`);
+      summary.slowestOperations.forEach((op) => {
+        this.logger.log(
+          `      - ${op.operation}: ${op.avgDuration.toFixed(2)}ms avg`,
+        );
       });
     }
 
     if (summary.fastestOperations.length > 0) {
       this.logger.log(`   ⚡ Fastest Operations:`);
-      summary.fastestOperations.forEach(op => {
-        this.logger.log(`      - ${op.operation}: ${op.avgDuration.toFixed(2)}ms avg`);
+      summary.fastestOperations.forEach((op) => {
+        this.logger.log(
+          `      - ${op.operation}: ${op.avgDuration.toFixed(2)}ms avg`,
+        );
       });
     }
   }
@@ -216,7 +231,7 @@ export class PerformanceMonitor {
    */
   clear(): void {
     this.metrics.clear();
-    this.logger.debug('Performance metrics cleared');
+    this.logger.debug("Performance metrics cleared");
   }
 
   /**
@@ -224,7 +239,9 @@ export class PerformanceMonitor {
    */
   clearOperation(operation: string): void {
     this.metrics.delete(operation);
-    this.logger.debug(`Performance metrics cleared for operation: ${operation}`);
+    this.logger.debug(
+      `Performance metrics cleared for operation: ${operation}`,
+    );
   }
 
   /**
@@ -232,10 +249,14 @@ export class PerformanceMonitor {
    */
   exportMetrics(): string {
     const allMetrics = this.getAllMetrics();
-    return JSON.stringify({
-      timestamp: new Date().toISOString(),
-      summary: this.getSummary(),
-      metrics: allMetrics,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        summary: this.getSummary(),
+        metrics: allMetrics,
+      },
+      null,
+      2,
+    );
   }
 }

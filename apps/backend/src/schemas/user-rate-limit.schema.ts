@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type UserRateLimitDocument = UserRateLimit & Document;
 
@@ -16,7 +16,7 @@ export interface RequestHistoryItem {
  * Documents: ~1,000 active windows
  * Growth: Controlled by TTL (auto-delete after 3 hours)
  */
-@Schema({ collection: 'user_rate_limits', timestamps: true })
+@Schema({ collection: "user_rate_limits", timestamps: true })
 export class UserRateLimit {
   @Prop({ required: true })
   identifier: string; // User ID or IP address (e.g., 'user_123' or 'ip_1.2.3.4')
@@ -40,7 +40,7 @@ export class UserRateLimit {
       validator: function (arr: RequestHistoryItem[]) {
         return arr.length <= 50;
       },
-      message: 'Request history cannot exceed 50 items',
+      message: "Request history cannot exceed 50 items",
     },
   })
   requestHistory?: RequestHistoryItem[]; // Last 50 requests
@@ -62,4 +62,7 @@ UserRateLimitSchema.index({ identifier: 1, windowStart: 1 }, { unique: true });
 UserRateLimitSchema.index({ windowEnd: 1 });
 
 // TTL index: Auto-delete after 3 hours (2-hour window + 1 hour buffer)
-UserRateLimitSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3 * 60 * 60 });
+UserRateLimitSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 3 * 60 * 60 },
+);

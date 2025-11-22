@@ -1,16 +1,16 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type HistoricalOhlcDocument = HistoricalOhlc & Document;
 
 export enum OhlcTimeframe {
-  HOURLY = 'hourly',
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  MONTHLY = 'monthly',
+  HOURLY = "hourly",
+  DAILY = "daily",
+  WEEKLY = "weekly",
+  MONTHLY = "monthly",
 }
 
-@Schema({ collection: 'historical_ohlc', timestamps: true })
+@Schema({ collection: "historical_ohlc", timestamps: true })
 export class HistoricalOhlc {
   @Prop({ required: true })
   itemCode: string; // References TrackedItem.code
@@ -43,7 +43,8 @@ export class HistoricalOhlc {
   expiresAt?: Date; // Optional TTL for cleanup policies
 }
 
-export const HistoricalOhlcSchema = SchemaFactory.createForClass(HistoricalOhlc);
+export const HistoricalOhlcSchema =
+  SchemaFactory.createForClass(HistoricalOhlc);
 
 // Compound indexes for efficient queries
 HistoricalOhlcSchema.index({ itemCode: 1, timeframe: 1, periodStart: -1 });

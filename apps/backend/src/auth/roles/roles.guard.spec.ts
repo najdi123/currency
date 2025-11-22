@@ -1,11 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { ExecutionContext } from '@nestjs/common';
-import { RolesGuard } from './roles.guard';
-import { UserRole } from '../../users/schemas/user.schema';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ForbiddenException } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { ExecutionContext } from "@nestjs/common";
+import { RolesGuard } from "./roles.guard";
+import { UserRole } from "../../users/schemas/user.schema";
 
-describe('RolesGuard', () => {
+describe("RolesGuard", () => {
   let guard: RolesGuard;
   let reflector: jest.Mocked<Reflector>;
 
@@ -15,10 +15,7 @@ describe('RolesGuard', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RolesGuard,
-        { provide: Reflector, useValue: mockReflector },
-      ],
+      providers: [RolesGuard, { provide: Reflector, useValue: mockReflector }],
     }).compile();
 
     guard = module.get<RolesGuard>(RolesGuard);
@@ -41,8 +38,8 @@ describe('RolesGuard', () => {
     } as any;
   };
 
-  describe('canActivate', () => {
-    it('should allow access when user has required role', () => {
+  describe("canActivate", () => {
+    it("should allow access when user has required role", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.ADMIN });
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
@@ -52,15 +49,15 @@ describe('RolesGuard', () => {
       expect(reflector.getAllAndOverride).toHaveBeenCalled();
     });
 
-    it('should deny access when user lacks required role', () => {
+    it("should deny access when user lacks required role", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.USER });
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
       expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
-      expect(() => guard.canActivate(mockContext)).toThrow('Insufficient role');
+      expect(() => guard.canActivate(mockContext)).toThrow("Insufficient role");
     });
 
-    it('should allow access when no roles are required', () => {
+    it("should allow access when no roles are required", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.USER });
       reflector.getAllAndOverride.mockReturnValue(null);
 
@@ -69,7 +66,7 @@ describe('RolesGuard', () => {
       expect(result).toBe(true);
     });
 
-    it('should allow access when roles array is empty', () => {
+    it("should allow access when roles array is empty", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.USER });
       reflector.getAllAndOverride.mockReturnValue([]);
 
@@ -78,30 +75,35 @@ describe('RolesGuard', () => {
       expect(result).toBe(true);
     });
 
-    it('should work with multiple roles', () => {
+    it("should work with multiple roles", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.USER });
-      reflector.getAllAndOverride.mockReturnValue([UserRole.USER, UserRole.ADMIN]);
+      reflector.getAllAndOverride.mockReturnValue([
+        UserRole.USER,
+        UserRole.ADMIN,
+      ]);
 
       const result = guard.canActivate(mockContext);
 
       expect(result).toBe(true);
     });
 
-    it('should deny access when user is undefined', () => {
+    it("should deny access when user is undefined", () => {
       const mockContext = createMockExecutionContext(undefined);
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
       expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
     });
 
-    it('should deny access when user has no role', () => {
-      const mockContext = createMockExecutionContext({ email: 'test@example.com' });
+    it("should deny access when user has no role", () => {
+      const mockContext = createMockExecutionContext({
+        email: "test@example.com",
+      });
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
       expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
     });
 
-    it('should allow admin access to admin-only routes', () => {
+    it("should allow admin access to admin-only routes", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.ADMIN });
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
@@ -110,23 +112,23 @@ describe('RolesGuard', () => {
       expect(result).toBe(true);
     });
 
-    it('should deny regular user access to admin-only routes', () => {
+    it("should deny regular user access to admin-only routes", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.USER });
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
       expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
     });
 
-    it('should check roles from both handler and class', () => {
+    it("should check roles from both handler and class", () => {
       const mockContext = createMockExecutionContext({ role: UserRole.ADMIN });
       reflector.getAllAndOverride.mockReturnValue([UserRole.ADMIN]);
 
       guard.canActivate(mockContext);
 
-      expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
-        'roles',
-        [mockContext.getHandler(), mockContext.getClass()]
-      );
+      expect(reflector.getAllAndOverride).toHaveBeenCalledWith("roles", [
+        mockContext.getHandler(),
+        mockContext.getClass(),
+      ]);
     });
   });
 });

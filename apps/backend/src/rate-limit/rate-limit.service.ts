@@ -1,10 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
-import moment from 'moment-timezone';
-import { UserRateLimit, UserRateLimitDocument } from '../schemas/user-rate-limit.schema';
-import { MetricsService } from '../metrics/metrics.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { ConfigService } from "@nestjs/config";
+import { Model } from "mongoose";
+import moment from "moment-timezone";
+import {
+  UserRateLimit,
+  UserRateLimitDocument,
+} from "../schemas/user-rate-limit.schema";
+import { MetricsService } from "../metrics/metrics.service";
 
 export interface RateLimitCheckResult {
   allowed: boolean;
@@ -35,8 +38,13 @@ export class RateLimitService {
     private readonly metricsService: MetricsService,
   ) {
     // Load configuration with validation and defaults
-    const windowHours = this.parseConfig('RATE_LIMIT_WINDOW_HOURS', 2, 1, 24);
-    const maxRequests = this.parseConfig('RATE_LIMIT_MAX_REQUESTS', 20, 1, 1000);
+    const windowHours = this.parseConfig("RATE_LIMIT_WINDOW_HOURS", 2, 1, 24);
+    const maxRequests = this.parseConfig(
+      "RATE_LIMIT_MAX_REQUESTS",
+      20,
+      1,
+      1000,
+    );
 
     this.WINDOW_DURATION_MS = windowHours * 60 * 60 * 1000;
     this.MAX_REQUESTS_PER_WINDOW = maxRequests;
@@ -49,7 +57,12 @@ export class RateLimitService {
   /**
    * Safely parse and validate configuration values
    */
-  private parseConfig(key: string, defaultValue: number, min: number, max: number): number {
+  private parseConfig(
+    key: string,
+    defaultValue: number,
+    min: number,
+    max: number,
+  ): number {
     const value = this.configService.get<string>(key);
     if (!value) return defaultValue;
 
@@ -73,7 +86,7 @@ export class RateLimitService {
    */
   private getCurrentWindow(): { start: Date; end: Date } {
     // Get current time in Tehran timezone (UTC+3:30)
-    const tehranTime = moment().tz('Asia/Tehran');
+    const tehranTime = moment().tz("Asia/Tehran");
 
     // Get hour of day in Tehran (0-23)
     const hourOfDay = tehranTime.hours();
@@ -85,13 +98,13 @@ export class RateLimitService {
     // Calculate window start in Tehran time
     const windowStartInTehran = tehranTime
       .clone()
-      .startOf('day')
-      .add(windowNumber * windowDurationHours, 'hours');
+      .startOf("day")
+      .add(windowNumber * windowDurationHours, "hours");
 
     // Calculate window end in Tehran time
     const windowEndInTehran = windowStartInTehran
       .clone()
-      .add(windowDurationHours, 'hours');
+      .add(windowDurationHours, "hours");
 
     // Convert to UTC Date objects for storage
     return {
@@ -127,7 +140,9 @@ export class RateLimitService {
       if (record.freshRequestsUsed >= this.MAX_REQUESTS_PER_WINDOW) {
         // Quota exceeded - must wait for next window
         const now = new Date();
-        const retryAfter = Math.ceil((window.end.getTime() - now.getTime()) / 1000);
+        const retryAfter = Math.ceil(
+          (window.end.getTime() - now.getTime()) / 1000,
+        );
 
         this.logger.warn(
           `Rate limit exceeded for ${identifier}. Retry in ${retryAfter}s`,
@@ -221,9 +236,14 @@ export class RateLimitService {
           windowStart: window.start,
         });
 
-        if (existing && existing.freshRequestsUsed >= this.MAX_REQUESTS_PER_WINDOW) {
+        if (
+          existing &&
+          existing.freshRequestsUsed >= this.MAX_REQUESTS_PER_WINDOW
+        ) {
           const now = new Date();
-          const retryAfter = Math.ceil((window.end.getTime() - now.getTime()) / 1000);
+          const retryAfter = Math.ceil(
+            (window.end.getTime() - now.getTime()) / 1000,
+          );
 
           this.logger.warn(
             `Rate limit exceeded for ${identifier}. Retry in ${retryAfter}s`,
@@ -244,9 +264,14 @@ export class RateLimitService {
       }
 
       // Successfully consumed quota
-      const remaining = Math.max(0, this.MAX_REQUESTS_PER_WINDOW - (result?.freshRequestsUsed || 1));
+      const remaining = Math.max(
+        0,
+        this.MAX_REQUESTS_PER_WINDOW - (result?.freshRequestsUsed || 1),
+      );
 
-      this.logger.debug(`Consumed quota for ${identifier}, remaining: ${remaining}`);
+      this.logger.debug(
+        `Consumed quota for ${identifier}, remaining: ${remaining}`,
+      );
 
       // Track metrics
       this.metricsService.trackRateLimitQuotaConsumed(
@@ -263,7 +288,10 @@ export class RateLimitService {
         showStaleData: false,
       };
     } catch (error) {
-      this.logger.error(`Error in checkAndConsumeQuota for ${identifier}:`, error);
+      this.logger.error(
+        `Error in checkAndConsumeQuota for ${identifier}:`,
+        error,
+      );
 
       // Track error metric
       this.metricsService.trackRateLimitError(
@@ -306,12 +334,16 @@ export class RateLimitService {
    * @throws Error if identifier is invalid
    */
   private validateIdentifier(identifier: string): void {
-    if (!identifier || identifier.trim() === '') {
-      throw new Error('Identifier cannot be empty');
+    if (!identifier || identifier.trim() === "") {
+      throw new Error("Identifier cannot be empty");
     }
 
-    if (identifier === 'ip_unknown' || identifier === 'ip_undefined' || identifier === 'ip_null') {
-      throw new Error('Invalid IP identifier');
+    if (
+      identifier === "ip_unknown" ||
+      identifier === "ip_undefined" ||
+      identifier === "ip_null"
+    ) {
+      throw new Error("Invalid IP identifier");
     }
 
     // Basic format validation
@@ -334,13 +366,13 @@ export class RateLimitService {
     }
 
     // Fallback to IP address
-    const forwarded = request.headers['x-forwarded-for'];
-    let ip = forwarded ? forwarded.split(',')[0].trim() : request.ip;
+    const forwarded = request.headers["x-forwarded-for"];
+    let ip = forwarded ? forwarded.split(",")[0].trim() : request.ip;
 
     // Validate IP exists
-    if (!ip || ip === 'undefined' || ip === 'null') {
-      ip = '127.0.0.1'; // Fallback to localhost for local dev
-      this.logger.warn('Could not determine IP address, using localhost');
+    if (!ip || ip === "undefined" || ip === "null") {
+      ip = "127.0.0.1"; // Fallback to localhost for local dev
+      this.logger.warn("Could not determine IP address, using localhost");
     }
 
     const identifier = `ip_${ip}`;

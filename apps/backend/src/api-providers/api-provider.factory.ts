@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { IApiProvider } from './api-provider.interface';
-import { PersianApiProvider } from './persianapi.provider';
+import { Injectable, Logger } from "@nestjs/common";
+import { IApiProvider } from "./api-provider.interface";
+import { PersianApiProvider } from "./persianapi.provider";
 
 /**
  * API Provider Factory
@@ -13,7 +13,7 @@ export class ApiProviderFactory {
   private readonly logger = new Logger(ApiProviderFactory.name);
 
   constructor(private readonly persianApiProvider: PersianApiProvider) {
-    this.logger.log('Initialized with PersianAPI provider');
+    this.logger.log("Initialized with PersianAPI provider");
   }
 
   /**
@@ -27,7 +27,7 @@ export class ApiProviderFactory {
    * Get the name of the active provider
    */
   getActiveProviderName(): string {
-    return 'persianapi';
+    return "persianapi";
   }
 
   /**
@@ -38,14 +38,14 @@ export class ApiProviderFactory {
       const isValid = await this.persianApiProvider.validateApiKey();
 
       if (isValid) {
-        this.logger.log('PersianAPI validated successfully');
+        this.logger.log("PersianAPI validated successfully");
       } else {
-        this.logger.error('PersianAPI validation failed');
+        this.logger.error("PersianAPI validation failed");
       }
 
       return isValid;
     } catch (error) {
-      this.logger.error('Failed to validate PersianAPI', error);
+      this.logger.error("Failed to validate PersianAPI", error);
       return false;
     }
   }

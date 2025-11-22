@@ -18,7 +18,16 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "*.config.js",
+      "*.config.ts",
+      "jest.config.js",
     ],
+  },
+  {
+    rules: {
+      "@typescript-eslint/no-unsafe-declaration-merging": "off",
+      "@typescript-eslint/no-var-requires": "off",
+    },
   },
 ];
 

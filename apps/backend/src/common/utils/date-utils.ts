@@ -3,12 +3,12 @@
  * All dates in the system use Tehran timezone (Asia/Tehran, UTC+3:30)
  */
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException } from "@nestjs/common";
 
 /**
  * Tehran timezone identifier
  */
-export const TEHRAN_TIMEZONE = 'Asia/Tehran';
+export const TEHRAN_TIMEZONE = "Asia/Tehran";
 
 /**
  * Parse a YYYY-MM-DD date string and return Date object in Tehran timezone
@@ -23,7 +23,7 @@ export function parseTehranDate(dateStr: string): Date {
 
   if (!match) {
     throw new BadRequestException(
-      'Invalid date format. Use YYYY-MM-DD (e.g., 2025-01-15)'
+      "Invalid date format. Use YYYY-MM-DD (e.g., 2025-01-15)",
     );
   }
 
@@ -34,13 +34,13 @@ export function parseTehranDate(dateStr: string): Date {
   // Validate ranges
   if (month < 1 || month > 12) {
     throw new BadRequestException(
-      `Invalid month: ${month}. Month must be between 1 and 12.`
+      `Invalid month: ${month}. Month must be between 1 and 12.`,
     );
   }
 
   if (day < 1 || day > 31) {
     throw new BadRequestException(
-      `Invalid day: ${day}. Day must be between 1 and 31.`
+      `Invalid day: ${day}. Day must be between 1 and 31.`,
     );
   }
 
@@ -54,7 +54,7 @@ export function parseTehranDate(dateStr: string): Date {
     date.getUTCFullYear() !== year
   ) {
     throw new BadRequestException(
-      `Invalid date: ${dateStr}. This date does not exist in the calendar.`
+      `Invalid date: ${dateStr}. This date does not exist in the calendar.`,
     );
   }
 
@@ -69,11 +69,11 @@ export function getTehranToday(): Date {
   const now = new Date();
 
   // Get Tehran date components
-  const tehranDateStr = new Intl.DateTimeFormat('en-CA', {
+  const tehranDateStr = new Intl.DateTimeFormat("en-CA", {
     timeZone: TEHRAN_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(now);
 
   // Parse as YYYY-MM-DD and return
@@ -87,14 +87,14 @@ export function getTehranToday(): Date {
  */
 export function getTehranStartOfDay(date: Date): Date {
   // Get Tehran date string
-  const tehranDateStr = new Intl.DateTimeFormat('en-CA', {
+  const tehranDateStr = new Intl.DateTimeFormat("en-CA", {
     timeZone: TEHRAN_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(date);
 
-  const [year, month, day] = tehranDateStr.split('-').map(Number);
+  const [year, month, day] = tehranDateStr.split("-").map(Number);
 
   // Create date at start of day in Tehran
   // Tehran is UTC+3:30, so we need to calculate UTC equivalent
@@ -125,11 +125,11 @@ export function getTehranEndOfDay(date: Date): Date {
  * @returns Formatted date string
  */
 export function formatTehranDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: TEHRAN_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(date);
 }
 
@@ -149,7 +149,7 @@ export function validateDateAge(date: Date, maxDays: number): string | null {
   }
 
   if (ageInMs < 0) {
-    return 'Date cannot be in the future.';
+    return "Date cannot be in the future.";
   }
 
   return null;
@@ -166,7 +166,7 @@ export function getTehranDayBoundaries(date: Date): {
   endOfDay: Date;
 } {
   const tehranDateStr = formatTehranDate(date);
-  const [year, month, day] = tehranDateStr.split('-').map(Number);
+  const [year, month, day] = tehranDateStr.split("-").map(Number);
 
   // Create precise boundaries in UTC
   // Tehran is UTC+3:30, so midnight Tehran = 20:30 previous day UTC

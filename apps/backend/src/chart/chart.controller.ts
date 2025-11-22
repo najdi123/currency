@@ -5,12 +5,12 @@ import {
   Query,
   Logger,
   BadRequestException,
-} from '@nestjs/common';
-import { ChartService } from './chart.service';
-import { ChartQueryDto } from './dto/chart-query.dto';
-import { ChartResponse } from './interfaces/chart.interface';
+} from "@nestjs/common";
+import { ChartService } from "./chart.service";
+import { ChartQueryDto } from "./dto/chart-query.dto";
+import { ChartResponse } from "./interfaces/chart.interface";
 
-@Controller('chart')
+@Controller("chart")
 export class ChartController {
   private readonly logger = new Logger(ChartController.name);
 
@@ -29,18 +29,20 @@ export class ChartController {
    * GET /api/chart/BTC?timeRange=1m&itemType=crypto
    * GET /api/chart/SEKKEH?timeRange=1y&itemType=gold
    */
-  @Get(':currencyCode')
+  @Get(":currencyCode")
   async getChartData(
-    @Param('currencyCode') currencyCode: string,
+    @Param("currencyCode") currencyCode: string,
     @Query() query: ChartQueryDto,
   ): Promise<ChartResponse> {
     // Validate currency code
     if (!currencyCode || currencyCode.trim().length === 0) {
-      throw new BadRequestException('Currency code is required');
+      throw new BadRequestException("Currency code is required");
     }
 
     if (currencyCode.length > 20) {
-      throw new BadRequestException('Currency code too long (max 20 characters)');
+      throw new BadRequestException(
+        "Currency code too long (max 20 characters)",
+      );
     }
 
     this.logger.log(
