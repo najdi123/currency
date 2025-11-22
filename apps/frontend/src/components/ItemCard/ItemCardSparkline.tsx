@@ -51,9 +51,10 @@ export const ItemCardSparkline: React.FC<ItemCardSparklineProps> = ({
   compact = false,
   show = true,
 }) => {
+  const t = useTranslations('Chart')
+
   // Don't render if show is false
   if (!show) return null
-  const t = useTranslations('Chart')
   return (
     <div className="flex-shrink-0 self-center">
       {/* Screen reader description for sparkline */}

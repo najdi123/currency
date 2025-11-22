@@ -255,6 +255,7 @@ export class MetricsService {
    * Track a cache hit
    */
   trackCacheHit(category: string, source: string): void {
+    this.cacheOperations.hits++;
     this.logger.debug(`Cache hit: ${category} from ${source}`);
   }
 
@@ -262,8 +263,60 @@ export class MetricsService {
    * Track a cache miss
    */
   trackCacheMiss(category: string, source: string): void {
+    this.cacheOperations.misses++;
     this.logger.debug(`Cache miss: ${category} from ${source}`);
   }
+
+  /**
+   * Track a cache set operation
+   */
+  trackCacheSet(key: string): void {
+    this.cacheOperations.sets++;
+    this.logger.debug(`Cache set: ${key}`);
+  }
+
+  /**
+   * Track a cache error
+   */
+  trackCacheError(error: string): void {
+    this.cacheOperations.errors++;
+    this.logger.error(`Cache error: ${error}`);
+  }
+
+  /**
+   * Get cache performance metrics
+   */
+  getCacheMetrics(): {
+    hits: number;
+    misses: number;
+    sets: number;
+    errors: number;
+    hitRate: number;
+    totalRequests: number;
+  } {
+    const totalRequests = this.cacheOperations.hits + this.cacheOperations.misses;
+    const hitRate =
+      totalRequests > 0
+        ? (this.cacheOperations.hits / totalRequests) * 100
+        : 0;
+
+    return {
+      hits: this.cacheOperations.hits,
+      misses: this.cacheOperations.misses,
+      sets: this.cacheOperations.sets,
+      errors: this.cacheOperations.errors,
+      totalRequests,
+      hitRate: parseFloat(hitRate.toFixed(2)),
+    };
+  }
+
+  // Cache performance metrics
+  private cacheOperations = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    errors: 0,
+  };
 
   // Rate limiting metrics
   private rateLimitQuotaConsumed = new Map<string, number>(); // identifier -> count
@@ -370,6 +423,54 @@ export class MetricsService {
     this.rateLimitQuotaConsumed.clear();
     this.rateLimitQuotaExhausted.clear();
     this.rateLimitErrors = 0;
+    this.cacheOperations = {
+      hits: 0,
+      misses: 0,
+      sets: 0,
+      errors: 0,
+    };
     this.logger.log("All metrics cleared");
+  }
+
+  /**
+   * Get comprehensive performance report
+   */
+  getPerformanceReport(): {
+    cache: {
+      hits: number;
+      misses: number;
+      sets: number;
+      errors: number;
+      hitRate: number;
+      totalRequests: number;
+    };
+    rateLimit: {
+      totalQuotaConsumed: number;
+      totalQuotaExhausted: number;
+      totalErrors: number;
+      topConsumers: Array<{ identifier: string; count: number }>;
+      topExhausted: Array<{ identifier: string; count: number }>;
+    };
+    health: {
+      healthy: boolean;
+      warnings: string[];
+      criticalIssues: string[];
+    };
+    failures: {
+      snapshots: SnapshotFailureMetric[];
+      dbOperations: DbOperationFailureMetric[];
+    };
+    timestamp: string;
+  } {
+    return {
+      cache: this.getCacheMetrics(),
+      rateLimit: this.getRateLimitMetrics(),
+      health: this.getHealthStatus(),
+      failures: {
+        snapshots: this.getSnapshotFailureMetrics(),
+        dbOperations: this.getDbOperationFailureMetrics(),
+      },
+      timestamp: new Date().toISOString(),
+    };
   }
 }

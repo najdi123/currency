@@ -21,6 +21,7 @@ import { OHLCModule } from "./ohlc/ohlc.module";
 import { RateLimitModule } from "./rate-limit/rate-limit.module";
 import { RateLimitGuard } from "./rate-limit/rate-limit.guard";
 import { SchemasModule } from "./schemas/schemas.module";
+import { CacheModule } from "./cache/cache.module";
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { SchemasModule } from "./schemas/schemas.module";
     MetricsModule, // Global module for metrics tracking
     CommonModule, // Global module for common services (audit, etc.)
     SchemasModule, // Register new simplified schemas
+    CacheModule, // Global module for Redis caching with in-memory fallback
 
     // Feature modules
     CurrenciesModule,

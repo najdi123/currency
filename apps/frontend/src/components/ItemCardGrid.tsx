@@ -102,10 +102,6 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   // Fetch OHLC data for all items
   const { data: ohlcData } = useGetAllTodayOhlcQuery()
 
-  if (!data) {
-    return null
-  }
-
   // Create a lookup map for OHLC data by itemCode
   const ohlcMap = useMemo(() => {
     if (!ohlcData?.data) return {}
@@ -125,6 +121,10 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
       return acc
     }, {} as Record<string, () => void>)
   }, [items, onItemClick])
+
+  if (!data) {
+    return null
+  }
 
   return (
     <div

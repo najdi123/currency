@@ -443,7 +443,10 @@
     "closeChart": "Close chart",
     "priceChart": "Price Chart",
     "toman": "Toman",
-    "retryLoading": "Try again"
+    "retryLoading": "Try again",
+    "loadError": "Loading Error",
+    "loadErrorMessage": "Unfortunately an error occurred while loading the chart. Please try again.",
+    "retry": "Retry"
   },
   "Common": {
     "loading": "Loading...",

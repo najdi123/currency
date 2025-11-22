@@ -34,6 +34,11 @@ const PriceChartComponent: React.FC<PriceChartProps> = ({
     itemType,
   })
 
+  // Memoize retry handler to prevent recreation on every render
+  const handleRetry = useCallback(() => {
+    refetch()
+  }, [refetch])
+
   const chartOption = useMemo(() => {
     if (!data?.data?.length) return null
 
@@ -51,11 +56,6 @@ const PriceChartComponent: React.FC<PriceChartProps> = ({
   if (isLoading) {
     return <ChartLoadingState />
   }
-
-  // Memoize retry handler to prevent recreation on every render
-  const handleRetry = useCallback(() => {
-    refetch()
-  }, [refetch])
 
   if (error) {
     // Provide user-friendly error messages in Persian

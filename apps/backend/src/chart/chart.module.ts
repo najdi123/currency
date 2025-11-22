@@ -12,6 +12,10 @@ import {
   PriceSnapshot,
   PriceSnapshotSchema,
 } from "../navasan/schemas/price-snapshot.schema";
+import {
+  HistoricalOhlc,
+  HistoricalOhlcSchema,
+} from "../schemas/historical-ohlc.schema";
 import { MetricsModule } from "../metrics/metrics.module";
 
 @Module({
@@ -21,6 +25,7 @@ import { MetricsModule } from "../metrics/metrics.module";
       { name: Cache.name, schema: CacheSchema },
       { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
       { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
+      { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
     ]),
     MetricsModule,
   ],

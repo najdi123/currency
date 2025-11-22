@@ -42,6 +42,7 @@ import {
 } from "../common/utils/date-utils";
 import { MetricsService } from "../metrics/metrics.service";
 import { ApiProviderFactory } from "../api-providers/api-provider.factory";
+import { CacheService } from "../cache/cache.service";
 import {
   CurrencyData,
   CryptoData,
@@ -91,10 +92,7 @@ export class NavasanService {
   };
 
   // PERFORMANCE OPTIMIZATIONS
-  private ohlcCache = new Map<
-    string,
-    { data: NavasanResponse; expiry: number }
-  >();
+  // Note: ohlcCache and historicalCache migrated to Redis via CacheService
   private pendingRequests = new Map<
     string,
     Promise<ApiResponse<NavasanResponse>>
@@ -104,14 +102,7 @@ export class NavasanService {
   // FIX #1: RATE LIMITING - Prevent API overload by limiting concurrent requests
   private readonly requestLimit = pLimit(5); // Max 5 concurrent requests
 
-  // FIX #2: HISTORICAL DATA CACHING - Cache immutable historical data for 24 hours
-  private historicalCache = new Map<
-    string,
-    {
-      data: any;
-      timestamp: number;
-    }
-  >();
+  // FIX #2: HISTORICAL DATA CACHING - Cache immutable historical data for 24 hours (now in Redis)
   private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
   // FIX #4: CIRCUIT BREAKER - Fast failure recovery pattern
@@ -133,6 +124,7 @@ export class NavasanService {
     private metricsService: MetricsService,
     private apiProviderFactory: ApiProviderFactory, // Inject PersianAPI provider
     private intradayOhlcService: IntradayOhlcService, // Inject Intraday OHLC service
+    private cacheService: CacheService, // Inject Redis cache service
   ) {
     this.apiKey = this.configService.get<string>("NAVASAN_API_KEY") || "";
     if (!this.apiKey) {
@@ -149,27 +141,7 @@ export class NavasanService {
 
     this.logger.log(`Using internal API base URL: ${this.internalApiBaseUrl}`);
 
-    // Clear expired cache entries every 10 minutes
-    setInterval(() => this.cleanExpiredCache(), 600000);
-  }
-
-  /**
-   * Clean expired entries from OHLC cache
-   */
-  private cleanExpiredCache(): void {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [key, value] of this.ohlcCache.entries()) {
-      if (now > value.expiry) {
-        this.ohlcCache.delete(key);
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      this.logger.log(`🧹 Cleaned ${cleaned} expired OHLC cache entries`);
-    }
+    // Note: Cache cleanup now handled by Redis TTL and CacheService's built-in cleanup
   }
 
   /**
@@ -1242,13 +1214,13 @@ export class NavasanService {
     category: string,
   ): Promise<NavasanResponse | null> {
     try {
-      // Check cache first
-      const cacheKey = `ohlc-${category}-${new Date().toDateString()}`;
-      const cached = this.ohlcCache.get(cacheKey);
+      // Check cache first (using Redis)
+      const cacheKey = `navasan:ohlc:${category}:${new Date().toDateString()}`;
+      const cached = await this.cacheService.get<NavasanResponse>(cacheKey);
 
-      if (cached && Date.now() < cached.expiry) {
-        this.logger.log(`📦 Using cached OHLC data for ${category}`);
-        return cached.data;
+      if (cached) {
+        this.logger.log(`📦 Using cached OHLC data for ${category} (from Redis)`);
+        return cached;
       }
 
       // Calculate yesterday's date range
@@ -1342,14 +1314,12 @@ export class NavasanService {
         `✅ Successfully fetched ${Object.keys(result).length} items from OHLC for ${category}`,
       );
 
-      // Cache the result for 1 hour
+      // Cache the result for 1 hour (using Redis with TTL)
       const finalResult = result as NavasanResponse;
-      this.ohlcCache.set(cacheKey, {
-        data: finalResult,
-        expiry: Date.now() + this.ohlcCacheDuration,
-      });
+      const ttlSeconds = Math.floor(this.ohlcCacheDuration / 1000); // Convert ms to seconds
+      await this.cacheService.set(cacheKey, finalResult, ttlSeconds);
       this.logger.log(
-        `📦 Cached OHLC data for ${category} (expires in 1 hour)`,
+        `📦 Cached OHLC data for ${category} in Redis (expires in 1 hour)`,
       );
 
       return finalResult;
@@ -1612,13 +1582,13 @@ export class NavasanService {
       `📊 Fetching historical data for ${category} on ${formattedDate}`,
     );
 
-    // FIX #2: RESPONSE CACHING - Check cache for historical data (immutable, can cache for 24h)
-    const cacheKey = `${category}-${targetDate.toISOString().split("T")[0]}`;
-    const cached = this.historicalCache.get(cacheKey);
+    // FIX #2: RESPONSE CACHING - Check Redis cache for historical data (immutable, can cache for 24h)
+    const cacheKey = `navasan:historical:${category}:${targetDate.toISOString().split("T")[0]}`;
+    const cached = await this.cacheService.get<ApiResponse<NavasanResponse>>(cacheKey);
 
-    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-      this.logger.log(`📦 Cache hit for ${cacheKey}`);
-      return cached.data;
+    if (cached) {
+      this.logger.log(`📦 Cache hit for ${cacheKey} (from Redis)`);
+      return cached;
     }
 
     try {
@@ -1866,12 +1836,10 @@ export class NavasanService {
         },
       };
 
-      // FIX #2: RESPONSE CACHING - Store response in cache for 24 hours (historical data is immutable)
-      this.historicalCache.set(cacheKey, {
-        data: response,
-        timestamp: Date.now(),
-      });
-      this.logger.log(`💾 Cached ${cacheKey} for 24 hours`);
+      // FIX #2: RESPONSE CACHING - Store response in Redis for 24 hours (historical data is immutable)
+      const ttlSeconds = Math.floor(this.CACHE_DURATION / 1000); // Convert ms to seconds (24 hours)
+      await this.cacheService.set(cacheKey, response, ttlSeconds);
+      this.logger.log(`💾 Cached ${cacheKey} in Redis for 24 hours`);
 
       // Return the response in the expected format with enhanced metadata
       return response;

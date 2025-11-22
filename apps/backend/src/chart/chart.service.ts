@@ -19,6 +19,11 @@ import {
   PriceSnapshot,
   PriceSnapshotDocument,
 } from "../navasan/schemas/price-snapshot.schema";
+import {
+  HistoricalOhlc,
+  HistoricalOhlcDocument,
+  OhlcTimeframe,
+} from "../schemas/historical-ohlc.schema";
 import { safeDbRead, safeDbWrite } from "../common/utils/db-error-handler";
 import { MetricsService } from "../metrics/metrics.service";
 import { NavasanOHLCDataPoint } from "../navasan/interfaces/navasan-response.interface";
@@ -39,6 +44,8 @@ export class ChartService {
     private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     @InjectModel(PriceSnapshot.name)
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
+    @InjectModel(HistoricalOhlc.name)
+    private historicalOhlcModel: Model<HistoricalOhlcDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
   ) {
@@ -574,7 +581,7 @@ export class ChartService {
           return staleCache as NavasanOHLCDataPoint[];
         }
 
-        // Step 4: Try to build chart from price snapshots as last resort
+        // Step 4: Try to build chart from price snapshots
         this.logger.warn(
           `📸 Attempting price snapshot fallback for ${itemCode}`,
         );
@@ -592,9 +599,27 @@ export class ChartService {
           return snapshotData;
         }
 
+        // Step 5: Try to build chart from historical_ohlc database (newly implemented)
+        this.logger.warn(
+          `🗄️  Attempting historical_ohlc database fallback for ${itemCode}`,
+        );
+        const historicalData = await this.buildChartFromHistoricalOhlc(
+          itemCode,
+          startTimestamp,
+          endTimestamp,
+          timeRange,
+        );
+
+        if (historicalData) {
+          this.logger.warn(
+            `⚠️  Serving chart data from HISTORICAL_OHLC database for ${itemCode} (${timeRange})`,
+          );
+          return historicalData;
+        }
+
         // No fallback options available
         this.logger.error(
-          `❌ No stale OHLC cache or price snapshots available for ${itemCode}`,
+          `❌ No fallback data available for ${itemCode}: stale cache, price snapshots, and historical_ohlc all failed`,
         );
         throw apiError;
       }
@@ -1516,6 +1541,126 @@ export class ChartService {
 
       this.logger.error(
         `Failed to build chart from price snapshots for ${itemCode}: ${errorMessage}`,
+        errorStack,
+      );
+
+      return null;
+    }
+  }
+
+  /**
+   * Build chart data from historical_ohlc database as fallback
+   * Uses daily OHLC data aggregated from intraday snapshots
+   * @param itemCode - Item code (e.g., 'usd_sell', 'btc')
+   * @param startTimestamp - Start time (Unix timestamp)
+   * @param endTimestamp - End time (Unix timestamp)
+   * @param timeRange - Time range enum (for logging)
+   * @returns Array of OHLC data points, or null if no data available
+   */
+  private async buildChartFromHistoricalOhlc(
+    itemCode: string,
+    startTimestamp: number,
+    endTimestamp: number,
+    timeRange: TimeRange,
+  ): Promise<NavasanOHLCDataPoint[] | null> {
+    try {
+      // Validate timestamps
+      if (startTimestamp < 0 || endTimestamp < 0) {
+        this.logger.error(
+          `Invalid timestamps for ${itemCode}: start=${startTimestamp}, end=${endTimestamp}`,
+        );
+        return null;
+      }
+
+      if (startTimestamp >= endTimestamp) {
+        this.logger.error(
+          `Start timestamp must be before end timestamp for ${itemCode}`,
+        );
+        return null;
+      }
+
+      this.logger.log(
+        `🗄️  Querying historical_ohlc database for ${itemCode} (${timeRange})`,
+      );
+
+      // Convert Unix timestamps to Date objects
+      const startDate = new Date(startTimestamp * 1000);
+      const endDate = new Date(endTimestamp * 1000);
+
+      // Determine which timeframe to use based on time range
+      // For shorter ranges, use daily data; for longer ranges, use weekly/monthly
+      let timeframe: OhlcTimeframe;
+      const daysDiff = Math.floor((endTimestamp - startTimestamp) / 86400);
+
+      if (daysDiff <= 7) {
+        timeframe = OhlcTimeframe.DAILY;
+      } else if (daysDiff <= 90) {
+        timeframe = OhlcTimeframe.DAILY;
+      } else if (daysDiff <= 365) {
+        timeframe = OhlcTimeframe.WEEKLY;
+      } else {
+        timeframe = OhlcTimeframe.MONTHLY;
+      }
+
+      // Query historical_ohlc collection
+      const historicalRecords = await safeDbRead(
+        () =>
+          this.historicalOhlcModel
+            .find({
+              itemCode,
+              timeframe,
+              periodStart: {
+                $gte: startDate,
+                $lte: endDate,
+              },
+            })
+            .sort({ periodStart: 1 })
+            .exec(),
+        "buildChartFromHistoricalOhlc",
+        this.logger,
+        { itemCode, timeframe, timeRange },
+      );
+
+      if (!historicalRecords || historicalRecords.length === 0) {
+        this.logger.warn(
+          `No historical_ohlc data found for ${itemCode} (${timeframe}) in requested time range`,
+        );
+        return null;
+      }
+
+      this.logger.log(
+        `✅ Found ${historicalRecords.length} historical_ohlc records (${timeframe}) for ${itemCode}`,
+      );
+
+      // Transform historical_ohlc records to NavasanOHLCDataPoint format
+      const ohlcData: NavasanOHLCDataPoint[] = historicalRecords.map(
+        (record) => {
+          const unixTimestamp = Math.floor(
+            record.periodStart.getTime() / 1000,
+          );
+          return {
+            timestamp: unixTimestamp,
+            date: record.periodStart.toISOString().split("T")[0], // YYYY-MM-DD
+            open: record.open,
+            high: record.high,
+            low: record.low,
+            close: record.close,
+          };
+        },
+      );
+
+      this.logger.log(
+        `✅ Successfully transformed ${ohlcData.length} historical_ohlc records to OHLC data points for ${itemCode}`,
+      );
+
+      return ohlcData;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `Failed to build chart from historical_ohlc for ${itemCode}: ${errorMessage}`,
         errorStack,
       );
 

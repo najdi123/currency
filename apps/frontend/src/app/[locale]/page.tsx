@@ -341,10 +341,10 @@ export default function Home() {
                     <div className="text-center">
                       <div className="mb-4 text-red-500 text-5xl">⚠️</div>
                       <h3 className="text-lg font-semibold text-error-text mb-2">
-                        {t('chart.loadError')}
+                        {t2('loadError')}
                       </h3>
                       <p className="text-text-secondary mb-4 text-sm">
-                        {t('chart.loadErrorMessage')}
+                        {t2('loadErrorMessage')}
                       </p>
                       <div className="flex gap-2 justify-center">
                         <button
@@ -354,13 +354,13 @@ export default function Home() {
                           }}
                           className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                         >
-                          {t('chart.retry')}
+                          {t2('retry')}
                         </button>
                         <button
                           onClick={chartSheet.closeChart}
                           className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
                         >
-                          {t('chart.close')}
+                          {t2('close')}
                         </button>
                       </div>
                     </div>
