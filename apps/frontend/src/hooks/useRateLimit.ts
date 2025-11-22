@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 
 export interface RateLimitStatus {
-  tier: 'free' | 'premium' | 'enterprise';
   allowed: boolean;
   remaining: number;
-  limit: number;
-  resetAt: string;
   retryAfter?: number;
+  windowStart: string;
+  windowEnd: string;
+  showStaleData: boolean;
   percentage: number;
+  maxRequestsPerWindow: number;
+  windowDurationHours: number;
 }
 
 interface UseRateLimitReturn {
@@ -24,10 +26,11 @@ let ongoingRequest: Promise<RateLimitStatus | null> | null = null;
 const CACHE_DURATION = 5000; // 5 seconds cache to prevent duplicate requests
 
 /**
- * Hook to fetch and monitor rate limit status
+ * Hook to fetch and monitor rate limit status (2-hour window system)
  *
  * Features:
  * - Fetches current rate limit status from backend
+ * - Displays quota within current 2-hour window (20 requests per window)
  * - Auto-refreshes every 30 seconds
  * - Provides loading and error states
  * - Exposes refetch function for manual updates

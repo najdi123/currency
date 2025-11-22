@@ -1,56 +1,63 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
-import { UserRateLimit, UserRateLimitDocument, UserTier } from '../schemas/user-rate-limit.schema';
+import moment from 'moment-timezone';
+import { UserRateLimit, UserRateLimitDocument } from '../schemas/user-rate-limit.schema';
+import { MetricsService } from '../metrics/metrics.service';
 
-export interface RateLimitCheck {
+export interface RateLimitCheckResult {
   allowed: boolean;
   remaining: number;
-  limit: number;
-  resetAt: Date;
-  retryAfter?: number; // seconds
+  retryAfter?: number; // seconds until window reset
+  windowStart: Date;
+  windowEnd: Date;
+  showStaleData: boolean;
 }
 
+/**
+ * Rate Limit Service - 2-hour window system
+ *
+ * Implements: 20 fresh requests per 2-hour window per user
+ * Windows: 00:00-02:00, 02:00-04:00, ..., 22:00-00:00
+ * Quota exceeded: Show stale data with friendly message
+ */
 @Injectable()
 export class RateLimitService {
   private readonly logger = new Logger(RateLimitService.name);
-
-  // Tier limits (requests per day) - configurable via environment variables
-  private readonly tierLimits: Record<UserTier, number>;
+  private readonly WINDOW_DURATION_MS: number;
+  private readonly MAX_REQUESTS_PER_WINDOW: number;
 
   constructor(
     @InjectModel(UserRateLimit.name)
-    private userRateLimitModel: Model<UserRateLimitDocument>,
-    private configService: ConfigService,
+    private readonly rateLimitModel: Model<UserRateLimitDocument>,
+    private readonly configService: ConfigService,
+    private readonly metricsService: MetricsService,
   ) {
-    // Load tier limits from config with validation and fallback to defaults
-    this.tierLimits = {
-      [UserTier.FREE]: this.parseLimit('RATE_LIMIT_FREE', 100),
-      [UserTier.PREMIUM]: this.parseLimit('RATE_LIMIT_PREMIUM', 1000),
-      [UserTier.ENTERPRISE]: this.parseLimit('RATE_LIMIT_ENTERPRISE', 10000),
-    };
+    // Load configuration with validation and defaults
+    const windowHours = this.parseConfig('RATE_LIMIT_WINDOW_HOURS', 2, 1, 24);
+    const maxRequests = this.parseConfig('RATE_LIMIT_MAX_REQUESTS', 20, 1, 1000);
+
+    this.WINDOW_DURATION_MS = windowHours * 60 * 60 * 1000;
+    this.MAX_REQUESTS_PER_WINDOW = maxRequests;
 
     this.logger.log(
-      `Rate limits configured: FREE=${this.tierLimits[UserTier.FREE]}, ` +
-      `PREMIUM=${this.tierLimits[UserTier.PREMIUM]}, ` +
-      `ENTERPRISE=${this.tierLimits[UserTier.ENTERPRISE]}`
+      `Rate limiting configured: ${this.MAX_REQUESTS_PER_WINDOW} requests per ${windowHours}-hour window`,
     );
   }
 
   /**
-   * Safely parse and validate rate limit configuration values
+   * Safely parse and validate configuration values
    */
-  private parseLimit(key: string, defaultValue: number): number {
+  private parseConfig(key: string, defaultValue: number, min: number, max: number): number {
     const value = this.configService.get<string>(key);
     if (!value) return defaultValue;
 
     const parsed = parseInt(value, 10);
 
-    // Validate: must be positive integer
-    if (isNaN(parsed) || parsed < 1 || parsed > 1000000) {
+    if (isNaN(parsed) || parsed < min || parsed > max) {
       this.logger.warn(
-        `Invalid ${key}="${value}" (must be 1-1000000). Using default: ${defaultValue}`
+        `Invalid ${key}="${value}" (must be ${min}-${max}). Using default: ${defaultValue}`,
       );
       return defaultValue;
     }
@@ -59,151 +66,314 @@ export class RateLimitService {
   }
 
   /**
-   * Check if a request is allowed and update rate limit
+   * Get current 2-hour window boundaries in Tehran timezone
+   * Windows start at: 00:00, 02:00, 04:00, 06:00, etc. (Tehran time)
+   *
+   * @returns Window boundaries as UTC Date objects
    */
-  async checkRateLimit(
-    identifier: string,
-    tier: UserTier = UserTier.FREE,
-  ): Promise<RateLimitCheck> {
-    const now = new Date();
-    const resetAt = this.getNextResetTime();
+  private getCurrentWindow(): { start: Date; end: Date } {
+    // Get current time in Tehran timezone (UTC+3:30)
+    const tehranTime = moment().tz('Asia/Tehran');
 
-    // Get or create rate limit record
-    let rateLimitRecord = await this.userRateLimitModel.findOne({ identifier }).exec();
+    // Get hour of day in Tehran (0-23)
+    const hourOfDay = tehranTime.hours();
 
-    if (!rateLimitRecord) {
-      rateLimitRecord = await this.createRateLimitRecord(identifier, tier, resetAt) as any;
-    }
+    // Calculate which window we're in (window duration in hours)
+    const windowDurationHours = this.WINDOW_DURATION_MS / (60 * 60 * 1000);
+    const windowNumber = Math.floor(hourOfDay / windowDurationHours);
 
-    // Reset if we've passed the reset time
-    if (now >= rateLimitRecord!.resetAt) {
-      const resetRecord = await this.resetRateLimit(rateLimitRecord!, resetAt);
-      if (resetRecord) {
-        rateLimitRecord = resetRecord as any;
-      }
-    }
+    // Calculate window start in Tehran time
+    const windowStartInTehran = tehranTime
+      .clone()
+      .startOf('day')
+      .add(windowNumber * windowDurationHours, 'hours');
 
-    // Check if blocked
-    if (rateLimitRecord!.isBlocked) {
-      return {
-        allowed: false,
-        remaining: 0,
-        limit: rateLimitRecord!.dailyLimit,
-        resetAt: rateLimitRecord!.resetAt,
-        retryAfter: Math.ceil((rateLimitRecord!.resetAt.getTime() - now.getTime()) / 1000),
-      };
-    }
+    // Calculate window end in Tehran time
+    const windowEndInTehran = windowStartInTehran
+      .clone()
+      .add(windowDurationHours, 'hours');
 
-    // Check if limit exceeded
-    const allowed = rateLimitRecord!.requestsToday < rateLimitRecord!.dailyLimit;
-    const remaining = Math.max(0, rateLimitRecord!.dailyLimit - rateLimitRecord!.requestsToday);
-
-    if (allowed) {
-      // Increment request count
-      await this.userRateLimitModel.updateOne(
-        { identifier },
-        {
-          $inc: { requestsToday: 1 },
-          $set: { lastRequest: now },
-        },
-      ).exec();
-    }
-
+    // Convert to UTC Date objects for storage
     return {
-      allowed,
-      remaining: allowed ? remaining - 1 : remaining,
-      limit: rateLimitRecord!.dailyLimit,
-      resetAt: rateLimitRecord!.resetAt,
-      retryAfter: allowed ? undefined : Math.ceil((rateLimitRecord!.resetAt.getTime() - now.getTime()) / 1000),
+      start: windowStartInTehran.toDate(),
+      end: windowEndInTehran.toDate(),
     };
   }
 
   /**
-   * Get rate limit status without incrementing count
+   * Check if user has quota remaining
+   * Returns information about rate limit status
    */
-  async getRateLimitStatus(identifier: string): Promise<RateLimitCheck> {
-    const rateLimitRecord = await this.userRateLimitModel.findOne({ identifier }).exec();
+  async checkQuota(identifier: string): Promise<RateLimitCheckResult> {
+    const window = this.getCurrentWindow();
 
-    if (!rateLimitRecord) {
-      const resetAt = this.getNextResetTime();
+    try {
+      const record = await this.rateLimitModel.findOne({
+        identifier,
+        windowStart: window.start,
+      });
+
+      if (!record) {
+        // First request in this window
+        return {
+          allowed: true,
+          remaining: this.MAX_REQUESTS_PER_WINDOW - 1,
+          windowStart: window.start,
+          windowEnd: window.end,
+          showStaleData: false,
+        };
+      }
+
+      if (record.freshRequestsUsed >= this.MAX_REQUESTS_PER_WINDOW) {
+        // Quota exceeded - must wait for next window
+        const now = new Date();
+        const retryAfter = Math.ceil((window.end.getTime() - now.getTime()) / 1000);
+
+        this.logger.warn(
+          `Rate limit exceeded for ${identifier}. Retry in ${retryAfter}s`,
+        );
+
+        return {
+          allowed: false,
+          remaining: 0,
+          retryAfter,
+          windowStart: window.start,
+          windowEnd: window.end,
+          showStaleData: true,
+        };
+      }
+
+      // Has quota remaining
       return {
         allowed: true,
-        remaining: this.tierLimits[UserTier.FREE],
-        limit: this.tierLimits[UserTier.FREE],
-        resetAt,
+        remaining: this.MAX_REQUESTS_PER_WINDOW - record.freshRequestsUsed,
+        windowStart: window.start,
+        windowEnd: window.end,
+        showStaleData: false,
+      };
+    } catch (error) {
+      this.logger.error(`Error checking quota for ${identifier}:`, error);
+      // On error, allow request (fail open for availability)
+      return {
+        allowed: true,
+        remaining: this.MAX_REQUESTS_PER_WINDOW,
+        windowStart: window.start,
+        windowEnd: window.end,
+        showStaleData: false,
       };
     }
-
-    const now = new Date();
-    const remaining = Math.max(0, rateLimitRecord.dailyLimit - rateLimitRecord.requestsToday);
-
-    return {
-      allowed: remaining > 0,
-      remaining,
-      limit: rateLimitRecord.dailyLimit,
-      resetAt: rateLimitRecord.resetAt,
-      retryAfter: remaining === 0
-        ? Math.ceil((rateLimitRecord.resetAt.getTime() - now.getTime()) / 1000)
-        : undefined,
-    };
   }
 
   /**
-   * Upgrade user tier
+   * Atomically check and consume quota in a single database operation
+   * Prevents race conditions where concurrent requests could exceed the limit
+   *
+   * @returns RateLimitCheckResult with consumption already applied if allowed
    */
-  async upgradeTier(identifier: string, newTier: UserTier): Promise<void> {
-    await this.userRateLimitModel.updateOne(
-      { identifier },
-      {
-        $set: {
-          tier: newTier,
-          dailyLimit: this.tierLimits[newTier],
-          'metadata.tier_upgraded_at': new Date(),
-        },
-      },
-      { upsert: true },
-    ).exec();
-
-    this.logger.log(`Upgraded ${identifier} to ${newTier}`);
-  }
-
-  private async createRateLimitRecord(
+  async checkAndConsumeQuota(
     identifier: string,
-    tier: UserTier,
-    resetAt: Date,
-  ) {
-    return this.userRateLimitModel.create({
-      identifier,
-      tier,
-      dailyLimit: this.tierLimits[tier],
-      requestsToday: 0,
-      resetAt,
-      isBlocked: false,
-    });
-  }
+    metadata?: { endpoint?: string; itemType?: string },
+  ): Promise<RateLimitCheckResult> {
+    const window = this.getCurrentWindow();
 
-  private async resetRateLimit(
-    record: UserRateLimitDocument,
-    newResetAt: Date,
-  ) {
-    await this.userRateLimitModel.updateOne(
-      { identifier: record.identifier },
-      {
-        $set: {
-          requestsToday: 0,
-          resetAt: newResetAt,
-          isBlocked: false,
-          blockReason: null,
+    try {
+      // Attempt to increment only if under limit (atomic operation)
+      const result = await this.rateLimitModel.findOneAndUpdate(
+        {
+          identifier,
+          windowStart: window.start,
+          freshRequestsUsed: { $lt: this.MAX_REQUESTS_PER_WINDOW },
         },
-      },
-    ).exec();
+        {
+          $inc: { freshRequestsUsed: 1 },
+          $set: {
+            lastRequest: new Date(),
+            windowEnd: window.end,
+          },
+          $setOnInsert: {
+            windowStart: window.start,
+            freshRequestsUsed: 0,
+            createdAt: new Date(),
+          },
+          $push: {
+            requestHistory: {
+              $each: [
+                {
+                  timestamp: new Date(),
+                  ...metadata,
+                },
+              ],
+              $slice: -50,
+            },
+          },
+        },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+        },
+      );
 
-    return this.userRateLimitModel.findOne({ identifier: record.identifier }).exec();
+      if (!result) {
+        // Quota was already at limit, check current status
+        const existing = await this.rateLimitModel.findOne({
+          identifier,
+          windowStart: window.start,
+        });
+
+        if (existing && existing.freshRequestsUsed >= this.MAX_REQUESTS_PER_WINDOW) {
+          const now = new Date();
+          const retryAfter = Math.ceil((window.end.getTime() - now.getTime()) / 1000);
+
+          this.logger.warn(
+            `Rate limit exceeded for ${identifier}. Retry in ${retryAfter}s`,
+          );
+
+          // Track quota exhaustion metric
+          this.metricsService.trackRateLimitQuotaExhausted(identifier);
+
+          return {
+            allowed: false,
+            remaining: 0,
+            retryAfter,
+            windowStart: window.start,
+            windowEnd: window.end,
+            showStaleData: true,
+          };
+        }
+      }
+
+      // Successfully consumed quota
+      const remaining = Math.max(0, this.MAX_REQUESTS_PER_WINDOW - (result?.freshRequestsUsed || 1));
+
+      this.logger.debug(`Consumed quota for ${identifier}, remaining: ${remaining}`);
+
+      // Track metrics
+      this.metricsService.trackRateLimitQuotaConsumed(
+        identifier,
+        metadata?.endpoint,
+        metadata?.itemType,
+      );
+
+      return {
+        allowed: true,
+        remaining,
+        windowStart: window.start,
+        windowEnd: window.end,
+        showStaleData: false,
+      };
+    } catch (error) {
+      this.logger.error(`Error in checkAndConsumeQuota for ${identifier}:`, error);
+
+      // Track error metric
+      this.metricsService.trackRateLimitError(
+        error instanceof Error ? error.message : String(error),
+      );
+
+      // Fail-open: Allow request on error
+      return {
+        allowed: true,
+        remaining: this.MAX_REQUESTS_PER_WINDOW,
+        windowStart: window.start,
+        windowEnd: window.end,
+        showStaleData: false,
+      };
+    }
   }
 
-  private getNextResetTime(): Date {
-    const tomorrow = new Date();
-    tomorrow.setUTCHours(24, 0, 0, 0); // Next midnight UTC
-    return tomorrow;
+  /**
+   * Get rate limit status for a user
+   * Used for displaying information to frontend
+   */
+  async getRateLimitStatus(identifier: string): Promise<RateLimitCheckResult> {
+    return this.checkQuota(identifier);
+  }
+
+  /**
+   * Reset rate limit for a user (admin function)
+   */
+  async resetUserLimit(identifier: string): Promise<void> {
+    const window = this.getCurrentWindow();
+    await this.rateLimitModel.deleteMany({
+      identifier,
+      windowStart: window.start,
+    });
+    this.logger.log(`Reset rate limit for ${identifier}`);
+  }
+
+  /**
+   * Validate identifier format
+   * @throws Error if identifier is invalid
+   */
+  private validateIdentifier(identifier: string): void {
+    if (!identifier || identifier.trim() === '') {
+      throw new Error('Identifier cannot be empty');
+    }
+
+    if (identifier === 'ip_unknown' || identifier === 'ip_undefined' || identifier === 'ip_null') {
+      throw new Error('Invalid IP identifier');
+    }
+
+    // Basic format validation
+    if (!identifier.match(/^(user_[a-zA-Z0-9-_]+|ip_[\d.a-fA-F:]+)$/)) {
+      throw new Error(`Invalid identifier format: ${identifier}`);
+    }
+  }
+
+  /**
+   * Get identifier from request
+   * Uses user ID if authenticated, otherwise IP address
+   */
+  getIdentifierFromRequest(request: any): string {
+    // Check for authenticated user
+    if (request.user?.id) {
+      const userId = String(request.user.id);
+      const identifier = `user_${userId}`;
+      this.validateIdentifier(identifier);
+      return identifier;
+    }
+
+    // Fallback to IP address
+    const forwarded = request.headers['x-forwarded-for'];
+    let ip = forwarded ? forwarded.split(',')[0].trim() : request.ip;
+
+    // Validate IP exists
+    if (!ip || ip === 'undefined' || ip === 'null') {
+      ip = '127.0.0.1'; // Fallback to localhost for local dev
+      this.logger.warn('Could not determine IP address, using localhost');
+    }
+
+    const identifier = `ip_${ip}`;
+    this.validateIdentifier(identifier);
+    return identifier;
+  }
+
+  /**
+   * Get the maximum number of requests allowed per window
+   * Used by controller and other services to display quota information
+   */
+  getMaxRequestsPerWindow(): number {
+    return this.MAX_REQUESTS_PER_WINDOW;
+  }
+
+  /**
+   * Get the window duration in hours
+   * Used by controller to display window duration to frontend
+   */
+  getWindowDurationHours(): number {
+    return this.WINDOW_DURATION_MS / (60 * 60 * 1000);
+  }
+
+  /**
+   * Cleanup old rate limit records (maintenance function)
+   * TTL index should handle this automatically, but this is a manual fallback
+   */
+  async cleanupOldRecords(): Promise<number> {
+    const cutoff = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3 hours ago
+    const result = await this.rateLimitModel.deleteMany({
+      windowEnd: { $lt: cutoff },
+    });
+    this.logger.log(`Cleaned up ${result.deletedCount} old rate limit records`);
+    return result.deletedCount;
   }
 }

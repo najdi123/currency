@@ -25,8 +25,8 @@ export function RateLimitMeter() {
     );
   }
 
-  const used = status.limit - status.remaining;
-  const percentage = Math.round((used / status.limit) * 100);
+  const used = status.maxRequestsPerWindow - status.remaining;
+  const percentage = Math.round((used / status.maxRequestsPerWindow) * 100);
 
   const getBarColor = () => {
     if (percentage < 50) return 'bg-gradient-to-r from-green-500 to-emerald-500';
@@ -35,16 +35,17 @@ export function RateLimitMeter() {
   };
 
   const formatResetTime = () => {
-    const resetDate = new Date(status.resetAt);
+    const resetDate = new Date(status.windowEnd);
     const now = new Date();
     const diffMs = resetDate.getTime() - now.getTime();
-    const hours = Math.ceil(diffMs / (1000 * 60 * 60));
+    const minutes = Math.ceil(diffMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
 
-    if (hours > 24) {
-      const days = Math.ceil(hours / 24);
-      return `${days} ${t(days === 1 ? 'day' : 'days')}`;
+    if (hours > 0) {
+      return `${hours}h ${remainingMinutes}m`;
     }
-    return hours > 1 ? `${hours} ${t('hours')}` : t('lessThanHour');
+    return `${minutes}m`;
   };
 
   return (
@@ -55,13 +56,8 @@ export function RateLimitMeter() {
           {t('apiUsage')}
         </h3>
         <div className="flex items-center gap-2">
-          <span className={cn(
-            'px-3 py-1 rounded-full text-xs font-medium',
-            status.tier === 'free' && 'bg-gray-500/20 text-gray-300',
-            status.tier === 'premium' && 'bg-blue-500/20 text-blue-300',
-            status.tier === 'enterprise' && 'bg-purple-500/20 text-purple-300',
-          )}>
-            {status.tier.charAt(0).toUpperCase() + status.tier.slice(1)} {t('plan')}
+          <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
+            {status.windowDurationHours}h {t('window')}
           </span>
         </div>
       </div>
@@ -70,7 +66,7 @@ export function RateLimitMeter() {
       <div className="mb-6">
         <div className="flex justify-between text-sm mb-2">
           <span className="text-white/80 font-medium">
-            {used} / {status.limit} {t('requests')}
+            {used} / {status.maxRequestsPerWindow} {t('requests')}
           </span>
           <span className="text-white/60">
             {percentage}%
@@ -110,25 +106,21 @@ export function RateLimitMeter() {
         </div>
       </div>
 
-      {/* Upgrade CTA */}
-      {status.tier === 'free' && percentage > 70 && (
-        <div className="mt-4 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg">
-          <div className="flex items-start justify-between gap-4">
+      {/* Warning when quota running low */}
+      {percentage > 70 && percentage <= 90 && (
+        <div className="mt-4 p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-yellow-500/20 rounded-full">
+              <Clock className="text-yellow-400" size={16} />
+            </div>
             <div>
-              <p className="text-sm font-medium text-white mb-1">
-                {t('nearLimitWarning')}
+              <p className="text-sm font-medium text-yellow-400 mb-1">
+                {t('quotaRunningLow')}
               </p>
-              <p className="text-xs text-white/60">
-                {t('upgradeForMore')}
+              <p className="text-xs text-yellow-400/70">
+                {t('quotaResetsSoon')} {formatResetTime()}
               </p>
             </div>
-            <button
-              onClick={() => window.open('/pricing', '_blank')}
-              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium whitespace-nowrap"
-            >
-              <Zap size={16} aria-hidden="true" />
-              <span>{t('upgradePlan')}</span>
-            </button>
           </div>
         </div>
       )}
@@ -145,7 +137,7 @@ export function RateLimitMeter() {
                 {t('criticalWarning')}
               </p>
               <p className="text-xs text-red-400/70">
-                {t('criticalMessage')}
+                {t('staleDataWillShow')} {formatResetTime()}
               </p>
             </div>
           </div>

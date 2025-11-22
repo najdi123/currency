@@ -7,6 +7,8 @@ import { ItemCardHeader } from './ItemCardHeader'
 import { ItemCardBadge } from './ItemCardBadge'
 import { ItemCardPrice } from './ItemCardPrice'
 import { ItemCardSparkline } from './ItemCardSparkline'
+import { DailyChangeBadge } from './DailyChangeBadge'
+import { IntradayMiniChart } from './IntradayMiniChart'
 import { useItemCardData } from './useItemCardData'
 import { isValidIconComponent, formatTomanForScreenReader } from './itemCard.utils'
 import { CurrencyVariantsDropdown } from '@/components/CurrencyVariantsDropdown'
@@ -62,6 +64,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   role,
   hasVariants = false,
   variants = [],
+  ohlc,
 }) => {
   // Process data using custom hook
   const { sparklineData, isPositive, sparklineColor } = useItemCardData({
@@ -123,7 +126,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
         {/* Bottom Section: Badge + Price only (no sparkline) */}
         <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 mt-auto">
-          <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
+          {ohlc?.dailyChangePercent !== undefined ? (
+            <DailyChangeBadge dailyChangePercent={ohlc.dailyChangePercent} compact={compact} />
+          ) : (
+            <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
+          )}
           <ItemCardPrice value={value} compact={compact} />
         </div>
       </button>
@@ -154,22 +161,34 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         }
       />
 
-      {/* Bottom Section: Left side (Change badge and Price) + Right side (Sparkline) */}
+      {/* Bottom Section: Left side (Change badge and Price) + Right side (Chart) */}
       <div className="flex items-end justify-between gap-2.5 mt-auto">
         {/* Left side: Change badge and Price */}
         <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 flex-1 min-w-0">
-          <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
+          {ohlc?.dailyChangePercent !== undefined ? (
+            <DailyChangeBadge dailyChangePercent={ohlc.dailyChangePercent} compact={compact} />
+          ) : (
+            <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
+          )}
           <ItemCardPrice value={value} compact={compact} />
         </div>
 
-        {/* Right side: Sparkline chart - Only show in normal (single-column) mode */}
-        <ItemCardSparkline
-          data={sparklineData}
-          color={sparklineColor}
-          isPositive={isPositive}
-          compact={compact}
-          show={!compact}
-        />
+        {/* Right side: Show mini chart if OHLC data available, otherwise sparkline */}
+        {ohlc?.dataPoints && ohlc.dataPoints.length >= 3 ? (
+          <IntradayMiniChart
+            dataPoints={ohlc.dataPoints}
+            isPositive={ohlc.dailyChangePercent !== undefined && ohlc.dailyChangePercent >= 0}
+            compact={compact}
+          />
+        ) : (
+          <ItemCardSparkline
+            data={sparklineData}
+            color={sparklineColor}
+            isPositive={isPositive}
+            compact={compact}
+            show={!compact}
+          />
+        )}
       </div>
     </button>
   )
@@ -207,6 +226,14 @@ export const ItemCard = React.memo<ItemCardProps>(
       prevProps.compact !== nextProps.compact ||
       prevProps.hasVariants !== nextProps.hasVariants
     ) {
+      return false
+    }
+
+    // Check OHLC data
+    if (prevProps.ohlc?.dailyChangePercent !== nextProps.ohlc?.dailyChangePercent) {
+      return false
+    }
+    if (prevProps.ohlc?.dataPoints?.length !== nextProps.ohlc?.dataPoints?.length) {
       return false
     }
 

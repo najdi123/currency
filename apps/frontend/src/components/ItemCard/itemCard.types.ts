@@ -18,6 +18,18 @@ export interface VariantData {
   change: number
 }
 
+export interface OhlcData {
+  /**
+   * Daily change percentage from open to close
+   */
+  dailyChangePercent?: number
+
+  /**
+   * Intraday price data points
+   */
+  dataPoints?: Array<{ time: string; price: number }>
+}
+
 export interface ItemCardProps {
   /**
    * Unique identifier for the item
@@ -91,4 +103,9 @@ export interface ItemCardProps {
    * Array of variant data for this currency
    */
   variants?: VariantData[]
+
+  /**
+   * Optional OHLC data for enhanced display
+   */
+  ohlc?: OhlcData
 }

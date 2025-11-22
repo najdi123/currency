@@ -24,14 +24,15 @@ async function bootstrap() {
     expressApp.set('trust proxy', 1); // Trust first proxy
   }
 
-  // Security: Add rate limiting (ONLY in production)
-  // In development, we want unlimited requests for testing
+  // Security: Add general rate limiting (ONLY in production)
+  // This is a high-level protection against abuse, not fresh data rate limiting
+  // Fresh data rate limiting is handled by RateLimitGuard (20 req per 2-hour window)
   if (isProduction) {
-    console.log('🛡️  Rate limiting ENABLED (Production)');
+    console.log('🛡️  General rate limiting ENABLED (Production): 1000 req/15min');
     app.use(
       rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 100, // limit each IP to 100 requests per windowMs
+        max: 1000, // Increased from 100 to 1000 to allow stale data requests
         message: 'Too many requests from this IP, please try again later.',
         standardHeaders: true,
         legacyHeaders: false,
@@ -40,7 +41,7 @@ async function bootstrap() {
       })
     );
   } else {
-    console.log('🔓 Rate limiting DISABLED (Development)');
+    console.log('🔓 General rate limiting DISABLED (Development)');
   }
 
   // Enable CORS for frontend integration

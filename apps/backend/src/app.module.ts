@@ -20,6 +20,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { OHLCModule } from './ohlc/ohlc.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { RateLimitGuard } from './rate-limit/rate-limit.guard';
+import { SchemasModule } from './schemas/schemas.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { RateLimitGuard } from './rate-limit/rate-limit.guard';
     // Global modules
     MetricsModule, // Global module for metrics tracking
     CommonModule, // Global module for common services (audit, etc.)
+    SchemasModule, // Register new simplified schemas
 
     // Feature modules
     CurrenciesModule,

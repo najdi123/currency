@@ -53,6 +53,31 @@ export type GoldResponse = Record<string, RateItem> & {
   _metadata?: ApiResponseMetadata
 }
 
+export interface OhlcDataPoint {
+  time: string // "08:00", "08:10"
+  price: number
+}
+
+export interface OhlcResponse {
+  itemCode: string
+  date: string
+  dateJalali: string
+  open: number
+  high: number
+  low: number
+  close: number
+  change: number // Daily change percentage
+  dataPoints: OhlcDataPoint[]
+  updateCount: number
+  firstUpdate: string
+  lastUpdate: string
+}
+
+export interface AllOhlcResponse {
+  count: number
+  data: OhlcResponse[]
+}
+
 export interface LatestRatesResponse {
   [key: string]: RateItem
 }
@@ -209,7 +234,7 @@ const baseQueryWithRetry = retry(
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithRetry,
-  tagTypes: ['Rates', 'ChartData', 'History', 'Currencies', 'DigitalCurrencies', 'Gold'],
+  tagTypes: ['Rates', 'ChartData', 'History', 'Currencies', 'DigitalCurrencies', 'Gold', 'Ohlc'],
   // Stale-data handling
   refetchOnFocus: false,
   refetchOnReconnect: true,
@@ -408,6 +433,18 @@ export const api = createApi({
       }),
       invalidatesTags: ['Gold', 'Rates'],
     }),
+    // Get today's OHLC for specific item
+    getTodayOhlc: builder.query<OhlcResponse, string>({
+      query: (itemCode) => `/navasan/ohlc/today/${itemCode}`,
+      providesTags: (result, error, itemCode) => [{ type: 'Ohlc', id: itemCode }],
+      keepUnusedDataFor: 600, // 10 minutes - intraday data changes frequently
+    }),
+    // Get today's OHLC for all items
+    getAllTodayOhlc: builder.query<AllOhlcResponse, void>({
+      query: () => '/navasan/ohlc/all',
+      providesTags: ['Ohlc'],
+      keepUnusedDataFor: 600, // 10 minutes - intraday data changes frequently
+    }),
   }),
 })
 
@@ -430,6 +467,8 @@ export const {
   useRefreshCurrencyDataMutation,
   useRefreshCryptoDataMutation,
   useRefreshGoldDataMutation,
+  useGetTodayOhlcQuery,
+  useGetAllTodayOhlcQuery,
 } = api
 
 // Re-export typed error utilities for component use

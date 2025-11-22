@@ -35,7 +35,11 @@ export class IntradayOhlcService {
     const tehranNow = moment().tz(this.timezone);
     const dateKey = tehranNow.format('YYYY-MM-DD');
     const jalaliDate = momentJalaali(tehranNow.toDate()).format('jYYYY/jMM/jDD');
-    const timeKey = tehranNow.format('HH:mm');
+
+    // DEDUPLICATION FIX: Round time to nearest 10 minutes to prevent duplicate data points
+    const roundedMinute = Math.floor(tehranNow.minute() / 10) * 10;
+    const roundedTime = tehranNow.clone().minute(roundedMinute).second(0).format('HH:mm');
+    const timeKey = roundedTime;
 
     const allItems = [
       ...data.currencies,
@@ -92,12 +96,27 @@ export class IntradayOhlcService {
 
     if (bulkOps.length > 0) {
       try {
-        await this.intradayModel.bulkWrite(bulkOps);
+        // RELIABILITY FIX: Use ordered: false to continue processing if one item fails
+        await this.intradayModel.bulkWrite(bulkOps, { ordered: false });
         this.logger.log(
           `📊 Recorded ${bulkOps.length} intraday OHLC updates for ${dateKey} at ${timeKey}`
         );
       } catch (error) {
         const err = error as Error;
+
+        // Ignore duplicate key errors (expected in race conditions)
+        if (err.message?.includes('duplicate key')) {
+          this.logger.debug('OHLC record already exists, skipping');
+          return;
+        }
+
+        // Log validation errors as warnings
+        if (err.message?.includes('validation')) {
+          this.logger.warn(`Invalid OHLC data: ${err.message}`);
+          return;
+        }
+
+        // Log other errors as errors
         this.logger.error(
           `Failed to record intraday OHLC: ${err.message}`,
           err.stack

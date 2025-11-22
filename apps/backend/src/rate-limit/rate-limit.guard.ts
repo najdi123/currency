@@ -6,47 +6,81 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { RateLimitService } from './rate-limit.service';
-import { UserTier } from '../schemas/user-rate-limit.schema';
+import { SKIP_RATE_LIMIT_KEY } from './decorators/skip-rate-limit.decorator';
 
+/**
+ * Rate Limit Guard - 2-hour window system
+ *
+ * Checks if user has remaining quota in current 2-hour window
+ * If quota exceeded: Throws 429 with stale data flag
+ * Controllers can catch 429 and serve stale data instead
+ */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger(RateLimitGuard.name);
 
   constructor(
     private rateLimitService: RateLimitService,
-    private configService: ConfigService,
+    private reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
 
+    // Check if rate limiting is disabled for this route
+    const skipRateLimit = this.reflector.get<boolean>(
+      SKIP_RATE_LIMIT_KEY,
+      context.getHandler(),
+    );
+
+    if (skipRateLimit) {
+      return true;
+    }
+
     try {
-      // Get identifier (user ID or IP) with security validation
-      const identifier = this.getIdentifier(request);
-      const tier = this.getUserTier(request);
+      // Get identifier (user ID or IP)
+      const identifier = this.rateLimitService.getIdentifierFromRequest(request);
 
-      // Check rate limit
-      const rateLimitCheck = await this.rateLimitService.checkRateLimit(identifier, tier);
+      // Extract metadata for tracking
+      const endpoint = request.path;
+      const itemType = request.params?.itemType || request.query?.itemType;
 
-      // Set rate limit headers
-      response.setHeader('X-RateLimit-Limit', rateLimitCheck.limit);
-      response.setHeader('X-RateLimit-Remaining', rateLimitCheck.remaining);
-      response.setHeader('X-RateLimit-Reset', rateLimitCheck.resetAt.toISOString());
+      // Atomically check and consume quota (prevents race conditions)
+      const rateLimitCheck = await this.rateLimitService.checkAndConsumeQuota(identifier, {
+        endpoint,
+        itemType,
+      });
+
+      // Get max requests from service
+      const maxRequests = this.rateLimitService.getMaxRequestsPerWindow();
+
+      // Set standard RateLimit-* headers (RFC 6585 / draft-ietf-httpapi-ratelimit-headers)
+      response.setHeader('RateLimit-Limit', maxRequests.toString());
+      response.setHeader('RateLimit-Remaining', rateLimitCheck.remaining.toString());
+      response.setHeader('RateLimit-Reset', rateLimitCheck.windowEnd.toISOString());
+
+      // Set legacy X-RateLimit-* headers for backwards compatibility
+      response.setHeader('X-RateLimit-Limit', maxRequests.toString());
+      response.setHeader('X-RateLimit-Remaining', rateLimitCheck.remaining.toString());
+      response.setHeader('X-RateLimit-Reset', rateLimitCheck.windowEnd.toISOString());
+      response.setHeader('X-RateLimit-Window-Start', rateLimitCheck.windowStart.toISOString());
+      response.setHeader('X-RateLimit-Window-End', rateLimitCheck.windowEnd.toISOString());
 
       if (!rateLimitCheck.allowed) {
+        // Quota exceeded - set retry header
         response.setHeader('Retry-After', rateLimitCheck.retryAfter);
 
         throw new HttpException(
           {
             statusCode: HttpStatus.TOO_MANY_REQUESTS,
-            message: 'Rate limit exceeded',
+            message: 'Fresh data quota exceeded. Showing stale data.',
             remaining: 0,
-            limit: rateLimitCheck.limit,
-            resetAt: rateLimitCheck.resetAt,
             retryAfter: rateLimitCheck.retryAfter,
+            windowEnd: rateLimitCheck.windowEnd,
+            showStaleData: true,
           },
           HttpStatus.TOO_MANY_REQUESTS,
         );
@@ -67,44 +101,5 @@ export class RateLimitGuard implements CanActivate {
 
       return true; // Fail-open: allow request when rate limiting is broken
     }
-  }
-
-  private getIdentifier(request: any): string {
-    // Prioritize authenticated user ID (most secure)
-    if (request.user?.id && typeof request.user.id === 'string') {
-      return `user:${request.user.id}`;
-    }
-
-    // Get real IP considering proxy headers
-    const ip = this.getRealIp(request);
-    return `ip:${ip}`;
-  }
-
-  private getRealIp(request: any): string {
-    const trustProxy = this.configService.get<string>('TRUST_PROXY', 'false') === 'true';
-
-    // If behind trusted proxy, use X-Forwarded-For
-    if (trustProxy) {
-      const forwarded = request.headers['x-forwarded-for'];
-      if (forwarded && typeof forwarded === 'string') {
-        // Take first IP in chain (original client)
-        const firstIp = forwarded.split(',')[0].trim();
-        if (firstIp) return firstIp;
-      }
-    }
-
-    // Fallback to direct connection IP
-    return request.ip || request.connection?.remoteAddress || 'unknown';
-  }
-
-  private getUserTier(request: any): UserTier {
-    const tier = request.user?.tier;
-
-    // Validate tier is one of the enum values
-    if (tier && Object.values(UserTier).includes(tier)) {
-      return tier;
-    }
-
-    return UserTier.FREE;
   }
 }

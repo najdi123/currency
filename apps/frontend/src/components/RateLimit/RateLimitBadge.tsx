@@ -16,25 +16,17 @@ export function RateLimitBadge() {
     );
   }
 
-  // Calculate percentage of remaining requests
-  const remainingPercentage = Math.round((status.remaining / status.limit) * 100);
+  // Calculate percentage of quota used (not remaining)
+  const used = status.maxRequestsPerWindow - status.remaining;
+  const usedPercentage = Math.round((used / status.maxRequestsPerWindow) * 100);
 
   const getColor = () => {
-    // Green if more than 50% remaining
-    if (remainingPercentage > 50) return 'bg-green-500/20 text-green-400 border-green-500/30';
-    // Yellow if 20-50% remaining (inclusive of 20%)
-    if (remainingPercentage >= 20) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-    // Red if less than 20% remaining
+    // Green if less than 50% used
+    if (usedPercentage < 50) return 'bg-green-500/20 text-green-400 border-green-500/30';
+    // Yellow if 50-80% used
+    if (usedPercentage < 80) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    // Red if more than 80% used
     return 'bg-red-500/20 text-red-400 border-red-500/30';
-  };
-
-  const getTierColor = () => {
-    const colors = {
-      free: 'bg-gray-500/20 text-gray-300',
-      premium: 'bg-blue-500/20 text-blue-300',
-      enterprise: 'bg-purple-500/20 text-purple-300',
-    };
-    return colors[status.tier] || colors.free;
   };
 
   return (
@@ -42,16 +34,8 @@ export function RateLimitBadge() {
       className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
       role="status"
       aria-live="polite"
-      aria-label={`${t('apiUsage')}: ${status.remaining} ${t('remaining')} out of ${status.limit} ${t('requests')}`}
+      aria-label={`${t('apiUsage')}: ${status.remaining} ${t('remaining')} out of ${status.maxRequestsPerWindow} ${t('requests')}`}
     >
-      {/* Tier Badge */}
-      <span className={cn(
-        'px-2 py-0.5 text-xs rounded font-medium',
-        getTierColor()
-      )}>
-        {status.tier.toUpperCase()}
-      </span>
-
       {/* Usage Indicator */}
       <div className={cn(
         'flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium',
@@ -59,12 +43,12 @@ export function RateLimitBadge() {
       )}>
         <div className={cn(
           'w-2 h-2 rounded-full',
-          remainingPercentage > 50 ? 'bg-green-400' :
-          remainingPercentage > 20 ? 'bg-yellow-400' : 'bg-red-400',
-          remainingPercentage < 30 && 'animate-pulse'
+          usedPercentage < 50 ? 'bg-green-400' :
+          usedPercentage < 80 ? 'bg-yellow-400' : 'bg-red-400',
+          usedPercentage > 70 && 'animate-pulse'
         )} />
         <span>
-          {status.remaining}/{status.limit}
+          {status.remaining}/{status.maxRequestsPerWindow}
         </span>
       </div>
     </div>

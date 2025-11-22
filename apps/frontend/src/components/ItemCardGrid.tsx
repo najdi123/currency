@@ -4,6 +4,8 @@ import { IconType } from 'react-icons'
 import type { ItemType } from '@/types/chart'
 import { ItemCard, AccentColorVariant } from './ItemCard'
 import { hasVariants, getVariantsForCurrency, getVariantData } from '@/lib/utils/dataItemHelpers'
+import { useGetAllTodayOhlcQuery } from '@/lib/store/services/api'
+import type { OhlcResponse } from '@/lib/store/services/api'
 
 export interface ItemCardGridProps {
   /**
@@ -97,9 +99,21 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
 }) => {
   const t = useTranslations('Home')
 
+  // Fetch OHLC data for all items
+  const { data: ohlcData } = useGetAllTodayOhlcQuery()
+
   if (!data) {
     return null
   }
+
+  // Create a lookup map for OHLC data by itemCode
+  const ohlcMap = useMemo(() => {
+    if (!ohlcData?.data) return {}
+    return ohlcData.data.reduce((acc, item) => {
+      acc[item.itemCode] = item
+      return acc
+    }, {} as Record<string, OhlcResponse>)
+  }, [ohlcData])
 
   // Memoize click handlers to prevent creating new functions on every render
   // Creates a stable object mapping item keys to their click handlers
@@ -181,6 +195,13 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
           }
         }
 
+        // Get OHLC data for this item if available
+        const ohlcItem = ohlcMap[item.key]
+        const ohlcData = ohlcItem ? {
+          dailyChangePercent: ohlcItem.change,
+          dataPoints: ohlcItem.dataPoints
+        } : undefined
+
         return (
           <ItemCard
             key={item.key}
@@ -198,6 +219,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             role="listitem"
             hasVariants={itemHasVariants}
             variants={variants}
+            ohlc={ohlcData}
           />
         )
       })}

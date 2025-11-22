@@ -6,7 +6,6 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RateLimitModule } from './rate-limit.module';
 import { RateLimitService } from './rate-limit.service';
-import { UserTier } from '../schemas/user-rate-limit.schema';
 
 @Module({
   imports: [
@@ -21,7 +20,9 @@ import { UserTier } from '../schemas/user-rate-limit.schema';
 class TestModule {}
 
 async function testRateLimiting() {
-  console.log('🧪 Testing Rate Limiting System\n');
+  console.log('🧪 Testing Rate Limiting System (2-hour window)');
+  console.log('='.repeat(60));
+  console.log('System: 20 requests per 2-hour window');
   console.log('='.repeat(60));
 
   const app = await NestFactory.createApplicationContext(TestModule);
@@ -35,9 +36,9 @@ async function testRateLimiting() {
   console.log('\n1️⃣  Test: First request should be allowed');
   totalTests++;
   try {
-    const result1 = await rateLimitService.checkRateLimit(testIdentifier, UserTier.FREE);
-    if (result1.allowed && result1.remaining === 99) {
-      console.log('   ✅ PASSED - Request allowed, 99 remaining');
+    const result1 = await rateLimitService.checkAndConsumeQuota(testIdentifier);
+    if (result1.allowed && result1.remaining === 19) {
+      console.log('   ✅ PASSED - Request allowed, 19 remaining');
       passedTests++;
     } else {
       console.log('   ❌ FAILED -', result1);
@@ -50,9 +51,9 @@ async function testRateLimiting() {
   console.log('\n2️⃣  Test: Second request decrements counter');
   totalTests++;
   try {
-    const result2 = await rateLimitService.checkRateLimit(testIdentifier, UserTier.FREE);
-    if (result2.allowed && result2.remaining === 98) {
-      console.log('   ✅ PASSED - Request allowed, 98 remaining');
+    const result2 = await rateLimitService.checkAndConsumeQuota(testIdentifier);
+    if (result2.allowed && result2.remaining === 18) {
+      console.log('   ✅ PASSED - Request allowed, 18 remaining');
       passedTests++;
     } else {
       console.log('   ❌ FAILED -', result2);
@@ -66,27 +67,27 @@ async function testRateLimiting() {
   totalTests++;
   try {
     const status = await rateLimitService.getRateLimitStatus(testIdentifier);
-    if (status.remaining === 98) {
+    if (status.remaining === 18) {
       console.log('   ✅ PASSED - Status check did not increment');
       passedTests++;
     } else {
-      console.log('   ❌ FAILED - Remaining:', status.remaining, '(expected 98)');
+      console.log('   ❌ FAILED - Remaining:', status.remaining, '(expected 18)');
     }
   } catch (error: any) {
     console.log('   ❌ ERROR -', error.message);
   }
 
-  // Test 4: Upgrade to premium tier
-  console.log('\n4️⃣  Test: Upgrade tier increases limit');
+  // Test 4: Window information is present
+  console.log('\n4️⃣  Test: Window boundaries are returned');
   totalTests++;
   try {
-    await rateLimitService.upgradeTier(testIdentifier, UserTier.PREMIUM);
     const status = await rateLimitService.getRateLimitStatus(testIdentifier);
-    if (status.limit === 1000) {
-      console.log('   ✅ PASSED - Upgraded to PREMIUM (1000 requests/day)');
+    if (status.windowStart && status.windowEnd) {
+      const windowDuration = (status.windowEnd.getTime() - status.windowStart.getTime()) / (60 * 60 * 1000);
+      console.log(`   ✅ PASSED - Window: ${windowDuration} hours`);
       passedTests++;
     } else {
-      console.log('   ❌ FAILED - Limit:', status.limit, '(expected 1000)');
+      console.log('   ❌ FAILED - Missing window boundaries');
     }
   } catch (error: any) {
     console.log('   ❌ ERROR -', error.message);
@@ -96,9 +97,9 @@ async function testRateLimiting() {
   console.log('\n5️⃣  Test: Different users have separate limits');
   totalTests++;
   try {
-    const result = await rateLimitService.checkRateLimit('test-user-456', UserTier.FREE);
-    if (result.allowed && result.remaining === 99) {
-      console.log('   ✅ PASSED - New user has fresh limit');
+    const result = await rateLimitService.checkAndConsumeQuota('test-user-456');
+    if (result.allowed && result.remaining === 19) {
+      console.log('   ✅ PASSED - New user has fresh limit (19 remaining)');
       passedTests++;
     } else {
       console.log('   ❌ FAILED -', result);

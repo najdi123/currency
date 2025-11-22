@@ -247,12 +247,111 @@ export class MetricsService {
     this.logger.debug(`Cache miss: ${category} from ${source}`);
   }
 
+  // Rate limiting metrics
+  private rateLimitQuotaConsumed = new Map<string, number>(); // identifier -> count
+  private rateLimitQuotaExhausted = new Map<string, number>(); // identifier -> count
+  private rateLimitErrors = 0;
+
+  /**
+   * Track quota consumption
+   */
+  trackRateLimitQuotaConsumed(
+    identifier: string,
+    endpoint?: string,
+    itemType?: string,
+  ): void {
+    const key = `${identifier}:${endpoint || 'unknown'}:${itemType || 'unknown'}`;
+    const current = this.rateLimitQuotaConsumed.get(key) || 0;
+    this.rateLimitQuotaConsumed.set(key, current + 1);
+
+    this.logger.debug(`Rate limit quota consumed: ${identifier} (${endpoint})`);
+  }
+
+  /**
+   * Track quota exhaustion
+   */
+  trackRateLimitQuotaExhausted(identifier: string): void {
+    const current = this.rateLimitQuotaExhausted.get(identifier) || 0;
+    this.rateLimitQuotaExhausted.set(identifier, current + 1);
+
+    this.logger.warn(`Rate limit quota exhausted for: ${identifier}`);
+  }
+
+  /**
+   * Track rate limit service errors
+   */
+  trackRateLimitError(error: string): void {
+    this.rateLimitErrors++;
+    this.logger.error(`Rate limit service error: ${error}`);
+
+    // Alert if errors exceed threshold
+    if (this.rateLimitErrors >= this.CONSECUTIVE_FAILURE_ALERT_THRESHOLD) {
+      this.logger.warn(
+        `⚠️  ALERT: ${this.rateLimitErrors} rate limit service errors detected`,
+        {
+          recommendation: 'Check database connection and rate limit configuration',
+        },
+      );
+    }
+  }
+
+  /**
+   * Get rate limit metrics summary
+   */
+  getRateLimitMetrics(): {
+    totalQuotaConsumed: number;
+    totalQuotaExhausted: number;
+    totalErrors: number;
+    topConsumers: Array<{ identifier: string; count: number }>;
+    topExhausted: Array<{ identifier: string; count: number }>;
+  } {
+    // Aggregate by identifier (remove endpoint/itemType breakdown)
+    const consumedByIdentifier = new Map<string, number>();
+    for (const [key, count] of this.rateLimitQuotaConsumed.entries()) {
+      const identifier = key.split(':')[0];
+      const current = consumedByIdentifier.get(identifier) || 0;
+      consumedByIdentifier.set(identifier, current + count);
+    }
+
+    // Get top consumers
+    const topConsumers = Array.from(consumedByIdentifier.entries())
+      .map(([identifier, count]) => ({ identifier, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Get top exhausted
+    const topExhausted = Array.from(this.rateLimitQuotaExhausted.entries())
+      .map(([identifier, count]) => ({ identifier, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const totalQuotaConsumed = Array.from(consumedByIdentifier.values()).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    const totalQuotaExhausted = Array.from(this.rateLimitQuotaExhausted.values()).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+
+    return {
+      totalQuotaConsumed,
+      totalQuotaExhausted,
+      totalErrors: this.rateLimitErrors,
+      topConsumers,
+      topExhausted,
+    };
+  }
+
   /**
    * Clear all metrics (useful for testing or reset)
    */
   clearAllMetrics(): void {
     this.snapshotFailures.clear();
     this.dbOperationFailures.clear();
+    this.rateLimitQuotaConsumed.clear();
+    this.rateLimitQuotaExhausted.clear();
+    this.rateLimitErrors = 0;
     this.logger.log('All metrics cleared');
   }
 }

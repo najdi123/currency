@@ -428,6 +428,16 @@ export class NavasanController {
   @Get('ohlc/today/:itemCode')
   async getTodayOhlc(@Param('itemCode') itemCode: string, @Res() res: Response) {
     try {
+      // SECURITY FIX: Validate itemCode to prevent NoSQL injection
+      if (!itemCode || typeof itemCode !== 'string') {
+        throw new BadRequestException('Invalid item code');
+      }
+
+      const safePattern = /^[a-zA-Z0-9_-]{1,50}$/;
+      if (!safePattern.test(itemCode)) {
+        throw new BadRequestException('Item code contains invalid characters');
+      }
+
       this.logger.log(`GET /api/navasan/ohlc/today/${itemCode} - Fetching today's OHLC data`);
 
       const ohlc = await this.intradayOhlcService.getTodayOhlc(itemCode);

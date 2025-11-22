@@ -258,8 +258,12 @@ export class NavasanService {
       await this.saveToStaleCacheWithRetry(category, apiResponse.data, apiResponse.metadata);
       await this.savePriceSnapshot(category, apiResponse.data, apiResponse.metadata);
 
-      // 📊 Record intraday OHLC data points
-      await this.recordIntradayOhlc(category, apiResponse.data as Record<string, unknown>);
+      // 📊 Record intraday OHLC data points with type validation
+      if (this.isValidNavasanData(apiResponse.data)) {
+        await this.recordIntradayOhlc(category, apiResponse.data);
+      } else {
+        this.logger.warn('Invalid Navasan data structure, skipping OHLC recording');
+      }
 
       this.logger.log(`✅ Force fetch successful for ${category}`);
       return { success: true };
@@ -280,6 +284,16 @@ export class NavasanService {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Type guard to validate Navasan data structure
+   * Ensures data is a non-null object suitable for OHLC recording
+   */
+  private isValidNavasanData(data: unknown): data is Record<string, unknown> {
+    if (typeof data !== 'object' || data === null) return false;
+    if (Array.isArray(data)) return false;
+    return true;
   }
 
   /**
@@ -511,67 +525,44 @@ export class NavasanService {
   }
 
   /**
-   * Validate Navasan API response structure
-   * Ensures response contains expected fields before caching
+   * Validate PersianAPI response structure
+   * Updated to work with dynamic currency codes from PersianAPI
    */
   private validateNavasanResponse(data: unknown, items: string): void {
     // Check that response data exists and is an object
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      this.logger.error('Invalid Navasan API response: data is not an object');
+      this.logger.error('Invalid PersianAPI response: data is not an object');
       throw new Error('Invalid API response structure: expected object, received invalid data');
     }
 
     const responseData = data as Record<string, unknown>;
 
-    // Parse the requested items to validate each field exists
-    const requestedItems = items.split(',').map((item) => item.trim());
+    // Check that response has some data
+    const keys = Object.keys(responseData);
+    if (keys.length === 0) {
+      this.logger.error('PersianAPI response is empty');
+      throw new Error('Invalid API response: no data returned');
+    }
 
-    // Define expected field structure for validation
-    const currencyFields = [
-      'usd_sell', 'eur', 'gbp', 'cad', 'aud', 'aed', 'cny', 'try',
-      'chf', 'jpy', 'rub', 'inr', 'pkr', 'iqd', 'kwd', 'sar', 'qar', 'omr', 'bhd',
-      'usd_buy', 'dolar_harat_sell', 'harat_naghdi_sell', 'harat_naghdi_buy',
-      'usd_farda_sell', 'usd_farda_buy', 'usd_shakhs', 'usd_sherkat', 'usd_pp',
-      'aed_sell', 'dirham_dubai',
-      'eur_hav', 'gbp_hav', 'gbp_wht', 'cad_hav', 'cad_cash',
-      'hav_cad_my', 'hav_cad_cheque', 'hav_cad_cash', 'aud_hav', 'aud_wht'
-    ];
-    const cryptoFields = ['usdt', 'btc', 'eth', 'bnb', 'xrp', 'ada', 'doge', 'sol', 'matic', 'dot', 'ltc'];
-    const goldFields = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar', 'abshodeh'];
-
-    // Optional fields that may not be returned by the API (regional variants, etc.)
-    const optionalFields = [
-      'dolar_mashad_sell', 'dolar_kordestan_sell', 'dolar_soleimanie_sell'
-    ];
-
-    // Check each requested item exists in the response
-    for (const item of requestedItems) {
-      if (!(item in responseData)) {
-        // Skip validation for optional fields that may not exist
-        if (optionalFields.includes(item)) {
-          this.logger.warn(`Optional field not returned by Navasan API: ${item}`);
-          continue;
-        }
-        this.logger.error(`Missing expected field in Navasan API response: ${item}`);
-        throw new Error(`Invalid API response: missing required field "${item}"`);
-      }
+    // Validate structure of each field in the response
+    for (const key of keys) {
+      const fieldData = responseData[key];
 
       // Validate that the field contains an object with required properties
-      const fieldData = responseData[item];
       if (!fieldData || typeof fieldData !== 'object' || Array.isArray(fieldData)) {
-        this.logger.error(`Invalid structure for field "${item}" in Navasan API response`);
-        throw new Error(`Invalid API response: field "${item}" has invalid structure`);
+        this.logger.error(`Invalid structure for field "${key}" in PersianAPI response`);
+        throw new Error(`Invalid API response: field "${key}" has invalid structure`);
       }
 
       // Validate that the field object contains 'value' property
       const fieldObject = fieldData as Record<string, unknown>;
       if (!('value' in fieldObject)) {
-        this.logger.error(`Missing "value" property in field "${item}"`);
-        throw new Error(`Invalid API response: field "${item}" missing "value" property`);
+        this.logger.error(`Missing "value" property in field "${key}"`);
+        throw new Error(`Invalid API response: field "${key}" missing "value" property`);
       }
     }
 
-    this.logger.log(`✅ Navasan API response validation passed for items: ${items}`);
+    this.logger.log(`✅ PersianAPI response validation passed: ${keys.length} items received`);
   }
 
   /**
