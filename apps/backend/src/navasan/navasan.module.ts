@@ -3,6 +3,15 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { NavasanController } from "./navasan.controller";
 import { NavasanService } from "./navasan.service";
 import { IntradayOhlcService } from "./services/intraday-ohlc.service";
+
+// New modular services
+import { NavasanFetcherService } from "./services/navasan-fetcher.service";
+import { NavasanCacheManagerService } from "./services/navasan-cache-manager.service";
+import { NavasanTransformerService } from "./services/navasan-transformer.service";
+import { NavasanCircuitBreakerService } from "./services/navasan-circuit-breaker.service";
+import { NavasanOhlcService } from "./services/navasan-ohlc.service";
+import { NavasanHistoricalService } from "./services/navasan-historical.service";
+
 import { Cache, CacheSchema } from "./schemas/cache.schema";
 import {
   PriceSnapshot,
@@ -45,10 +54,32 @@ import { RateLimitModule } from "../rate-limit/rate-limit.module";
     RateLimitModule, // Import rate limiting module
   ],
   controllers: [NavasanController],
-  providers: [NavasanService, IntradayOhlcService],
+  providers: [
+    // Core orchestration service
+    NavasanService,
+
+    // Modular services (new architecture)
+    NavasanFetcherService,
+    NavasanCacheManagerService,
+    NavasanTransformerService,
+    NavasanCircuitBreakerService,
+    NavasanOhlcService,
+    NavasanHistoricalService,
+
+    // Legacy service (to be refactored)
+    IntradayOhlcService,
+  ],
   exports: [
     NavasanService,
     IntradayOhlcService,
+
+    // Export new services for use in other modules
+    NavasanFetcherService,
+    NavasanCacheManagerService,
+    NavasanTransformerService,
+    NavasanOhlcService,
+    NavasanHistoricalService,
+
     MongooseModule, // Export MongooseModule to make the models available to other modules
   ],
 })
