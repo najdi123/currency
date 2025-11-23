@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { useTranslations } from 'next-intl'
 import { FiArrowUp, FiArrowDown } from 'react-icons/fi'
 
 interface DailyChangeBadgeProps {
@@ -46,6 +47,7 @@ export const DailyChangeBadge: React.FC<DailyChangeBadgeProps> = ({
   compact = false,
   className = '',
 }) => {
+  const t = useTranslations('ItemCard')
   const isPositive = dailyChangePercent >= 0
   const isZero = dailyChangePercent === 0
 
@@ -71,7 +73,7 @@ export const DailyChangeBadge: React.FC<DailyChangeBadgeProps> = ({
     <div
       className={`inline-flex items-center rounded-lg font-semibold transition-colors ${bgColor} ${textColor} ${sizeClasses} ${className}`}
       role="status"
-      aria-label={`Daily change: ${isPositive ? '+' : ''}${dailyChangePercent.toFixed(2)}%`}
+      aria-label={isPositive ? t('priceIncrease') : t('priceDecrease')}
       dir="ltr"
     >
       {!isZero && <ArrowIcon className={compact ? 'text-xs' : 'text-sm'} aria-hidden="true" />}

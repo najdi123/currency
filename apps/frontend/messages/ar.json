@@ -20,7 +20,11 @@
     "goToYesterday": "أمس",
     "viewingDate": "عرض: {date}",
     "loading": "جارٍ التحميل",
-    "dataReady": "البيانات جاهزة"
+    "dataReady": "البيانات جاهزة",
+    "openDatePicker": "فتح منتقي التاريخ",
+    "openDatePickerPersian": "فتح التقويم الفارسي",
+    "openDatePickerGregorian": "فتح التقويم الميلادي",
+    "go": "انتقل"
   },
   "DataSection": {
     "currencies": "العملات",
@@ -32,11 +36,17 @@
     "errorCrypto": "خطأ في تحميل بيانات العملات الرقمية",
     "errorGold": "خطأ في تحميل بيانات الذهب والعملات",
     "loadingNewData": "جارٍ تحميل البيانات الجديدة",
-    "loadingText": "جارٍ التحميل..."
+    "loadingText": "جارٍ التحميل...",
+    "partialDataWarning": "عذراً، البيانات التاريخية للعملات الأخرى غير متوفرة",
+    "partialDataDetails": "فقط {available} من {total} عنصر لديها بيانات تاريخية"
   },
   "ItemCard": {
     "priceIncrease": "ارتفاع السعر",
-    "priceDecrease": "انخفاض السعر"
+    "priceDecrease": "انخفاض السعر",
+    "toman": "تومان",
+    "thousandToman": "ألف تومان",
+    "millionToman": "مليون تومان",
+    "billionToman": "مليار تومان"
   },
   "SettingsModal": {
     "title": "الإعدادات",
@@ -644,5 +654,22 @@
     "timeRemaining": "الوقت المتبقي حتى إعادة التعيين:",
     "errorLoading": "فشل تحميل حالة حد المعدل",
     "loading": "جاري التحميل..."
+  },
+  "DatePicker": {
+    "titlePersian": "التقويم الفارسي",
+    "titleGregorian": "التقويم الميلادي",
+    "close": "إغلاق",
+    "today": "اليوم",
+    "pastOnly": "التواريخ الماضية فقط",
+    "previousMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "manualInput": "أو اكتب التاريخ",
+    "go": "انتقل",
+    "invalidFormat": "تنسيق غير صحيح. استخدم YYYY-MM-DD",
+    "invalidDate": "تاريخ غير صحيح",
+    "invalidMonth": "شهر غير صحيح (1-12)",
+    "futureDate": "لا يمكن تحديد تواريخ مستقبلية",
+    "tooOld": "التاريخ قديم جداً",
+    "clickToSelect": "انقر لتحديد التاريخ"
   }
 }

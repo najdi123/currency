@@ -49,6 +49,7 @@ import {
   GoldData,
 } from "../api-providers/api-provider.interface";
 import { IntradayOhlcService } from "./services/intraday-ohlc.service";
+import { PersianApiTransformer } from "../api-providers/persianapi.transformer";
 
 /**
  * FIX #5: TYPE SAFETY - Define proper interfaces instead of using 'any'
@@ -125,6 +126,7 @@ export class NavasanService {
     private apiProviderFactory: ApiProviderFactory, // Inject PersianAPI provider
     private intradayOhlcService: IntradayOhlcService, // Inject Intraday OHLC service
     private cacheService: CacheService, // Inject Redis cache service
+    private persianApiTransformer: PersianApiTransformer, // Inject PersianAPI transformer
   ) {
     this.apiKey = this.configService.get<string>("NAVASAN_API_KEY") || "";
     if (!this.apiKey) {
@@ -253,6 +255,18 @@ export class NavasanService {
       data: transformedData as NavasanResponse,
       metadata: response.metadata,
     };
+  }
+
+  /**
+   * Get latest coin prices only
+   * Returns coins from PersianAPI (Sekkeh Bahar Azadi, Nim Sekkeh, Rob Sekkeh, etc.)
+   * Note: Uses same endpoint as gold (/common/gold-currency-coin) but returns only coin items
+   */
+  async getCoins(): Promise<ApiResponse<NavasanResponse>> {
+    // For now, coins come from the same gold endpoint, so we can fetch from gold
+    // and filter, or create a specific coins item list
+    const coinsItems = "sekkeh,bahar,nim,rob,gerami";
+    return this.fetchWithCache("coins", coinsItems);
   }
 
   /**
@@ -682,30 +696,21 @@ export class NavasanService {
   }
 
   /**
+   * @deprecated Use PersianApiTransformer.transformToNavasanFormat() instead
+   *
    * Map PersianAPI response array to NavasanResponse object format
    * PersianAPI returns: [{ code: 'usd_sell', price: 42500, ... }]
    * Navasan format: { usd_sell: { value: "42500", ... } }
+   *
+   * For crypto: Uses priceIrt (Toman) instead of price (USD)
+   *
+   * This method is kept for backward compatibility but delegates to the transformer.
    */
   private mapPersianApiToNavasan(
     data: (CurrencyData | CryptoData | GoldData)[],
   ): NavasanResponse {
-    const result: Record<string, NavasanPriceItem> = {};
-
-    for (const item of data) {
-      const key = item.code;
-      const timestamp = item.updatedAt || new Date();
-
-      // Map to Navasan format with calculated date/dt fields
-      result[key] = {
-        value: String(item.price || 0),
-        change: "change" in item && item.change ? item.change : 0,
-        utc: timestamp.toISOString(),
-        date: this.toJalaliDateString(timestamp),
-        dt: this.toTimeString(timestamp),
-      };
-    }
-
-    return result as NavasanResponse;
+    // Delegate to transformer
+    return this.persianApiTransformer.transformToNavasanFormat(data) as NavasanResponse;
   }
 
   /**
@@ -818,10 +823,10 @@ export class NavasanService {
         }
       }
 
-      // Map PersianAPI response to NavasanResponse format
-      const navasanData = this.mapPersianApiToNavasan(responseData);
+      // Use PersianApiTransformer to convert to NavasanResponse format
+      const navasanData = this.persianApiTransformer.transformToNavasanFormat(responseData);
 
-      // Validate the mapped response
+      // Validate the transformed response
       this.validateNavasanResponse(navasanData, items);
 
       this.logger.debug(

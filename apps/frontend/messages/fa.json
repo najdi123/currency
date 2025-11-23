@@ -20,7 +20,11 @@
     "goToYesterday": "دیروز",
     "viewingDate": "مشاهده تاریخ: {date}",
     "loading": "در حال بارگذاری",
-    "dataReady": "داده‌ها آماده"
+    "dataReady": "داده‌ها آماده",
+    "openDatePicker": "باز کردن تقویم",
+    "openDatePickerPersian": "باز کردن تقویم شمسی",
+    "openDatePickerGregorian": "باز کردن تقویم میلادی",
+    "go": "برو"
   },
   "DataSection": {
     "currencies": "ارزها",
@@ -32,11 +36,17 @@
     "errorCrypto": "خطا در دریافت اطلاعات ارزهای دیجیتال",
     "errorGold": "خطا در دریافت اطلاعات طلا و سکه",
     "loadingNewData": "در حال بارگذاری داده‌های جدید",
-    "loadingText": "در حال بارگذاری..."
+    "loadingText": "در حال بارگذاری...",
+    "partialDataWarning": "متأسفانه اطلاعات تاریخی سایر ارزها در دسترس نیست",
+    "partialDataDetails": "فقط {available} مورد از {total} مورد دارای اطلاعات تاریخی هستند"
   },
   "ItemCard": {
     "priceIncrease": "افزایش قیمت",
-    "priceDecrease": "کاهش قیمت"
+    "priceDecrease": "کاهش قیمت",
+    "toman": "تومان",
+    "thousandToman": "هزار تومان",
+    "millionToman": "میلیون تومان",
+    "billionToman": "میلیارد تومان"
   },
   "SettingsModal": {
     "title": "تنظیمات",
@@ -644,5 +654,22 @@
     "timeRemaining": "زمان باقی‌مانده تا بازنشانی:",
     "errorLoading": "بارگذاری وضعیت محدودیت نرخ ناموفق بود",
     "loading": "در حال بارگذاری..."
+  },
+  "DatePicker": {
+    "titlePersian": "تقویم شمسی",
+    "titleGregorian": "تقویم میلادی",
+    "close": "بستن",
+    "today": "امروز",
+    "pastOnly": "فقط تاریخ‌های گذشته",
+    "previousMonth": "ماه قبل",
+    "nextMonth": "ماه بعد",
+    "manualInput": "یا تاریخ را تایپ کنید",
+    "go": "برو",
+    "invalidFormat": "فرمت نامعتبر. از YYYY/MM/DD استفاده کنید",
+    "invalidDate": "تاریخ نامعتبر",
+    "invalidMonth": "ماه نامعتبر (۱-۱۲)",
+    "futureDate": "نمی‌توان تاریخ آینده انتخاب کرد",
+    "tooOld": "تاریخ خیلی قدیمی است",
+    "clickToSelect": "برای انتخاب تاریخ کلیک کنید"
   }
 }

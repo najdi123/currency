@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query'
+import { config } from '@/lib/config'
 
 // TypeScript interfaces for authentication
 export interface LoginRequest {
@@ -59,7 +60,7 @@ export interface MessageResponse {
 
 // Base query with auth token injection
 const baseQuery = fetchBaseQuery({
-  baseUrl: 'http://localhost:4000/api',
+  baseUrl: config.apiUrl,
   credentials: 'omit',
   prepareHeaders: (headers) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null

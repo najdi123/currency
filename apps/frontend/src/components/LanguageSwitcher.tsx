@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 import { locales } from '@/i18n/request';
 import { FiCheck } from 'react-icons/fi';
@@ -21,14 +21,20 @@ export function LanguageSwitcher() {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Memoize the handler to prevent recreation on every render
   const handleChange = useCallback((newLocale: string) => {
     const pathWithoutLocale = pathname.replace(`/${locale}`, '');
     const newPath = `/${newLocale}${pathWithoutLocale}`;
-    router.push(newPath);
+
+    // Preserve query parameters (like ?date=2025-11-22)
+    const queryString = searchParams.toString();
+    const fullPath = queryString ? `${newPath}?${queryString}` : newPath;
+
+    router.push(fullPath);
     router.refresh();
-  }, [locale, pathname, router]);
+  }, [locale, pathname, searchParams, router]);
 
   return (
     <div className="space-y-2" role="radiogroup" aria-label="Select Language">

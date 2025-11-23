@@ -2,11 +2,15 @@
  * useHistoricalNavigation Hook
  *
  * Manages multi-day historical date navigation with support for up to 90 days back
+ * Integrates with URL query parameters for shareable links and browser history support
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+'use client'
+
+import { useCallback, useMemo, useEffect, useState } from 'react'
 import { formatDateForApi, getTehranToday } from '@/lib/utils/dateUtils'
 import { getTehranDateFromApi } from '@/lib/utils/timeApi'
+import { useDateNavigation } from './useDateNavigation'
 
 const MAX_DAYS_BACK = 90
 
@@ -19,6 +23,8 @@ export interface HistoricalNavigationState {
   goToNextDay: () => void
   /** Reset to today */
   goToToday: () => void
+  /** Set a specific date */
+  setDate: (date: Date | null) => void
   /** Whether we're viewing today's data */
   isToday: boolean
   /** Number of days back from today (0 = today, 1 = yesterday, etc.) */
@@ -43,11 +49,14 @@ const getDaysDifference = (date1: Date, date2: Date): number => {
 
 /**
  * Hook to manage multi-day historical navigation
+ * Uses URL query parameters for state persistence
  * Fetches actual Tehran time from external API to avoid system clock issues
  */
 export function useHistoricalNavigation(): HistoricalNavigationState {
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [actualTehranToday, setActualTehranToday] = useState<Date>(getTehranToday())
+
+  // Use URL-based date navigation
+  const { selectedDate, setDate, isToday: urlIsToday } = useDateNavigation()
 
   // Fetch actual Tehran time from API on mount
   useEffect(() => {
@@ -94,50 +103,52 @@ export function useHistoricalNavigation(): HistoricalNavigationState {
 
   // Navigate to previous day
   const goToPreviousDay = useCallback(() => {
-    setSelectedDate((current) => {
-      const dateToUse = current || today
-      const newDate = new Date(dateToUse)
-      newDate.setDate(newDate.getDate() - 1)
+    const dateToUse = selectedDate || today
+    const newDate = new Date(dateToUse)
+    newDate.setDate(newDate.getDate() - 1)
 
-      // Check if we've exceeded the max days back
-      const daysDiff = getDaysDifference(today, newDate)
-      if (daysDiff >= MAX_DAYS_BACK) {
-        // Can't go back further
-        return current
-      }
+    // Check if we've exceeded the max days back
+    const daysDiff = getDaysDifference(today, newDate)
+    if (daysDiff >= MAX_DAYS_BACK) {
+      // Can't go back further
+      console.warn('[useHistoricalNavigation] Cannot go back further than 90 days')
+      return
+    }
 
-      return newDate
-    })
-  }, [today])
+    setDate(newDate)
+  }, [selectedDate, today, setDate])
 
   // Navigate to next day
   const goToNextDay = useCallback(() => {
-    setSelectedDate((current) => {
-      if (!current) return null // Already at today
+    if (!selectedDate) {
+      // Already at today
+      return
+    }
 
-      const newDate = new Date(current)
-      newDate.setDate(newDate.getDate() + 1)
+    const newDate = new Date(selectedDate)
+    newDate.setDate(newDate.getDate() + 1)
 
-      // If we're going to today, set to null
-      const daysDiff = getDaysDifference(today, newDate)
-      if (daysDiff <= 0) {
-        return null
-      }
+    // If we're going to today, set to null
+    const daysDiff = getDaysDifference(today, newDate)
+    if (daysDiff <= 0) {
+      setDate(null)
+      return
+    }
 
-      return newDate
-    })
-  }, [today])
+    setDate(newDate)
+  }, [selectedDate, today, setDate])
 
   // Go to today
   const goToToday = useCallback(() => {
-    setSelectedDate(null)
-  }, [])
+    setDate(null)
+  }, [setDate])
 
   return {
     selectedDate,
     goToPreviousDay,
     goToNextDay,
     goToToday,
+    setDate,
     isToday,
     daysAgo,
     formattedDate,

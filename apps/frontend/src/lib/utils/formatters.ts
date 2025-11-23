@@ -92,14 +92,32 @@ export function formatChange(change: number | undefined | null, locale?: string)
  * Format a change amount as separate parts for custom layout
  * @param change - The change amount in Toman
  * @param locale - Locale for number formatting (default: 'fa')
- * @returns Object with label (Persian text), sign, and formatted number
+ * @param translations - Optional translation object with toman, thousandToman, millionToman, billionToman keys
+ * @returns Object with label (localized text), sign, and formatted number
  */
-export function formatChangeParts(change: number | undefined | null, locale?: string): {
+export function formatChangeParts(
+  change: number | undefined | null,
+  locale?: string,
+  translations?: {
+    toman: string
+    thousandToman: string
+    millionToman: string
+    billionToman: string
+  }
+): {
   label: string
   signedNumber: string
 } {
+  // Default to Persian labels if no translations provided (for backwards compatibility)
+  const labels = translations || {
+    toman: 'تومان',
+    thousandToman: 'هزار تومان',
+    millionToman: 'میلیون تومان',
+    billionToman: 'میلیارد تومان'
+  }
+
   if (change === undefined || change === null || change === 0) {
-    return { label: 'تومان', signedNumber: locale === 'fa' ? '۰' : '0' }
+    return { label: labels.toman, signedNumber: locale === 'fa' ? '۰' : '0' }
   }
 
   const sign = change > 0 ? '+' : '-'
@@ -110,12 +128,12 @@ export function formatChangeParts(change: number | undefined | null, locale?: st
     const formatted = new Intl.NumberFormat('en-US').format(Math.round(absNum))
     const number = locale === 'fa' ? toPersianDigits(formatted) : formatted
     return {
-      label: 'تومان',
+      label: labels.toman,
       signedNumber: `${sign}${number}`
     }
   }
 
-  // 1,000 - 999,999: use "هزار تومان" (thousand)
+  // 1,000 - 999,999: use "thousand Toman"
   if (absNum < 1_000_000) {
     const thousands = absNum / 1000
     const formatted = thousands % 1 === 0
@@ -124,12 +142,12 @@ export function formatChangeParts(change: number | undefined | null, locale?: st
     const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
     const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
     return {
-      label: 'هزار تومان',
+      label: labels.thousandToman,
       signedNumber: `${sign}${finalNumber}`
     }
   }
 
-  // 1,000,000 - 999,999,999: use "میلیون تومان" (million)
+  // 1,000,000 - 999,999,999: use "million Toman"
   if (absNum < 1_000_000_000) {
     const millions = absNum / 1_000_000
     const formatted = millions % 1 === 0
@@ -140,12 +158,12 @@ export function formatChangeParts(change: number | undefined | null, locale?: st
     const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
     const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
     return {
-      label: 'میلیون تومان',
+      label: labels.millionToman,
       signedNumber: `${sign}${finalNumber}`
     }
   }
 
-  // 1 billion+: use "میلیارد تومان" (billion)
+  // 1 billion+: use "billion Toman"
   const billions = absNum / 1_000_000_000
   const formatted = billions % 1 === 0
     ? billions.toFixed(0)
@@ -155,7 +173,7 @@ export function formatChangeParts(change: number | undefined | null, locale?: st
   const number = new Intl.NumberFormat('en-US').format(parseFloat(formatted))
   const finalNumber = locale === 'fa' ? toPersianDigits(number) : number
   return {
-    label: 'میلیارد تومان',
+    label: labels.billionToman,
     signedNumber: `${sign}${finalNumber}`
   }
 }

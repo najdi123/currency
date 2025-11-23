@@ -20,7 +20,11 @@
     "goToYesterday": "Yesterday",
     "viewingDate": "Viewing: {date}",
     "loading": "Loading",
-    "dataReady": "Data ready"
+    "dataReady": "Data ready",
+    "openDatePicker": "Open Date Picker",
+    "openDatePickerPersian": "Open Persian Calendar",
+    "openDatePickerGregorian": "Open Gregorian Calendar",
+    "go": "Go"
   },
   "DataSection": {
     "currencies": "Currencies",
@@ -32,11 +36,17 @@
     "errorCrypto": "Error loading cryptocurrency data",
     "errorGold": "Error loading gold and coins data",
     "loadingNewData": "Loading new data",
-    "loadingText": "Loading..."
+    "loadingText": "Loading...",
+    "partialDataWarning": "Sorry, historical data for other currencies is not available",
+    "partialDataDetails": "Only {available} of {total} items have historical data"
   },
   "ItemCard": {
     "priceIncrease": "Price increase",
-    "priceDecrease": "Price decrease"
+    "priceDecrease": "Price decrease",
+    "toman": "Toman",
+    "thousandToman": "K Toman",
+    "millionToman": "M Toman",
+    "billionToman": "B Toman"
   },
   "SettingsModal": {
     "title": "Settings",
@@ -644,5 +654,22 @@
     "timeRemaining": "Time remaining until reset:",
     "errorLoading": "Failed to load rate limit status",
     "loading": "Loading..."
+  },
+  "DatePicker": {
+    "titlePersian": "Persian Calendar",
+    "titleGregorian": "Gregorian Calendar",
+    "close": "Close",
+    "today": "Today",
+    "pastOnly": "Past dates only",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "manualInput": "Or type a date",
+    "go": "Go",
+    "invalidFormat": "Invalid format. Use YYYY-MM-DD",
+    "invalidDate": "Invalid date",
+    "invalidMonth": "Invalid month (1-12)",
+    "futureDate": "Cannot select future dates",
+    "tooOld": "Date is too far in the past",
+    "clickToSelect": "Click to select date"
   }
 }

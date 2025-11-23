@@ -20,6 +20,7 @@ import {
   formatTehranDate,
 } from "../common/utils/date-utils";
 import { RateLimitGuard } from "../rate-limit/rate-limit.guard";
+import { CurrencyConversionService } from "../common/services/currency-conversion.service";
 
 @Controller("navasan")
 @UseGuards(RateLimitGuard) // Apply rate limiting to all endpoints
@@ -29,6 +30,7 @@ export class NavasanController {
   constructor(
     private readonly navasanService: NavasanService,
     private readonly intradayOhlcService: IntradayOhlcService,
+    private readonly currencyConversionService: CurrencyConversionService,
   ) {}
 
   /**
@@ -286,6 +288,12 @@ export class NavasanController {
 
       const response = await this.navasanService.getCurrencies();
 
+      // Convert from Rial to Toman for display
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
       res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
       res.setHeader("X-Data-Stale", String(response.metadata.isStale));
       res.setHeader(
@@ -307,7 +315,7 @@ export class NavasanController {
       }
 
       return res.json({
-        ...response.data,
+        ...convertedData.data,
         _metadata: response.metadata,
       });
     } catch (error) {
@@ -392,6 +400,12 @@ export class NavasanController {
 
       const response = await this.navasanService.getCrypto();
 
+      // Convert from Rial to Toman for display
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
       res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
       res.setHeader("X-Data-Stale", String(response.metadata.isStale));
       res.setHeader(
@@ -413,7 +427,7 @@ export class NavasanController {
       }
 
       return res.json({
-        ...response.data,
+        ...convertedData.data,
         _metadata: response.metadata,
       });
     } catch (error) {
@@ -497,6 +511,52 @@ export class NavasanController {
       this.logger.log("GET /api/navasan/gold - Fetching gold prices");
 
       const response = await this.navasanService.getGold();
+
+      // Convert from Rial to Toman for display
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
+      res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
+      res.setHeader("X-Data-Stale", String(response.metadata.isStale));
+      res.setHeader(
+        "X-Data-Age-Minutes",
+        String(response.metadata.dataAge || 0),
+      );
+      res.setHeader("X-Data-Source", response.metadata.source);
+      res.setHeader(
+        "X-Last-Updated",
+        response.metadata.lastUpdated.toISOString(),
+      );
+
+      // SECURITY FIX: Sanitize warning message to prevent header injection
+      if (response.metadata.warning) {
+        res.setHeader(
+          "X-Data-Warning",
+          this.sanitizeHeaderValue(response.metadata.warning),
+        );
+      }
+
+      return res.json({
+        ...convertedData.data,
+        _metadata: response.metadata,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * GET /api/navasan/coins
+   * Returns coin prices (Sekkeh Bahar Azadi, Nim Sekkeh, Rob Sekkeh, etc.)
+   */
+  @Get("coins")
+  async getCoins(@Res() res: Response) {
+    try {
+      this.logger.log("GET /api/navasan/coins - Fetching coin prices");
+
+      const response = await this.navasanService.getCoins();
 
       res.setHeader("X-Data-Fresh", String(response.metadata.isFresh));
       res.setHeader("X-Data-Stale", String(response.metadata.isStale));

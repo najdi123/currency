@@ -403,26 +403,30 @@ export class PersianApiProvider implements IApiProvider {
   }
 
   /**
-   * Fetch cryptocurrencies from common/gold-currency-coin endpoint
-   * NOTE: Base Package may not include crypto data
+   * Fetch cryptocurrencies from common/digitalcurrency endpoint
+   * Returns crypto data with prices in both USD and Toman (IRT)
    */
   async fetchCrypto(params?: FetchParams): Promise<CryptoData[]> {
     try {
-      // Try to use digitalcurrency endpoint, but it may fail with Base Package
       const response = await this.makeRequestWithDedup(
         "/common/digitalcurrency",
         params,
       );
 
-      if (!Array.isArray(response)) {
-        this.logger.warn(`Crypto endpoint not available with Base Package`);
+      // Check if response has the expected list structure
+      if (!response || !Array.isArray(response)) {
+        this.logger.error(
+          `Invalid crypto response format. Expected array, got: ${typeof response}`,
+        );
         return [];
       }
 
-      return response.map((item) => this.mapToCryptoData(item));
+      const cryptoData = response.map((item) => this.mapToCryptoData(item));
+      this.logger.log(`✅ Fetched ${cryptoData.length} cryptocurrencies from PersianAPI`);
+      return cryptoData;
     } catch (error: any) {
-      this.logger.warn("Crypto data not available (Base Package limitation)");
-      return []; // Return empty array instead of throwing
+      this.logger.error("Failed to fetch crypto from PersianAPI", error);
+      throw this.handleError(error);
     }
   }
 
@@ -960,14 +964,19 @@ export class PersianApiProvider implements IApiProvider {
 
   /**
    * Map PersianAPI crypto response to standard format
+   * Stores price_irt in Rial as received from API (conversion happens at display time)
    */
   private mapToCryptoData(item: PersianApiCryptoResponse): CryptoData {
+    // Store price in Rial as received from API
+    // Conversion to Toman happens at display time via CurrencyConversionService
+    const priceInRials = this.parsePrice(item.price_irt);
+
     return {
       code: item.symbol?.toLowerCase() || item.slug || "unknown",
       name: item.name || item.title || "Unknown",
       symbol: item.symbol || "UNKNOWN",
-      price: this.parsePrice(item["Usd-price"] || item.price),
-      priceIrt: this.parsePrice(item.price_irt),
+      price: this.parsePrice(item["Usd-price"] || item.price), // USD price
+      priceIrt: priceInRials, // Iranian Rial price (raw from API)
       high24h: this.parsePrice(item.high24h),
       low24h: this.parsePrice(item.low24h),
       change24h: this.parsePrice(item["percent_change_24h"]),

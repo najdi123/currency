@@ -35,7 +35,7 @@ export interface CryptoData {
   name: string; // e.g., 'Bitcoin'
   symbol: string; // e.g., 'BTC'
   price: number; // Current price in USD
-  priceIrt: number; // Price in Iranian Rial
+  priceIrt: number; // Price in Iranian Rial (raw from API, converted to Toman at display time)
   high24h?: number;
   low24h?: number;
   change1h?: number; // 1 hour change %

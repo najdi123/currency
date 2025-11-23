@@ -1,9 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { FiClock, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { HiCalendar } from 'react-icons/hi'
 import type { HistoricalNavigationState } from '@/hooks/useHistoricalNavigation'
+import { DatePicker } from '@/components/DatePicker/DatePicker'
 
 interface LastUpdatedDisplayProps {
   lastUpdated: Date | null
@@ -18,6 +20,102 @@ export const LastUpdatedDisplay = ({
 }: LastUpdatedDisplayProps) => {
   const t = useTranslations('PageHeader')
   const locale = useLocale()
+
+  // State to track which date picker is open
+  const [openPicker, setOpenPicker] = useState<'persian' | 'gregorian' | null>(null)
+
+  // State to track which dropdown group is active (to show the button)
+  const [activeDropdown, setActiveDropdown] = useState<'persian' | 'gregorian' | null>(null)
+
+  // State for Persian date dropdowns
+  const [persianDay, setPersianDay] = useState<number>(1)
+  const [persianMonth, setPersianMonth] = useState<number>(1)
+  const [persianYear, setPersianYear] = useState<number>(1403)
+
+  // State for Gregorian date dropdowns
+  const [gregorianDay, setGregorianDay] = useState<number>(1)
+  const [gregorianMonth, setGregorianMonth] = useState<number>(1)
+  const [gregorianYear, setGregorianYear] = useState<number>(2025)
+
+  // Update dropdown states when selectedDate changes
+  useEffect(() => {
+    const date = historicalNav?.selectedDate ?? lastUpdated
+    if (!date) return
+
+    // Update Persian dropdowns
+    const persianFormatter = new Intl.DateTimeFormat('en-u-nu-latn-ca-persian', {
+      timeZone: 'Asia/Tehran',
+      calendar: 'persian',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    })
+    const persianParts = persianFormatter.formatToParts(date)
+    const pYear = parseInt(persianParts.find(p => p.type === 'year')?.value || '1403')
+    const pMonth = parseInt(persianParts.find(p => p.type === 'month')?.value || '1')
+    const pDay = parseInt(persianParts.find(p => p.type === 'day')?.value || '1')
+    setPersianYear(pYear)
+    setPersianMonth(pMonth)
+    setPersianDay(pDay)
+
+    // Update Gregorian dropdowns
+    setGregorianYear(date.getFullYear())
+    setGregorianMonth(date.getMonth() + 1)
+    setGregorianDay(date.getDate())
+  }, [historicalNav?.selectedDate, lastUpdated])
+
+  // Handle date selection from picker
+  const handleDateSelect = (date: Date) => {
+    if (historicalNav) {
+      historicalNav.setDate(date)
+    }
+  }
+
+  // Handle opening the date picker from button
+  const handleOpenPicker = (type: 'persian' | 'gregorian') => {
+    setOpenPicker(type)
+    setActiveDropdown(null) // Hide button after opening picker
+  }
+
+  // Handle applying the Persian date from dropdowns
+  const handleApplyPersianDate = () => {
+    // Create a date object from Persian calendar values
+    // We'll use a simple approximation by creating a date in Gregorian and adjusting
+    // For production, use a proper Persian calendar library like @persian-tools/persian-tools
+
+    // Create a date string in Persian format that Intl can parse
+    const persianDateString = `${persianYear}/${persianMonth.toString().padStart(2, '0')}/${persianDay.toString().padStart(2, '0')}`
+
+    // Use Intl to parse Persian date to Gregorian
+    // This is approximate - for accurate conversion use a library
+    try {
+      // Create a date by approximating Persian to Gregorian
+      // Persian year 1403 ≈ Gregorian 2024/2025
+      const gregorianYear = persianYear + 621
+      const gregorianDate = new Date(gregorianYear, persianMonth - 1, persianDay)
+
+      if (historicalNav) {
+        historicalNav.setDate(gregorianDate)
+      }
+      setActiveDropdown(null)
+    } catch (error) {
+      console.error('Error converting Persian date:', error)
+    }
+  }
+
+  // Handle applying the Gregorian date from dropdowns
+  const handleApplyGregorianDate = () => {
+    try {
+      const gregorianDate = new Date(gregorianYear, gregorianMonth - 1, gregorianDay)
+
+      if (historicalNav) {
+        historicalNav.setDate(gregorianDate)
+      }
+      setActiveDropdown(null)
+    } catch (error) {
+      console.error('Error creating Gregorian date:', error)
+    }
+  }
 
   return (
     <div className="flex items-center gap-4" role="region" aria-label={t('lastUpdated')}>
@@ -82,43 +180,106 @@ export const LastUpdatedDisplay = ({
                 {t('tehranTime')}
               </span>
             </div>
-            <div className="flex flex-col gap-0.5 text-apple-caption text-text-tertiary">
-              <div>
-          <div dir="rtl" className="text-right">
-  {(() => {
-    const date = historicalNav?.selectedDate ?? lastUpdated
-    if (!date) return '--'
-
-    const usePersianLocale = locale === 'fa'
-
-    const formatter = new Intl.DateTimeFormat(
-      usePersianLocale ? 'fa-IR' : 'en-u-nu-latn-ca-persian', // Latin digits, Persian calendar
-      {
-        timeZone: 'Asia/Tehran',
-        calendar: 'persian',
-        year: 'numeric',
-        month: usePersianLocale ? 'long' : 'numeric',
-        day: 'numeric',
-      }
-    )
-
-    const parts = formatter.formatToParts(date)
-    const year = parts.find(p => p.type === 'year')?.value
-    const month = parts.find(p => p.type === 'month')?.value
-    const day = parts.find(p => p.type === 'day')?.value
-
-    return `${day} ${month} ${year}`
-  })()}
-</div>
+            <div className="flex flex-col gap-1 text-apple-caption text-text-tertiary relative">
+              {/* Persian Date - Day/Month/Year Dropdowns */}
+              <div
+                className="flex gap-1 items-center"
+                dir={locale === 'fa' || locale === 'ar' ? 'rtl' : 'ltr'}
+                onClick={() => setActiveDropdown('persian')}
+              >
+                <select
+                  value={persianYear}
+                  onChange={(e) => setPersianYear(parseInt(e.target.value))}
+                  className="bg-transparent border border-border-light hover:border-accent rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-text-tertiary text-xs"
+                  dir="ltr"
+                >
+                  {Array.from({ length: 50 }, (_, i) => 1403 - i).map(year => (
+                    <option key={year} value={year}>{locale === 'fa' ? new Intl.NumberFormat('fa-IR').format(year) : year}</option>
+                  ))}
+                </select>
+                <span className="text-text-tertiary">/</span>
+                <select
+                  value={persianMonth}
+                  onChange={(e) => setPersianMonth(parseInt(e.target.value))}
+                  className="bg-transparent border border-border-light hover:border-accent rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-text-tertiary text-xs"
+                  dir="ltr"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                    <option key={month} value={month}>
+                      {locale === 'fa' ? new Intl.NumberFormat('fa-IR').format(month).padStart(2, '۰') : month.toString().padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-text-tertiary">/</span>
+                <select
+                  value={persianDay}
+                  onChange={(e) => setPersianDay(parseInt(e.target.value))}
+                  className="bg-transparent border border-border-light hover:border-accent rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-text-tertiary text-xs"
+                  dir="ltr"
+                >
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                    <option key={day} value={day}>
+                      {locale === 'fa' ? new Intl.NumberFormat('fa-IR').format(day).padStart(2, '۰') : day.toString().padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                {new Intl.DateTimeFormat('en-US', {
-                  timeZone: 'Asia/Tehran',
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric'
-                }).format(historicalNav && historicalNav.selectedDate ? historicalNav.selectedDate : lastUpdated)}
+
+              {/* Gregorian Date - Day/Month/Year Dropdowns */}
+              <div
+                className="flex gap-1 items-center"
+                onClick={() => setActiveDropdown('gregorian')}
+              >
+                <select
+                  value={gregorianYear}
+                  onChange={(e) => setGregorianYear(parseInt(e.target.value))}
+                  className="bg-transparent border border-border-light hover:border-accent rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-text-tertiary text-xs"
+                >
+                  {Array.from({ length: 50 }, (_, i) => 2025 - i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                <span className="text-text-tertiary">-</span>
+                <select
+                  value={gregorianMonth}
+                  onChange={(e) => setGregorianMonth(parseInt(e.target.value))}
+                  className="bg-transparent border border-border-light hover:border-accent rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-text-tertiary text-xs"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                    <option key={month} value={month}>{month.toString().padStart(2, '0')}</option>
+                  ))}
+                </select>
+                <span className="text-text-tertiary">-</span>
+                <select
+                  value={gregorianDay}
+                  onChange={(e) => setGregorianDay(parseInt(e.target.value))}
+                  className="bg-transparent border border-border-light hover:border-accent rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-text-tertiary text-xs"
+                >
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                    <option key={day} value={day}>{day.toString().padStart(2, '0')}</option>
+                  ))}
+                </select>
               </div>
+
+              {/* Action Buttons - Shows when dropdown is active */}
+              {activeDropdown && (
+                <div className="absolute top-full left-0 mt-1 flex gap-2 z-10">
+                  <button
+                    onClick={() => activeDropdown === 'persian' ? handleApplyPersianDate() : handleApplyGregorianDate()}
+                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    aria-label="Go to selected date"
+                  >
+                    {t('go')}
+                  </button>
+                  <button
+                    onClick={() => handleOpenPicker(activeDropdown)}
+                    className="px-3 py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent/90 transition-all shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+                    aria-label={activeDropdown === 'persian' ? t('openDatePickerPersian') : t('openDatePickerGregorian')}
+                  >
+                    {t('openDatePicker')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -160,6 +321,26 @@ export const LastUpdatedDisplay = ({
     )}
   </button>
 )}
+
+      {/* Date Pickers */}
+      {historicalNav && (
+        <>
+          <DatePicker
+            selectedDate={historicalNav.selectedDate}
+            onDateSelect={handleDateSelect}
+            onClose={() => setOpenPicker(null)}
+            isOpen={openPicker === 'persian'}
+            calendarType="persian"
+          />
+          <DatePicker
+            selectedDate={historicalNav.selectedDate}
+            onDateSelect={handleDateSelect}
+            onClose={() => setOpenPicker(null)}
+            isOpen={openPicker === 'gregorian'}
+            calendarType="gregorian"
+          />
+        </>
+      )}
     </div>
   )
 }

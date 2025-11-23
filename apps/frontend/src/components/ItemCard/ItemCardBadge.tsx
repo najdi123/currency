@@ -42,7 +42,12 @@ export const ItemCardBadge: React.FC<ItemCardBadgeProps> = ({
 }) => {
   const locale = useLocale()
   const t = useTranslations('ItemCard')
-  const { label, signedNumber } = formatChangeParts(change, locale)
+  const { label, signedNumber } = formatChangeParts(change, locale, {
+    toman: t('toman'),
+    thousandToman: t('thousandToman'),
+    millionToman: t('millionToman'),
+    billionToman: t('billionToman')
+  })
 
   return (
     <div

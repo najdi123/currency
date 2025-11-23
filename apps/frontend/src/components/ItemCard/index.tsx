@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { formatToman } from '@/lib/utils/formatters'
 import { logComponentError } from '@/lib/errorLogger'
 import { ItemCardHeader } from './ItemCardHeader'
@@ -66,6 +67,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   variants = [],
   ohlc,
 }) => {
+  const t = useTranslations('ItemCard')
+
   // Process data using custom hook
   const { sparklineData, isPositive, sparklineColor } = useItemCardData({
     code,
@@ -107,8 +110,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         role={role}
         className={getCardClassName(compact)}
         aria-label={`${name}: ${formatTomanForScreenReader(value)}، ${
-          isPositive ? 'افزایش' : 'کاهش'
-        } ${formatTomanForScreenReader(Math.abs(change))} نسبت به قبل`}
+          isPositive ? t('priceIncrease') : t('priceDecrease')
+        } ${formatTomanForScreenReader(Math.abs(change))}`}
       >
         {/* Header Section with fallback */}
         <ItemCardHeader
@@ -144,8 +147,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       role={role}
       className={getCardClassName(compact)}
       aria-label={`${name}: ${formatTomanForScreenReader(value)}، ${
-        isPositive ? 'افزایش' : 'کاهش'
-      } ${formatTomanForScreenReader(Math.abs(change))} نسبت به قبل`}
+        isPositive ? t('priceIncrease') : t('priceDecrease')
+      } ${formatTomanForScreenReader(Math.abs(change))}`}
     >
       {/* Header Section */}
       <ItemCardHeader
