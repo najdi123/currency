@@ -7,7 +7,7 @@ export class CacheService implements OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
   private redis: Redis | null = null;
   private readonly useRedis: boolean;
-  private memoryCache = new Map<string, { value: any; expiry: number }>();
+  private memoryCache = new Map<string, { value: string; expiry: number }>();
   private cleanupInterval: NodeJS.Timeout;
 
   // Metrics tracking
@@ -37,7 +37,7 @@ export class CacheService implements OnModuleDestroy {
           host: redisHost,
           port: redisPort,
           password: redisPassword || undefined,
-          retryStrategy: (times) => {
+          retryStrategy: (times: number): number | null => {
             if (times > 5) {
               this.logger.error(
                 "Redis connection failed after 5 retries, falling back to memory cache",
@@ -57,7 +57,7 @@ export class CacheService implements OnModuleDestroy {
           this.logger.log("Redis connected successfully");
         });
 
-        this.redis.on("error", (error) => {
+        this.redis.on("error", (error: Error) => {
           this.logger.error(`Redis error: ${error.message}`);
         });
 

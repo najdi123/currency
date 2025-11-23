@@ -5,6 +5,7 @@ import {
   CACHE_DURATIONS,
   ItemCategory,
 } from '../constants/navasan.constants';
+import { CacheData, OhlcData, HistoricalDataPoint } from '../types/navasan.types';
 
 /**
  * NavasanCacheManagerService
@@ -27,7 +28,7 @@ export class NavasanCacheManagerService {
   /**
    * Get fresh data from cache
    */
-  async getFreshData(category: ItemCategory): Promise<any | null> {
+  async getFreshData(category: ItemCategory): Promise<unknown> {
     const cacheKey = this.buildFreshCacheKey(category);
 
     try {
@@ -42,7 +43,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(`Fresh cache miss for ${category}`);
       this.metricsService.trackCacheMiss(category, 'fresh');
       return null;
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error reading fresh cache for ${category}: ${err.message}`,
@@ -55,7 +56,7 @@ export class NavasanCacheManagerService {
   /**
    * Set fresh data in cache
    */
-  async setFreshData(category: ItemCategory, data: any): Promise<void> {
+  async setFreshData(category: ItemCategory, data: unknown): Promise<void> {
     const cacheKey = this.buildFreshCacheKey(category);
     const ttlSeconds = Math.floor(CACHE_DURATIONS.FRESH / 1000);
 
@@ -65,7 +66,7 @@ export class NavasanCacheManagerService {
         `Cached fresh data for ${category} (TTL: ${ttlSeconds}s)`,
       );
       this.metricsService.trackCacheSet(cacheKey);
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error caching fresh data for ${category}: ${err.message}`,
@@ -77,7 +78,7 @@ export class NavasanCacheManagerService {
   /**
    * Get stale data from cache (fallback)
    */
-  async getStaleData(category: ItemCategory): Promise<any | null> {
+  async getStaleData(category: ItemCategory): Promise<unknown> {
     const cacheKey = this.buildStaleCacheKey(category);
 
     try {
@@ -92,7 +93,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(`Stale cache miss for ${category}`);
       this.metricsService.trackCacheMiss(category, 'stale');
       return null;
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error reading stale cache for ${category}: ${err.message}`,
@@ -104,7 +105,7 @@ export class NavasanCacheManagerService {
   /**
    * Set stale data in cache (long-term fallback)
    */
-  async setStaleData(category: ItemCategory, data: any): Promise<void> {
+  async setStaleData(category: ItemCategory, data: unknown): Promise<void> {
     const cacheKey = this.buildStaleCacheKey(category);
     const ttlSeconds = Math.floor(CACHE_DURATIONS.STALE / 1000);
 
@@ -113,7 +114,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(
         `Cached stale data for ${category} (TTL: ${ttlSeconds}s)`,
       );
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error caching stale data for ${category}: ${err.message}`,
@@ -124,7 +125,7 @@ export class NavasanCacheManagerService {
   /**
    * Get OHLC data from cache
    */
-  async getOhlcData(category: ItemCategory): Promise<any | null> {
+  async getOhlcData(category: ItemCategory): Promise<OhlcData | null> {
     const dateString = new Date().toDateString();
     const cacheKey = `navasan:ohlc:${category}:${dateString}`;
 
@@ -140,7 +141,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(`OHLC cache miss for ${category}`);
       this.metricsService.trackCacheMiss(category, 'ohlc');
       return null;
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error reading OHLC cache for ${category}: ${err.message}`,
@@ -152,7 +153,7 @@ export class NavasanCacheManagerService {
   /**
    * Set OHLC data in cache
    */
-  async setOhlcData(category: ItemCategory, data: any): Promise<void> {
+  async setOhlcData(category: ItemCategory, data: OhlcData): Promise<void> {
     const dateString = new Date().toDateString();
     const cacheKey = `navasan:ohlc:${category}:${dateString}`;
     const ttlSeconds = Math.floor(CACHE_DURATIONS.OHLC / 1000);
@@ -162,7 +163,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(
         `Cached OHLC data for ${category} (TTL: ${ttlSeconds}s)`,
       );
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error caching OHLC data for ${category}: ${err.message}`,
@@ -176,7 +177,7 @@ export class NavasanCacheManagerService {
   async getHistoricalData(
     category: ItemCategory,
     date: Date,
-  ): Promise<any | null> {
+  ): Promise<HistoricalDataPoint | null> {
     const dateISO = date.toISOString().split('T')[0];
     const cacheKey = `navasan:historical:${category}:${dateISO}`;
 
@@ -192,7 +193,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(`Historical cache miss for ${category}:${dateISO}`);
       this.metricsService.trackCacheMiss(category, 'historical');
       return null;
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error reading historical cache for ${category}: ${err.message}`,
@@ -207,7 +208,7 @@ export class NavasanCacheManagerService {
   async setHistoricalData(
     category: ItemCategory,
     date: Date,
-    data: any,
+    data: HistoricalDataPoint,
   ): Promise<void> {
     const dateISO = date.toISOString().split('T')[0];
     const cacheKey = `navasan:historical:${category}:${dateISO}`;
@@ -218,7 +219,7 @@ export class NavasanCacheManagerService {
       this.logger.debug(
         `Cached historical data for ${category}:${dateISO} (TTL: ${ttlSeconds}s)`,
       );
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error caching historical data for ${category}: ${err.message}`,

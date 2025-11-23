@@ -8,6 +8,7 @@ import {
 import { ItemCategory } from '../constants/navasan.constants';
 import { NavasanTransformerService } from './navasan-transformer.service';
 import { NavasanCacheManagerService } from './navasan-cache-manager.service';
+import { OhlcData, PriceData } from '../types/navasan.types';
 
 /**
  * NavasanOhlcService
@@ -33,7 +34,7 @@ export class NavasanOhlcService {
   /**
    * Get OHLC data for yesterday (fallback when fresh data unavailable)
    */
-  async getYesterdayOhlc(category: ItemCategory): Promise<any | null> {
+  async getYesterdayOhlc(category: ItemCategory): Promise<OhlcData | null> {
     try {
       // Check cache first
       const cached = await this.cacheManager.getOhlcData(category);
@@ -69,10 +70,12 @@ export class NavasanOhlcService {
 
       // Transform and cache
       const transformed = this.transformSnapshot(snapshot);
-      await this.cacheManager.setOhlcData(category, transformed);
+      if (transformed) {
+        await this.cacheManager.setOhlcData(category, transformed);
+      }
 
       return transformed;
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error fetching yesterday's OHLC for ${category}: ${err.message}`,
@@ -87,7 +90,7 @@ export class NavasanOhlcService {
   async getOhlcForDate(
     category: ItemCategory,
     date: Date,
-  ): Promise<any | null> {
+  ): Promise<OhlcData | null> {
     try {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
@@ -113,7 +116,7 @@ export class NavasanOhlcService {
       }
 
       return this.transformSnapshot(snapshot);
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error fetching OHLC for ${category} on ${date.toDateString()}: ${err.message}`,
@@ -129,7 +132,7 @@ export class NavasanOhlcService {
     category: ItemCategory,
     startDate: Date,
     endDate: Date,
-  ): Promise<any[]> {
+  ): Promise<OhlcData[]> {
     try {
       const snapshots = await this.ohlcSnapshotModel
         .find({
@@ -143,8 +146,8 @@ export class NavasanOhlcService {
         .lean()
         .exec();
 
-      return snapshots.map((snapshot) => this.transformSnapshot(snapshot));
-    } catch (error) {
+      return snapshots.map((snapshot) => this.transformSnapshot(snapshot)) as OhlcData[];
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error fetching OHLC range for ${category}: ${err.message}`,
@@ -156,12 +159,17 @@ export class NavasanOhlcService {
   /**
    * Calculate OHLC from price snapshots
    */
-  calculateOhlcFromPrices(prices: any[]): any {
+  calculateOhlcFromPrices(prices: PriceData[]): OhlcData | null {
     if (!Array.isArray(prices) || prices.length === 0) {
       return null;
     }
 
-    const values = prices.map((p) => parseFloat(p.value)).filter((v) => !isNaN(v));
+    const values = prices
+      .map((p) => {
+        const val = p.value || p.price;
+        return typeof val === 'string' ? parseFloat(val) : Number(val);
+      })
+      .filter((v) => !isNaN(v));
 
     if (values.length === 0) {
       return null;
@@ -172,7 +180,6 @@ export class NavasanOhlcService {
       high: Math.max(...values),
       low: Math.min(...values),
       close: values[values.length - 1],
-      count: values.length,
     };
   }
 
@@ -181,7 +188,7 @@ export class NavasanOhlcService {
    */
   async createSnapshot(
     category: ItemCategory,
-    data: any,
+    data: OhlcData,
     timestamp: Date = new Date(),
   ): Promise<void> {
     try {
@@ -192,7 +199,7 @@ export class NavasanOhlcService {
       });
 
       this.logger.log(`Created OHLC snapshot for ${category} at ${timestamp.toISOString()}`);
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error creating OHLC snapshot for ${category}: ${err.message}`,
@@ -203,7 +210,7 @@ export class NavasanOhlcService {
   /**
    * Get latest OHLC snapshot
    */
-  async getLatestSnapshot(category: ItemCategory): Promise<any | null> {
+  async getLatestSnapshot(category: ItemCategory): Promise<OhlcData | null> {
     try {
       const snapshot = await this.ohlcSnapshotModel
         .findOne({ category })
@@ -216,7 +223,7 @@ export class NavasanOhlcService {
       }
 
       return this.transformSnapshot(snapshot);
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error fetching latest OHLC snapshot for ${category}: ${err.message}`,
@@ -228,15 +235,26 @@ export class NavasanOhlcService {
   /**
    * Transform database snapshot to API response format
    */
-  private transformSnapshot(snapshot: any): any {
-    if (!snapshot) {
+  private transformSnapshot(snapshot: unknown): OhlcData | null {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null;
+    }
+
+    const snapshotData = snapshot as Record<string, unknown>;
+    const data = snapshotData.data as Record<string, unknown>;
+
+    if (!data) {
       return null;
     }
 
     return {
-      ...snapshot.data,
-      timestamp: snapshot.timestamp,
-      category: snapshot.category,
+      open: data.open as number | string,
+      high: data.high as number | string,
+      low: data.low as number | string,
+      close: data.close as number | string,
+      timestamp: snapshotData.timestamp as string,
+      volume: data.volume as number | string | undefined,
+      itemCode: data.itemCode as string | undefined,
     };
   }
 
@@ -247,7 +265,7 @@ export class NavasanOhlcService {
     category: ItemCategory,
     timeframe: string,
     limit: number = 100,
-  ): Promise<any[]> {
+  ): Promise<OhlcData[]> {
     // This would implement aggregation logic
     // For now, return empty array as placeholder
     this.logger.warn(`OHLC aggregation by timeframe not yet implemented`);
@@ -284,7 +302,7 @@ export class NavasanOhlcService {
         oldestSnapshot: oldest?.timestamp || null,
         newestSnapshot: newest?.timestamp || null,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error fetching OHLC stats for ${category}: ${err.message}`,

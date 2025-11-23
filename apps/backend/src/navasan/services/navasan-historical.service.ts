@@ -5,6 +5,7 @@ import { NavasanFetcherService } from './navasan-fetcher.service';
 import { NavasanCacheManagerService } from './navasan-cache-manager.service';
 import { NavasanOhlcService } from './navasan-ohlc.service';
 import { NavasanTransformerService } from './navasan-transformer.service';
+import { HistoricalDataPoint } from '../types/navasan.types';
 
 /**
  * NavasanHistoricalService
@@ -24,7 +25,7 @@ export class NavasanHistoricalService {
   // Request deduplication map
   private pendingHistoricalRequests = new Map<
     string,
-    Promise<any>
+    Promise<HistoricalDataPoint | null>
   >();
 
   constructor(
@@ -41,7 +42,7 @@ export class NavasanHistoricalService {
   async getHistoricalData(
     category: ItemCategory,
     date: Date,
-  ): Promise<any | null> {
+  ): Promise<HistoricalDataPoint | null> {
     const dateStr = date.toISOString().split('T')[0];
     const requestKey = `${category}:${dateStr}`;
 
@@ -72,30 +73,26 @@ export class NavasanHistoricalService {
   private async fetchHistoricalDataInternal(
     category: ItemCategory,
     date: Date,
-  ): Promise<any | null> {
+  ): Promise<HistoricalDataPoint | null> {
     // Step 1: Check cache
     const cached = await this.cacheManager.getHistoricalData(category, date);
     if (cached) {
-      return this.transformerService.addMetadata(cached, {
-        source: 'cache',
-        category,
-      });
+      return cached;
     }
 
     // Step 2: Try OHLC database
     const ohlcData = await this.ohlcService.getOhlcForDate(category, date);
     if (ohlcData) {
-      const response = this.transformerService.addMetadata(ohlcData, {
-        source: 'ohlc',
-        category,
-        isHistorical: true,
-        historicalDate: date,
-      });
+      const historicalPoint: HistoricalDataPoint = {
+        timestamp: ohlcData.timestamp || new Date(date).toISOString(),
+        date: date.toISOString(),
+        ...ohlcData,
+      };
 
       // Cache the result
-      await this.cacheManager.setHistoricalData(category, date, response);
+      await this.cacheManager.setHistoricalData(category, date, historicalPoint);
 
-      return response;
+      return historicalPoint;
     }
 
     // Step 3: Try internal API
@@ -106,19 +103,12 @@ export class NavasanHistoricalService {
       );
 
       if (apiData) {
-        const response = this.transformerService.addMetadata(apiData, {
-          source: 'api',
-          category,
-          isHistorical: true,
-          historicalDate: date,
-        });
-
         // Cache the result
-        await this.cacheManager.setHistoricalData(category, date, response);
+        await this.cacheManager.setHistoricalData(category, date, apiData);
 
-        return response;
+        return apiData;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error fetching historical data from API for ${category}:${date.toISOString()}: ${err.message}`,
@@ -137,7 +127,7 @@ export class NavasanHistoricalService {
     category: ItemCategory,
     startDate: Date,
     endDate: Date,
-  ): Promise<any[]> {
+  ): Promise<HistoricalDataPoint[]> {
     const dates = this.generateDateRange(startDate, endDate);
 
     this.logger.log(
@@ -152,13 +142,13 @@ export class NavasanHistoricalService {
     );
 
     // Filter out null results
-    return results.filter((r) => r !== null);
+    return results.filter((r): r is HistoricalDataPoint => r !== null);
   }
 
   /**
    * Get historical data for the last N days
    */
-  async getLastNDays(category: ItemCategory, days: number): Promise<any[]> {
+  async getLastNDays(category: ItemCategory, days: number): Promise<HistoricalDataPoint[]> {
     const endDate = new Date();
     endDate.setHours(0, 0, 0, 0);
 
@@ -171,13 +161,15 @@ export class NavasanHistoricalService {
   /**
    * Validate historical data response
    */
-  validateHistoricalData(data: any): boolean {
+  validateHistoricalData(data: unknown): boolean {
     if (!data || typeof data !== 'object') {
       return false;
     }
 
+    const dataObj = data as Record<string, unknown>;
+
     // Check for required fields
-    if (!data.timestamp && !data.date) {
+    if (!dataObj.timestamp && !dataObj.date) {
       this.logger.warn('Historical data missing timestamp field');
       return false;
     }
@@ -188,13 +180,13 @@ export class NavasanHistoricalService {
   /**
    * Merge historical data from multiple sources
    */
-  mergeHistoricalSources(sources: any[]): any[] {
+  mergeHistoricalSources(sources: unknown[]): HistoricalDataPoint[] {
     if (!Array.isArray(sources) || sources.length === 0) {
       return [];
     }
 
     // Create map by date for deduplication
-    const byDate = new Map<string, any>();
+    const byDate = new Map<string, HistoricalDataPoint>();
 
     for (const sourceData of sources) {
       if (Array.isArray(sourceData)) {
@@ -209,8 +201,10 @@ export class NavasanHistoricalService {
 
     // Convert map back to array and sort by date
     return Array.from(byDate.values()).sort((a, b) => {
-      const dateA = new Date(a.timestamp || a.date).getTime();
-      const dateB = new Date(b.timestamp || b.date).getTime();
+      const timestampA = a.timestamp || a.date;
+      const timestampB = b.timestamp || b.date;
+      const dateA = new Date(timestampA as string | Date).getTime();
+      const dateB = new Date(timestampB as string | Date).getTime();
       return dateA - dateB;
     });
   }
@@ -218,17 +212,18 @@ export class NavasanHistoricalService {
   /**
    * Extract date key from historical data item
    */
-  private extractDateKey(item: any): string | null {
-    if (!item) {
+  private extractDateKey(item: unknown): string | null {
+    if (!item || typeof item !== 'object') {
       return null;
     }
 
-    const timestamp = item.timestamp || item.date;
+    const itemObj = item as Record<string, unknown>;
+    const timestamp = itemObj.timestamp || itemObj.date;
     if (!timestamp) {
       return null;
     }
 
-    const date = new Date(timestamp);
+    const date = new Date(timestamp as string | Date);
     return date.toISOString().split('T')[0];
   }
 

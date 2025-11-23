@@ -10,6 +10,7 @@ import {
 } from '../constants/navasan.constants';
 import { ApiProviderFactory } from '../../api-providers/api-provider.factory';
 import { MetricsService } from '../../metrics/metrics.service';
+import { CacheData, HistoricalDataPoint } from '../types/navasan.types';
 
 /**
  * NavasanFetcherService
@@ -41,7 +42,7 @@ export class NavasanFetcherService {
   async fetchFreshData(
     category: ItemCategory,
     items?: string[],
-  ): Promise<any> {
+  ): Promise<unknown> {
     try {
       this.logger.log(
         `Fetching fresh data for ${category}`,
@@ -49,7 +50,7 @@ export class NavasanFetcherService {
 
       const provider = this.apiProviderFactory.getActiveProvider();
 
-      let response: any;
+      let response: unknown;
       switch (category) {
         case 'currencies':
           response = await provider.fetchCurrencies();
@@ -66,7 +67,7 @@ export class NavasanFetcherService {
 
       this.logger.log(`Successfully fetched fresh data for ${category}`);
       return response;
-    } catch (error) {
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Failed to fetch fresh data for ${category}: ${err.message}`,
@@ -86,7 +87,7 @@ export class NavasanFetcherService {
   async fetchWithTimeout(
     url: string,
     timeout: number = REQUEST_TIMING.API_TIMEOUT,
-  ): Promise<any> {
+  ): Promise<unknown> {
     try {
       const response = await axios.get(url, {
         timeout,
@@ -98,7 +99,7 @@ export class NavasanFetcherService {
       }
 
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         if (axiosError.code === 'ECONNABORTED') {
@@ -118,7 +119,7 @@ export class NavasanFetcherService {
   async fetchHistoricalFromInternal(
     category: ItemCategory,
     date: Date,
-  ): Promise<any> {
+  ): Promise<HistoricalDataPoint> {
     const dateStr = date.toISOString().split('T')[0];
     const url = `${this.internalApiUrl}/navasan/${category}/historical/${dateStr}`;
 
@@ -126,8 +127,8 @@ export class NavasanFetcherService {
 
     try {
       const data = await this.fetchWithTimeout(url);
-      return data;
-    } catch (error) {
+      return data as HistoricalDataPoint;
+    } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Failed to fetch historical data for ${category} on ${dateStr}: ${err.message}`,
@@ -139,7 +140,7 @@ export class NavasanFetcherService {
   /**
    * Validate API response structure
    */
-  validateResponse(response: any, category: ItemCategory): boolean {
+  validateResponse(response: unknown, category: ItemCategory): boolean {
     if (!response || typeof response !== 'object') {
       this.logger.warn(`Invalid response structure for ${category}`);
       return false;
@@ -158,7 +159,7 @@ export class NavasanFetcherService {
       const provider = this.apiProviderFactory.getActiveProvider();
       // Implement provider-specific health check
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('API health check failed');
       return false;
     }

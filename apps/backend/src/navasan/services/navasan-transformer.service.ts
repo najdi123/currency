@@ -1,5 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ItemCategory } from '../constants/navasan.constants';
+import {
+  ApiResponse,
+  TransformOptions,
+  OhlcData,
+  HistoricalDataPoint,
+  ErrorResponse,
+  CacheData,
+} from '../types/navasan.types';
 
 /**
  * NavasanTransformerService
@@ -18,7 +26,7 @@ export class NavasanTransformerService {
   /**
    * Transform raw API response to standardized format
    */
-  transformApiResponse(rawData: any, category: ItemCategory): any {
+  transformApiResponse(rawData: CacheData, category: ItemCategory): CacheData | null {
     if (!rawData || typeof rawData !== 'object') {
       this.logger.warn(`Invalid data structure for ${category}`);
       return null;
@@ -78,7 +86,7 @@ export class NavasanTransformerService {
   /**
    * Transform OHLC data to API response format
    */
-  transformOhlcData(ohlcData: any): any {
+  transformOhlcData(ohlcData: OhlcData): OhlcData | null {
     if (!ohlcData) {
       return null;
     }
@@ -95,30 +103,35 @@ export class NavasanTransformerService {
   /**
    * Transform historical data to API response format
    */
-  transformHistoricalData(historicalData: any[], category: ItemCategory): any {
+  transformHistoricalData(historicalData: HistoricalDataPoint[], category: ItemCategory): ApiResponse<HistoricalDataPoint[]> {
     if (!Array.isArray(historicalData) || historicalData.length === 0) {
       return {
         data: [],
         metadata: {
+          isFresh: false,
+          isStale: false,
+          source: 'historical',
           category,
-          count: 0,
-          isEmpty: true,
+          lastUpdated: new Date().toISOString(),
+          cached: false,
         },
       };
     }
 
-    const transformed = historicalData.map((item) => ({
+    const transformed: HistoricalDataPoint[] = historicalData.map((item) => ({
       ...item,
-      timestamp: item.timestamp || item.date,
+      timestamp: (item.timestamp || item.date || new Date().toISOString()) as string | Date,
     }));
 
     return {
       data: transformed,
       metadata: {
+        isFresh: false,
+        isStale: false,
+        source: 'historical',
         category,
-        count: transformed.length,
-        startDate: transformed[0]?.timestamp,
-        endDate: transformed[transformed.length - 1]?.timestamp,
+        lastUpdated: new Date().toISOString(),
+        cached: false,
       },
     };
   }
@@ -126,14 +139,7 @@ export class NavasanTransformerService {
   /**
    * Add metadata to response
    */
-  addMetadata(data: any, options: {
-    isFresh?: boolean;
-    isStale?: boolean;
-    source?: string;
-    category?: ItemCategory;
-    isHistorical?: boolean;
-    historicalDate?: Date;
-  }): any {
+  addMetadata<T = CacheData>(data: T, options: TransformOptions): ApiResponse<T> {
     return {
       data,
       metadata: {
@@ -152,14 +158,15 @@ export class NavasanTransformerService {
   /**
    * Type guard for currency response
    */
-  isCurrencyResponse(data: any): boolean {
+  isCurrencyResponse(data: unknown): data is CacheData {
     if (!data || typeof data !== 'object') {
       return false;
     }
 
     // Check for common currency fields
-    const hasUsdSell = 'usd_sell' in data;
-    const hasUsdBuy = 'usd_buy' in data;
+    const dataObj = data as Record<string, unknown>;
+    const hasUsdSell = 'usd_sell' in dataObj;
+    const hasUsdBuy = 'usd_buy' in dataObj;
 
     return hasUsdSell || hasUsdBuy;
   }
@@ -167,14 +174,15 @@ export class NavasanTransformerService {
   /**
    * Type guard for crypto response
    */
-  isCryptoResponse(data: any): boolean {
+  isCryptoResponse(data: unknown): data is CacheData {
     if (!data || typeof data !== 'object') {
       return false;
     }
 
     // Check for common crypto fields
-    const hasBtc = 'btc' in data;
-    const hasEth = 'eth' in data;
+    const dataObj = data as Record<string, unknown>;
+    const hasBtc = 'btc' in dataObj;
+    const hasEth = 'eth' in dataObj;
 
     return hasBtc || hasEth;
   }
@@ -182,14 +190,15 @@ export class NavasanTransformerService {
   /**
    * Type guard for gold response
    */
-  isGoldResponse(data: any): boolean {
+  isGoldResponse(data: unknown): data is CacheData {
     if (!data || typeof data !== 'object') {
       return false;
     }
 
     // Check for common gold fields
-    const hasGoldMesghal = 'gold_mesghal' in data;
-    const hasGoldGeram = 'gold_geram18' in data;
+    const dataObj = data as Record<string, unknown>;
+    const hasGoldMesghal = 'gold_mesghal' in dataObj;
+    const hasGoldGeram = 'gold_geram18' in dataObj;
 
     return hasGoldMesghal || hasGoldGeram;
   }
@@ -197,8 +206,9 @@ export class NavasanTransformerService {
   /**
    * Sanitize error message (remove sensitive data)
    */
-  sanitizeErrorMessage(error: any): string {
-    let message = error?.message || String(error);
+  sanitizeErrorMessage(error: unknown): string {
+    const err = error as Error | { message?: string };
+    let message = err?.message || String(error);
 
     // Remove URLs
     message = message.replace(/https?:\/\/[^\s]+/g, '[URL]');
@@ -228,7 +238,7 @@ export class NavasanTransformerService {
   /**
    * Format number to string with fixed decimals
    */
-  private formatNumber(value: any, decimals: number = 2): string {
+  private formatNumber(value: string | number, decimals: number = 2): string {
     const num = typeof value === 'string' ? parseFloat(value) : value;
 
     if (isNaN(num)) {
@@ -241,7 +251,7 @@ export class NavasanTransformerService {
   /**
    * Extract category from data structure
    */
-  extractCategory(data: any): ItemCategory | null {
+  extractCategory(data: unknown): ItemCategory | null {
     if (this.isCurrencyResponse(data)) {
       return 'currencies';
     }
@@ -260,7 +270,7 @@ export class NavasanTransformerService {
   /**
    * Merge multiple data sources (useful for aggregation)
    */
-  mergeDataSources(sources: any[]): any {
+  mergeDataSources(sources: CacheData[]): CacheData | null {
     if (!Array.isArray(sources) || sources.length === 0) {
       return null;
     }
@@ -290,12 +300,16 @@ export class NavasanTransformerService {
   /**
    * Create error response with standardized format
    */
-  createErrorResponse(error: any, category?: ItemCategory): any {
+  createErrorResponse(error: unknown, category?: ItemCategory): ErrorResponse {
     return {
-      error: true,
-      message: this.sanitizeErrorMessage(error),
-      category,
-      timestamp: new Date().toISOString(),
+      error: {
+        message: this.sanitizeErrorMessage(error),
+        timestamp: new Date().toISOString(),
+      },
+      metadata: {
+        category,
+        source: 'error',
+      },
     };
   }
 }
