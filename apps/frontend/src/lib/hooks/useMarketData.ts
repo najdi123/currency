@@ -3,9 +3,11 @@ import {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
+  useGetCoinsQuery,
   useGetCurrenciesHistoricalQuery,
   useGetCryptoHistoricalQuery,
   useGetGoldHistoricalQuery,
+  useGetCoinsHistoricalQuery,
 } from '@/lib/store/services/api'
 import { computeMarketState } from '@/lib/utils/marketDataUtils'
 import { formatDateForApi } from '@/lib/utils/dateUtils'
@@ -15,7 +17,7 @@ import { formatDateForApi } from '@/lib/utils/dateUtils'
 const POLLING_INTERVAL = 0 // Disabled - was 5 minutes (300000)
 
 /**
- * Hook to consolidate all market data queries (currencies, crypto, gold)
+ * Hook to consolidate all market data queries (currencies, crypto, gold, coins)
  * Provides unified state and refetch functions
  *
  * Note: Polling is disabled to prevent 429 rate limit errors.
@@ -44,6 +46,11 @@ export const useMarketData = (selectedDate: Date | null = null) => {
     skip: isHistorical,
   })
 
+  const coinsCurrentQuery = useGetCoinsQuery(undefined, {
+    pollingInterval: POLLING_INTERVAL,
+    skip: isHistorical,
+  })
+
   // Historical data queries (enabled when historical date selected)
   const currenciesHistoricalQuery = useGetCurrenciesHistoricalQuery(dateParam || '', {
     pollingInterval: POLLING_INTERVAL,
@@ -60,10 +67,16 @@ export const useMarketData = (selectedDate: Date | null = null) => {
     skip: !isHistorical || !dateParam,
   })
 
+  const coinsHistoricalQuery = useGetCoinsHistoricalQuery(dateParam || '', {
+    pollingInterval: POLLING_INTERVAL,
+    skip: !isHistorical || !dateParam,
+  })
+
   // Select the appropriate query result based on mode
   const currenciesQuery = isHistorical ? currenciesHistoricalQuery : currenciesCurrentQuery
   const cryptoQuery = isHistorical ? cryptoHistoricalQuery : cryptoCurrentQuery
   const goldQuery = isHistorical ? goldHistoricalQuery : goldCurrentQuery
+  const coinsQuery = isHistorical ? coinsHistoricalQuery : coinsCurrentQuery
 
   const {
     data: currencies,
@@ -88,6 +101,14 @@ export const useMarketData = (selectedDate: Date | null = null) => {
     error: goldError,
     refetch: refetchGold,
   } = goldQuery
+
+  const {
+    data: coins,
+    isLoading: coinsLoading,
+    isFetching: coinsFetching,
+    error: coinsError,
+    refetch: refetchCoins,
+  } = coinsQuery
 
   // Memoize computed state to prevent unnecessary re-renders
   const computedState = useMemo(
@@ -123,7 +144,7 @@ export const useMarketData = (selectedDate: Date | null = null) => {
   )
 
   const refetchAll = async () => {
-    await Promise.all([refetchCurrencies(), refetchCrypto(), refetchGold()])
+    await Promise.all([refetchCurrencies(), refetchCrypto(), refetchGold(), refetchCoins()])
   }
 
   return {
@@ -131,22 +152,27 @@ export const useMarketData = (selectedDate: Date | null = null) => {
     currencies,
     crypto,
     gold,
+    coins,
     // Loading states
     currenciesLoading,
     cryptoLoading,
     goldLoading,
+    coinsLoading,
     // Fetching states
     currenciesFetching,
     cryptoFetching,
     goldFetching,
+    coinsFetching,
     // Errors
     currenciesError,
     cryptoError,
     goldError,
+    coinsError,
     // Refetch functions
     refetchCurrencies,
     refetchCrypto,
     refetchGold,
+    refetchCoins,
     refetchAll,
     // Computed state
     ...computedState,

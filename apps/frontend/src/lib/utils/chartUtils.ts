@@ -79,7 +79,7 @@ export const formatYAxisLabel = (value: number): string => {
     return `${(value / 1_000_000).toFixed(1)}M`
   }
   if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(0)}K`
+    return `${(value / 1_000).toFixed(1)}K`
   }
   return value.toFixed(0)
 }
@@ -102,6 +102,16 @@ export const getEChartsOption = (
     text: isDark ? 'rgb(235, 235, 245)' : 'rgb(60, 60, 67)',      // --text-secondary
     bg: 'transparent',
   }
+
+  // Calculate dynamic Y-axis range with 5% padding for better visibility
+  const dataMin = Math.min(...prices)
+  const dataMax = Math.max(...prices)
+  const range = dataMax - dataMin
+  const padding = range * 0.05 // 5% padding on each side
+
+  // Calculate min/max with padding, ensuring we don't go below 0
+  const yAxisMin = Math.max(0, Math.floor(dataMin - padding))
+  const yAxisMax = Math.ceil(dataMax + padding)
 
   return {
     backgroundColor: colors.bg,
@@ -128,6 +138,8 @@ export const getEChartsOption = (
     },
     yAxis: {
       type: 'value',
+      min: yAxisMin,
+      max: yAxisMax,
       axisLine: {
         show: false, // Clean Apple style - no axis lines
       },

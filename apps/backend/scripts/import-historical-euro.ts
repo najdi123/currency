@@ -95,6 +95,7 @@ async function importHistoricalData() {
       const { open, high, low, close, gregorian } = dataPoint;
 
       // Convert from Rial to Toman (divide by 10)
+      // Backend standard: all prices stored in Toman
       const openToman = open / 10;
       const highToman = high / 10;
       const lowToman = low / 10;

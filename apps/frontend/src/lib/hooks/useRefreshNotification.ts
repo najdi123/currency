@@ -18,7 +18,10 @@ export const useRefreshNotification = (
   currenciesError: any,
   cryptoError: any,
   goldError: any,
-  refetchAll: () => Promise<void>
+  refetchAll: () => Promise<void>,
+  coinsFetching?: boolean,
+  coins?: any,
+  coinsError?: any
 ) => {
   const [showSuccess, setShowSuccess] = useState(false)
   const [isStaleData, setIsStaleData] = useState(false)
@@ -31,16 +34,18 @@ export const useRefreshNotification = (
     const currencyMetadata = currencies?._metadata
     const cryptoMetadata = crypto?._metadata
     const goldMetadata = gold?._metadata
+    const coinsMetadata = coins?._metadata
 
     // If any metadata indicates stale data
     const isStale =
-      currencyMetadata?.isStale || cryptoMetadata?.isStale || goldMetadata?.isStale
+      currencyMetadata?.isStale || cryptoMetadata?.isStale || goldMetadata?.isStale || coinsMetadata?.isStale
 
     // Get the oldest lastUpdated timestamp
     const timestamps = [
       currencyMetadata?.lastUpdated,
       cryptoMetadata?.lastUpdated,
       goldMetadata?.lastUpdated,
+      coinsMetadata?.lastUpdated,
     ].filter(Boolean)
 
     const oldestTimestamp = timestamps.length > 0
@@ -57,8 +62,8 @@ export const useRefreshNotification = (
     // 2. Not currently fetching
     // 3. Data successfully loaded (at least one dataset available)
     const wasManualRefresh = isManualRefresh.current
-    const notFetching = !currenciesFetching && !cryptoFetching && !goldFetching
-    const hasData = currencies || crypto || gold
+    const notFetching = !currenciesFetching && !cryptoFetching && !goldFetching && !coinsFetching
+    const hasData = currencies || crypto || gold || coins
 
     if (wasManualRefresh && notFetching && hasData) {
       // Reset manual refresh flag
@@ -67,7 +72,7 @@ export const useRefreshNotification = (
       // Check if data is stale
       const { isStale, lastUpdated } = checkIfStale()
 
-      if (!currenciesError && !cryptoError && !goldError && !isStale) {
+      if (!currenciesError && !cryptoError && !goldError && !coinsError && !isStale) {
         // Fresh data - show quick success
         setIsStaleData(false)
         setShowSuccess(true)
@@ -96,12 +101,15 @@ export const useRefreshNotification = (
     currenciesFetching,
     cryptoFetching,
     goldFetching,
+    coinsFetching,
     currencies,
     crypto,
     gold,
+    coins,
     currenciesError,
     cryptoError,
     goldError,
+    coinsError,
   ])
 
   const handleRefresh = async () => {

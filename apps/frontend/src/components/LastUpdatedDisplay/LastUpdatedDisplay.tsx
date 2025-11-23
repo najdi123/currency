@@ -124,7 +124,7 @@ export const LastUpdatedDisplay = ({
   <button
     onClick={historicalNav.goToPreviousDay}
     disabled={!historicalNav.canGoBack || isFetching}
-    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
     aria-label={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
     title={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
     aria-disabled={!historicalNav.canGoBack || isFetching}
@@ -144,6 +144,7 @@ export const LastUpdatedDisplay = ({
 
       {/* Last Updated Time Display */}
       <div className="flex items-center gap-3 text-text-secondary" aria-busy={isFetching}>
+          <div className="flex flex-col justify-center items-center">
       <span className="relative flex h-3 w-3" aria-hidden="true" role="status" aria-label={isFetching ? t('loading') || 'Loading' : t('dataReady') || 'Data ready'}>
         {isFetching ? (
           <>
@@ -157,7 +158,9 @@ export const LastUpdatedDisplay = ({
           </>
         )}
       </span>
+    
       <FiClock className="text-base flex-shrink-0 mt-1" aria-hidden="true" />
+      </div>
       <div className="flex flex-col items-start gap-0.5" aria-live="polite">
         <div className="text-apple-footnote text-text-tertiary">
           {historicalNav && !historicalNav.isToday ? t('historicalDataTime') : t('lastUpdated')}
@@ -266,7 +269,7 @@ export const LastUpdatedDisplay = ({
                 <div className="absolute top-full left-0 mt-1 flex gap-2 z-10">
                   <button
                     onClick={() => activeDropdown === 'persian' ? handleApplyPersianDate() : handleApplyGregorianDate()}
-                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium rounded-lg transition-all shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                     aria-label="Go to selected date"
                   >
                     {t('go')}
@@ -300,7 +303,7 @@ export const LastUpdatedDisplay = ({
   <button
     onClick={historicalNav.canGoForward ? historicalNav.goToNextDay : historicalNav.goToToday}
     disabled={historicalNav.isToday || isFetching}
-    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
     aria-label={historicalNav.canGoForward ? t('nextDay') : t('today')}
     title={historicalNav.canGoForward ? t('nextDay') : t('today')}
     aria-disabled={historicalNav.isToday || isFetching}

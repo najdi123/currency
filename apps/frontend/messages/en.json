@@ -515,12 +515,14 @@
     "sections": {
       "currencies": "Currencies",
       "crypto": "Cryptocurrencies",
-      "gold": "Gold & Coins"
+      "gold": "Gold",
+      "coins": "Gold Coins"
     },
     "errors": {
       "currencies": "Error loading currencies",
       "crypto": "Error loading cryptocurrencies",
-      "gold": "Error loading gold prices"
+      "gold": "Error loading gold prices",
+      "coins": "Error loading gold coins"
     },
     "footer": {
       "autoUpdate": "Data automatically refreshes every 5 minutes"
@@ -608,7 +610,8 @@
     "noResults": "No results found",
     "typeCurrency": "Currency",
     "typeCrypto": "Cryptocurrency",
-    "typeGold": "Gold & Coins",
+    "typeGold": "Gold",
+    "typeCoins": "Gold Coins",
     "results": "Search Results",
     "searching": "Searching for",
     "resultsCount": "{count} results found"

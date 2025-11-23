@@ -3,7 +3,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { FiSearch, FiX } from 'react-icons/fi'
-import { currencyItems, cryptoItems, goldItems } from '@/lib/utils/dataItemHelpers'
+import { currencyItems, cryptoItems, goldItems,
+  //  coinItems
+   } from '@/lib/utils/dataItemHelpers'
 import type { ItemType } from '@/types/chart'
 import { formatToman, formatChange } from '@/lib/utils/formatters'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -46,6 +48,7 @@ interface SearchBarProps {
   currencies: MarketData | null
   crypto: MarketData | null
   gold: MarketData | null
+  coins?: MarketData | null
   onItemClick: (itemKey: string, itemType: ItemType) => void
   maxResults?: number
 }
@@ -60,6 +63,7 @@ export function SearchBar({
   currencies,
   crypto,
   gold,
+  coins,
   onItemClick,
   maxResults = DEFAULT_MAX_RESULTS
 }: SearchBarProps) {
@@ -212,8 +216,11 @@ export function SearchBar({
     // Search gold
     goldItems.forEach(item => addResult(item, 'gold', gold))
 
+    // Search coins
+    // coinItems.forEach(item => addResult(item, 'coins', coins || null))
+
     return results.slice(0, maxResults)
-  }, [debouncedQuery, t, currencies, crypto, gold, maxResults, normalizeText])
+  }, [debouncedQuery, t, currencies, crypto, gold, coins, maxResults, normalizeText])
 
   const handleClear = () => {
     setQuery('')
@@ -354,6 +361,7 @@ export function SearchBar({
                     {result.type === 'currency' && tSearch('typeCurrency')}
                     {result.type === 'crypto' && tSearch('typeCrypto')}
                     {result.type === 'gold' && tSearch('typeGold')}
+                    {result.type === 'coins' && tSearch('typeCoins')}
                   </div>
                 </div>
 

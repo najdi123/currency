@@ -53,6 +53,10 @@ export type GoldResponse = Record<string, RateItem> & {
   _metadata?: ApiResponseMetadata
 }
 
+export type CoinsResponse = Record<string, RateItem> & {
+  _metadata?: ApiResponseMetadata
+}
+
 export interface OhlcDataPoint {
   time: string // "08:00", "08:10"
   price: number
@@ -234,7 +238,7 @@ const baseQueryWithRetry = retry(
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithRetry,
-  tagTypes: ['Rates', 'ChartData', 'History', 'Currencies', 'DigitalCurrencies', 'Gold', 'Ohlc'],
+  tagTypes: ['Rates', 'ChartData', 'History', 'Currencies', 'DigitalCurrencies', 'Gold', 'Coins', 'Ohlc'],
   // Stale-data handling
   refetchOnFocus: false,
   refetchOnReconnect: true,
@@ -288,6 +292,20 @@ export const api = createApi({
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
       },
     }),
+    getCoins: builder.query<CoinsResponse & { _metadata?: ApiResponseMetadata }, void>({
+      query: () => '/navasan/coins',
+      providesTags: ['Rates', 'Coins'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Coins response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Metadata:', response._metadata)
+          }
+        }
+        return response as CoinsResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
     // Yesterday's data endpoints
     getCurrenciesYesterday: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, void>({
       query: () => '/navasan/currencies/yesterday',
@@ -329,6 +347,20 @@ export const api = createApi({
           }
         }
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
+    getCoinsYesterday: builder.query<CoinsResponse & { _metadata?: ApiResponseMetadata }, void>({
+      query: () => '/navasan/coins/yesterday',
+      providesTags: ['Rates', 'Coins'],
+      keepUnusedDataFor: 1200,
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Coins Yesterday response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Yesterday Metadata:', response._metadata)
+          }
+        }
+        return response as CoinsResponse & { _metadata?: ApiResponseMetadata }
       },
     }),
     // Historical data endpoints with date parameter (90 days back)
@@ -379,6 +411,22 @@ export const api = createApi({
           }
         }
         return response as GoldResponse & { _metadata?: ApiResponseMetadata }
+      },
+    }),
+    getCoinsHistorical: builder.query<CoinsResponse & { _metadata?: ApiResponseMetadata }, string>({
+      query: (date) => `/navasan/coins/historical?date=${date}`,
+      providesTags: (_result, _error, date) => [
+        { type: 'Coins' as const, id: `historical-${date}` }
+      ],
+      keepUnusedDataFor: 86400, // 24 hours - historical data doesn't change
+      transformResponse: (response: ApiRawResponse) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RTK Query] Coins Historical response has _metadata:', '_metadata' in response)
+          if ('_metadata' in response) {
+            console.log('[RTK Query] Historical Metadata:', response._metadata)
+          }
+        }
+        return response as CoinsResponse & { _metadata?: ApiResponseMetadata }
       },
     }),
     getChartData: builder.query<ChartResponse, ChartQueryParams>({
@@ -433,6 +481,14 @@ export const api = createApi({
       }),
       invalidatesTags: ['Gold', 'Rates'],
     }),
+    refreshCoinsData: builder.mutation<void, void>({
+      query: () => ({
+        url: '/navasan/coins',
+        method: 'GET',
+        params: { _t: Date.now() }
+      }),
+      invalidatesTags: ['Coins', 'Rates'],
+    }),
     // Get today's OHLC for specific item
     getTodayOhlc: builder.query<OhlcResponse, string>({
       query: (itemCode) => `/navasan/ohlc/today/${itemCode}`,
@@ -454,12 +510,15 @@ export const {
   useGetCurrenciesQuery,
   useGetCryptoQuery,
   useGetGoldQuery,
+  useGetCoinsQuery,
   useGetCurrenciesYesterdayQuery,
   useGetCryptoYesterdayQuery,
   useGetGoldYesterdayQuery,
+  useGetCoinsYesterdayQuery,
   useGetCurrenciesHistoricalQuery,
   useGetCryptoHistoricalQuery,
   useGetGoldHistoricalQuery,
+  useGetCoinsHistoricalQuery,
   useGetChartDataQuery,
   useGetCurrencyHistoryQuery,
   useGetDigitalCurrencyHistoryQuery,
@@ -467,6 +526,7 @@ export const {
   useRefreshCurrencyDataMutation,
   useRefreshCryptoDataMutation,
   useRefreshGoldDataMutation,
+  useRefreshCoinsDataMutation,
   useGetTodayOhlcQuery,
   useGetAllTodayOhlcQuery,
 } = api

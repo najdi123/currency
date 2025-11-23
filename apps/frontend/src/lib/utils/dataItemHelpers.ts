@@ -48,13 +48,12 @@ export const cryptoItems: DataItem[] = [
 ]
 
 export const goldItems: DataItem[] = [
-  { key: 'sekkeh', icon: GiTwoCoins, color: 'text-yellow-300' }, // Gold color for coins
-  { key: 'bahar', icon: GiTwoCoins, color: 'text-yellow-300' }, // Gold color for coins
-  { key: 'nim', icon: GiTwoCoins, color: 'text-yellow-300' }, // Gold color for coins
-  { key: 'rob', icon: GiTwoCoins, color: 'text-yellow-300' }, // Gold color for coins
-  { key: 'gerami', icon: GiTwoCoins, color: 'text-yellow-300' }, // Gold color for coins
-  { key: '18ayar', icon: GiGoldBar, color: 'text-amber-300' }, // Amber/gold for gold bars
-  { key: 'abshodeh', icon: GiGoldBar, color: 'text-yellow-400' }, // Gold for melted gold
+  { key: '18ayar', icon: GiGoldBar, color: 'text-amber-300' }, // Amber/gold for 18k gold bars
+  { key: 'sekkeh', icon: GiTwoCoins, color: 'text-yellow-300' }, // Emami gold coin
+  { key: 'bahar', icon: GiTwoCoins, color: 'text-yellow-300' }, // Bahar Azadi coin
+  { key: 'nim', icon: GiTwoCoins, color: 'text-yellow-300' }, // Half coin
+  { key: 'rob', icon: GiTwoCoins, color: 'text-yellow-300' }, // Quarter coin
+  { key: 'gerami', icon: GiTwoCoins, color: 'text-yellow-300' }, // Gerami coin
 ]
 
 /**
@@ -283,9 +282,9 @@ export const additionalCrypto = [
   'bnb', 'xrp', 'ada', 'doge', 'sol', 'matic', 'dot', 'ltc'
 ]
 
-export const mainGold = ['sekkeh', 'bahar', 'nim', 'rob', 'gerami', '18ayar']
+export const mainGold = ['18ayar', 'sekkeh', 'bahar', 'nim', 'rob', 'gerami']
 
-export const additionalGold = ['abshodeh']
+export const additionalGold: string[] = []
 
 /**
  * Split items into main and additional for a category

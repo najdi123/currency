@@ -10,16 +10,18 @@ export const useLastUpdatedTimestamp = (
   gold: any,
   currenciesError: any,
   cryptoError: any,
-  goldError: any
+  goldError: any,
+  coins?: any,
+  coinsError?: any
 ) => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useEffect(() => {
     // Only update timestamp if no errors and at least one dataset is available
-    if (!currenciesError && !cryptoError && !goldError && (currencies || crypto || gold)) {
+    if (!currenciesError && !cryptoError && !goldError && !coinsError && (currencies || crypto || gold || coins)) {
       setLastUpdated(new Date())
     }
-  }, [currencies, crypto, gold, currenciesError, cryptoError, goldError])
+  }, [currencies, crypto, gold, coins, currenciesError, cryptoError, goldError, coinsError])
 
   return lastUpdated
 }

@@ -15,12 +15,17 @@
     "137121": { "code": "24ayar", "name": "طلای 24 عیار", "category": "طلا" }
   },
   "coins": {
-    "137137": { "code": "sekkeh", "name": "سکه امامی", "category": "سکه نقدی" },
-    "137136": { "code": "bahar", "name": "سکه بهار آزادی", "category": "سکه نقدی" },
-    "137138": { "code": "nim", "name": "نیم سکه", "category": "سکه نقدی" },
-    "137139": { "code": "rob", "name": "ربع سکه", "category": "سکه نقدی" },
-    "137140": { "code": "gerami", "name": "سکه گرمی", "category": "سکه نقدی" },
+    "391295": { "code": "sekkeh", "name": "سکه امامی", "category": "سکه نقدی" },
+    "391298": { "code": "bahar", "name": "سکه بهار آزادی", "category": "سکه نقدی" },
+    "137131": { "code": "nim", "name": "نیم سکه", "category": "سکه نقدی" },
+    "137132": { "code": "rob", "name": "ربع سکه", "category": "سکه نقدی" },
+    "137118": { "code": "gerami", "name": "سکه گرمی", "category": "سکه نقدی" },
+    "137137": { "code": "sekkeh_old", "name": "سکه امامی (قدیمی)", "category": "سکه نقدی" },
+    "137136": { "code": "bahar_old", "name": "سکه بهار آزادی (قدیمی)", "category": "سکه نقدی" },
+    "137138": { "code": "nim_old", "name": "نیم سکه (قدیمی)", "category": "سکه نقدی" },
+    "137139": { "code": "rob_old", "name": "ربع سکه (قدیمی)", "category": "سکه نقدی" },
+    "137140": { "code": "gerami_old", "name": "سکه گرمی (قدیمی)", "category": "سکه نقدی" },
     "137119": { "code": "mesghal", "name": "مثقال طلا", "category": "مظنه / مثقال" },
-    "391296": { "code": "abshodeh", "name": "آبشده نقدی", "category": "آبشده" }
+    "137122": { "code": "abshodeh", "name": "آبشده نقدی", "category": "آبشده" }
   }
 }

@@ -3,7 +3,7 @@
  */
 
 export type TimeRange = '1d' | '1w' | '1m' | '3m' | '1y' | 'all'
-export type ItemType = 'currency' | 'gold' | 'crypto'
+export type ItemType = 'currency' | 'gold' | 'crypto' | 'coins'
 
 export interface ChartDataPoint {
   timestamp: string
