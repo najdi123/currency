@@ -47,7 +47,8 @@ export function useItemCardData({ code, value, change, type }: UseItemCardDataPa
     { skip: type !== 'gold' }
   )
 
-  // Transform real historical data to sparkline format, or use mock as fallback
+  // Transform real historical data to sparkline format
+  // Returns empty array if no real data available (no fake data)
   const sparklineData = useMemo(() => {
     // Select the appropriate history data based on type
     const historyData =
@@ -62,9 +63,9 @@ export function useItemCardData({ code, value, change, type }: UseItemCardDataPa
       return historyData.data.map((point) => point.price)
     }
 
-    // Fallback to mock data if API not available or failed
-    return getSparklineData(code, value)
-  }, [currencyHistory, cryptoHistory, goldHistory, type, code, value])
+    // Return empty array if no real data (no fake/mock data)
+    return []
+  }, [currencyHistory, cryptoHistory, goldHistory, type])
 
   // Determine sparkline color based on change direction
   const isPositive = change >= 0

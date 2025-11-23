@@ -80,7 +80,7 @@ export class CurrencyConversionService {
     data: T,
     fields: string[] = ['value', 'price', 'change', 'high', 'low']
   ): T {
-    const converted = { ...data };
+    const converted: Record<string, any> = { ...data };
 
     for (const field of fields) {
       if (field in converted) {
@@ -90,17 +90,17 @@ export class CurrencyConversionService {
         if (typeof value === 'string') {
           const numValue = parseFloat(value);
           if (!isNaN(numValue)) {
-            converted[field] = this.rialToTomanString(numValue) as any;
+            converted[field] = this.rialToTomanString(numValue);
           }
         }
         // Handle numeric values
         else if (typeof value === 'number') {
-          converted[field] = this.rialToToman(value) as any;
+          converted[field] = this.rialToToman(value);
         }
       }
     }
 
-    return converted;
+    return converted as T;
   }
 
   /**
@@ -128,7 +128,7 @@ export class CurrencyConversionService {
       itemCodesToExclude = []
     } = options;
 
-    const converted = { ...response };
+    const converted: Record<string, any> = { ...response };
 
     // If response has a data key, convert items within it
     if (dataKey in converted && typeof converted[dataKey] === 'object') {
@@ -156,10 +156,10 @@ export class CurrencyConversionService {
         }
       }
 
-      converted[dataKey] = convertedData as any;
+      converted[dataKey] = convertedData;
     }
 
-    return converted;
+    return converted as T;
   }
 
   /**

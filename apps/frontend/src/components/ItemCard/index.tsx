@@ -176,14 +176,14 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           <ItemCardPrice value={value} compact={compact} />
         </div>
 
-        {/* Right side: Show mini chart if OHLC data available, otherwise sparkline */}
+        {/* Right side: Show mini chart if OHLC data available, otherwise sparkline (only with real data) */}
         {ohlc?.dataPoints && ohlc.dataPoints.length >= 3 ? (
           <IntradayMiniChart
             dataPoints={ohlc.dataPoints}
             isPositive={ohlc.dailyChangePercent !== undefined && ohlc.dailyChangePercent >= 0}
             compact={compact}
           />
-        ) : (
+        ) : sparklineData.length > 0 ? (
           <ItemCardSparkline
             data={sparklineData}
             color={sparklineColor}
@@ -191,7 +191,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             compact={compact}
             show={!compact}
           />
-        )}
+        ) : null}
       </div>
     </button>
   )
