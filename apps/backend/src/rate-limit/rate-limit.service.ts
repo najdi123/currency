@@ -207,7 +207,6 @@ export class RateLimitService {
           },
           $setOnInsert: {
             windowStart: window.start,
-            freshRequestsUsed: 0,
             createdAt: new Date(),
           },
           $push: {
