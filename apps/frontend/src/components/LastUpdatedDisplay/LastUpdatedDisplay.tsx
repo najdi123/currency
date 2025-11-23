@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useReducer } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { FiClock, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { HiCalendar } from 'react-icons/hi'
@@ -9,6 +9,7 @@ import { DatePicker } from '@/components/DatePicker/DatePicker'
 import jalaali from 'jalaali-js'
 import { fetchTehranTime } from '@/lib/utils/timeApi'
 import toast from 'react-hot-toast'
+import { useDebounce } from '@/hooks/useDebounce'
 
 interface LastUpdatedDisplayProps {
   lastUpdated: Date | null
@@ -124,6 +125,76 @@ const validateDateSelection = (
   return { isValid: true }
 }
 
+// Date state type for atomic updates
+interface DateState {
+  persian: {
+    year: number
+    month: number
+    day: number
+  }
+  gregorian: {
+    year: number
+    month: number
+    day: number
+  }
+}
+
+// Date actions for reducer
+type DateAction =
+  | { type: 'SET_FROM_DATE'; date: Date }
+  | { type: 'SET_PERSIAN_YEAR'; year: number }
+  | { type: 'SET_PERSIAN_MONTH'; month: number }
+  | { type: 'SET_PERSIAN_DAY'; day: number }
+  | { type: 'SET_GREGORIAN_YEAR'; year: number }
+  | { type: 'SET_GREGORIAN_MONTH'; month: number }
+  | { type: 'SET_GREGORIAN_DAY'; day: number }
+  | { type: 'AUTO_ADJUST_PERSIAN_DAY'; maxDay: number }
+
+/**
+ * Reducer for atomic date state updates
+ * Prevents race conditions by updating all related state in a single action
+ */
+const dateReducer = (state: DateState, action: DateAction): DateState => {
+  switch (action.type) {
+    case 'SET_FROM_DATE': {
+      try {
+        const persian = safeGregorianToPersian(action.date)
+        return {
+          persian: { year: persian.jy, month: persian.jm, day: persian.jd },
+          gregorian: {
+            year: action.date.getFullYear(),
+            month: action.date.getMonth() + 1,
+            day: action.date.getDate(),
+          },
+        }
+      } catch (error) {
+        console.error('[dateReducer] Failed to convert date:', error)
+        return state // Keep previous valid state atomically
+      }
+    }
+    case 'SET_PERSIAN_YEAR':
+      return { ...state, persian: { ...state.persian, year: action.year } }
+    case 'SET_PERSIAN_MONTH':
+      return { ...state, persian: { ...state.persian, month: action.month } }
+    case 'SET_PERSIAN_DAY':
+      return { ...state, persian: { ...state.persian, day: action.day } }
+    case 'SET_GREGORIAN_YEAR':
+      return { ...state, gregorian: { ...state.gregorian, year: action.year } }
+    case 'SET_GREGORIAN_MONTH':
+      return { ...state, gregorian: { ...state.gregorian, month: action.month } }
+    case 'SET_GREGORIAN_DAY':
+      return { ...state, gregorian: { ...state.gregorian, day: action.day } }
+    case 'AUTO_ADJUST_PERSIAN_DAY': {
+      if (state.persian.day > action.maxDay) {
+        return { ...state, persian: { ...state.persian, day: action.maxDay } }
+      }
+      return state
+    }
+    default:
+      return state
+  }
+}
+
 export const LastUpdatedDisplay = ({
   lastUpdated,
   isFetching,
@@ -138,18 +209,27 @@ export const LastUpdatedDisplay = ({
   // State to track which dropdown group is active (to show the button)
   const [activeDropdown, setActiveDropdown] = useState<'persian' | 'gregorian' | null>(null)
 
-  // State for Persian date dropdowns
-  const [persianDay, setPersianDay] = useState<number>(1)
-  const [persianMonth, setPersianMonth] = useState<number>(1)
-  const [persianYear, setPersianYear] = useState<number>(1404)
-
-  // State for Gregorian date dropdowns
-  const [gregorianDay, setGregorianDay] = useState<number>(1)
-  const [gregorianMonth, setGregorianMonth] = useState<number>(1)
-  const [gregorianYear, setGregorianYear] = useState<number>(2025)
-
   // Cache Tehran time to avoid race conditions in validation
   const [tehranNow, setTehranNow] = useState<Date>(new Date())
+
+  // Use reducer for atomic date state updates (prevents race conditions)
+  const [dateState, dispatchDateState] = useReducer(dateReducer, {
+    persian: { year: 1404, month: 1, day: 1 },
+    gregorian: { year: 2025, month: 1, day: 1 },
+  })
+
+  // Extract date values for easier access
+  const { persian, gregorian } = dateState
+  const persianYear = persian.year
+  const persianMonth = persian.month
+  const persianDay = persian.day
+  const gregorianYear = gregorian.year
+  const gregorianMonth = gregorian.month
+  const gregorianDay = gregorian.day
+
+  // Debounce year and month changes to prevent excessive re-renders during rapid selection
+  const debouncedPersianYear = useDebounce(persianYear, 150)
+  const debouncedPersianMonth = useDebounce(persianMonth, 150)
 
   // Get current Persian and Gregorian years dynamically
   const currentGregorianYear = tehranNow.getFullYear()
@@ -179,10 +259,10 @@ export const LastUpdatedDisplay = ({
   // Memoize month options (static, but good for consistency)
   const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), [])
 
-  // Memoize Persian day options based on selected year and month
+  // Memoize Persian day options based on debounced year and month (prevents excessive recalculation)
   const persianDayOptions = useMemo(
-    () => Array.from({ length: getValidPersianDays(persianYear, persianMonth) }, (_, i) => i + 1),
-    [persianYear, persianMonth]
+    () => Array.from({ length: getValidPersianDays(debouncedPersianYear, debouncedPersianMonth) }, (_, i) => i + 1),
+    [debouncedPersianYear, debouncedPersianMonth]
   )
 
   // Memoize Gregorian day options (always 31 for simplicity)
@@ -269,36 +349,21 @@ export const LastUpdatedDisplay = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [historicalNav, handleKeyDown])
 
-  // Update dropdown states when selectedDate changes
+  // Update dropdown states when selectedDate changes (atomic update via reducer)
   useEffect(() => {
     const date = historicalNav?.selectedDate ?? lastUpdated
     if (!date) return
 
-    try {
-      // Convert Gregorian to Persian using safe conversion
-      const persian = safeGregorianToPersian(date)
-
-      setPersianYear(persian.jy)
-      setPersianMonth(persian.jm)
-      setPersianDay(persian.jd)
-
-      // Update Gregorian dropdowns
-      setGregorianYear(date.getFullYear())
-      setGregorianMonth(date.getMonth() + 1)
-      setGregorianDay(date.getDate())
-    } catch (error) {
-      console.error('[LastUpdatedDisplay] Failed to convert date:', error)
-      // Keep existing values on error
-    }
+    // Dispatch atomic update - all state changes happen together
+    dispatchDateState({ type: 'SET_FROM_DATE', date })
   }, [historicalNav?.selectedDate, lastUpdated])
 
   // Auto-adjust Persian day when year or month changes to prevent invalid dates
+  // Uses debounced values to prevent excessive adjustments during rapid selection
   useEffect(() => {
-    const maxDay = getValidPersianDays(persianYear, persianMonth)
-    if (persianDay > maxDay) {
-      setPersianDay(maxDay)
-    }
-  }, [persianYear, persianMonth]) // Removed persianDay to prevent infinite loop
+    const maxDay = getValidPersianDays(debouncedPersianYear, debouncedPersianMonth)
+    dispatchDateState({ type: 'AUTO_ADJUST_PERSIAN_DAY', maxDay })
+  }, [debouncedPersianYear, debouncedPersianMonth])
 
   // Handle date selection from picker
   const handleDateSelect = (date: Date) => {
@@ -514,7 +579,7 @@ export const LastUpdatedDisplay = ({
                   >
                     <select
                       value={persianYear}
-                      onChange={(e) => setPersianYear(parseInt(e.target.value))}
+                      onChange={(e) => dispatchDateState({ type: 'SET_PERSIAN_YEAR', year: parseInt(e.target.value) })}
                       className={`bg-transparent border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-xs transition-colors ${
                         activeDropdown === 'persian'
                           ? 'border-accent text-text-primary font-medium'
@@ -530,7 +595,7 @@ export const LastUpdatedDisplay = ({
                     <span className={`transition-colors ${activeDropdown === 'persian' ? 'text-accent' : 'text-text-tertiary'}`}>/</span>
                     <select
                       value={persianMonth}
-                      onChange={(e) => setPersianMonth(parseInt(e.target.value))}
+                      onChange={(e) => dispatchDateState({ type: 'SET_PERSIAN_MONTH', month: parseInt(e.target.value) })}
                       className={`bg-transparent border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-xs transition-colors ${
                         activeDropdown === 'persian'
                           ? 'border-accent text-text-primary font-medium'
@@ -548,7 +613,7 @@ export const LastUpdatedDisplay = ({
                     <span className={`transition-colors ${activeDropdown === 'persian' ? 'text-accent' : 'text-text-tertiary'}`}>/</span>
                     <select
                       value={persianDay}
-                      onChange={(e) => setPersianDay(parseInt(e.target.value))}
+                      onChange={(e) => dispatchDateState({ type: 'SET_PERSIAN_DAY', day: parseInt(e.target.value) })}
                       className={`bg-transparent border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-xs transition-colors ${
                         activeDropdown === 'persian'
                           ? 'border-accent text-text-primary font-medium'
@@ -574,7 +639,7 @@ export const LastUpdatedDisplay = ({
                   >
                     <select
                       value={gregorianYear}
-                      onChange={(e) => setGregorianYear(parseInt(e.target.value))}
+                      onChange={(e) => dispatchDateState({ type: 'SET_GREGORIAN_YEAR', year: parseInt(e.target.value) })}
                       className={`bg-transparent border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-xs transition-colors ${
                         activeDropdown === 'gregorian'
                           ? 'border-accent text-text-primary font-medium'
@@ -589,7 +654,7 @@ export const LastUpdatedDisplay = ({
                     <span className={`transition-colors ${activeDropdown === 'gregorian' ? 'text-accent' : 'text-text-tertiary'}`}>-</span>
                     <select
                       value={gregorianMonth}
-                      onChange={(e) => setGregorianMonth(parseInt(e.target.value))}
+                      onChange={(e) => dispatchDateState({ type: 'SET_GREGORIAN_MONTH', month: parseInt(e.target.value) })}
                       className={`bg-transparent border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-xs transition-colors ${
                         activeDropdown === 'gregorian'
                           ? 'border-accent text-text-primary font-medium'
@@ -604,7 +669,7 @@ export const LastUpdatedDisplay = ({
                     <span className={`transition-colors ${activeDropdown === 'gregorian' ? 'text-accent' : 'text-text-tertiary'}`}>-</span>
                     <select
                       value={gregorianDay}
-                      onChange={(e) => setGregorianDay(parseInt(e.target.value))}
+                      onChange={(e) => dispatchDateState({ type: 'SET_GREGORIAN_DAY', day: parseInt(e.target.value) })}
                       className={`bg-transparent border rounded px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent text-xs transition-colors ${
                         activeDropdown === 'gregorian'
                           ? 'border-accent text-text-primary font-medium'

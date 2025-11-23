@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { FiChevronLeft, FiChevronRight, FiCalendar, FiX } from 'react-icons/fi'
 import { getTehranToday } from '@/lib/utils/dateUtils'
 import jalaali from 'jalaali-js'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface DatePickerProps {
   /**
@@ -66,6 +67,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const locale = useLocale()
   const t = useTranslations('DatePicker')
   const pickerRef = useRef<HTMLDivElement>(null)
+
+  // Focus trap to keep keyboard navigation within the modal
+  const focusTrapRef = useFocusTrap<HTMLDivElement>(isOpen)
 
   // Current month being displayed (defaults to selected date or today)
   const [viewDate, setViewDate] = useState<Date>(selectedDate || new Date())
@@ -315,7 +319,15 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
-        ref={pickerRef}
+        ref={(node) => {
+          // Apply both refs to the dialog element
+          if (pickerRef) {
+            (pickerRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+          }
+          if (focusTrapRef) {
+            (focusTrapRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+          }
+        }}
         className="bg-bg-elevated rounded-2xl shadow-2xl border border-border-light max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
