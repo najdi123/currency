@@ -32,6 +32,16 @@ export function LanguageSwitcher() {
     const queryString = searchParams.toString();
     const fullPath = queryString ? `${newPath}?${queryString}` : newPath;
 
+    console.log('[LanguageSwitcher] Switching locale:', {
+      from: locale,
+      to: newLocale,
+      pathname,
+      pathWithoutLocale,
+      newPath,
+      queryString,
+      fullPath
+    });
+
     router.push(fullPath);
     router.refresh();
   }, [locale, pathname, searchParams, router]);

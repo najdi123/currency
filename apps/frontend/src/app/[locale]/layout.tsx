@@ -10,6 +10,7 @@ import { OfflineBannerWrapper } from "@/components/OfflineBannerWrapper";
 import { RateLimitWrapper } from "@/components/RateLimitWrapper";
 import { ThemeProvider } from "next-themes";
 import { validateConfig } from "@/lib/config";
+import { Toaster } from 'react-hot-toast';
 import "../globals.css";
 
 // Validate config at module load (server) – throws early if misconfigured
@@ -101,6 +102,7 @@ export default async function RootLayout({
             <StoreProvider>
               <RateLimitWrapper>
                 <OfflineBannerWrapper />
+                <Toaster />
                 {children}
               </RateLimitWrapper>
             </StoreProvider>

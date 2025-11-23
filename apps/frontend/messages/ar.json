@@ -24,7 +24,18 @@
     "openDatePicker": "فتح منتقي التاريخ",
     "openDatePickerPersian": "فتح التقويم الفارسي",
     "openDatePickerGregorian": "فتح التقويم الميلادي",
-    "go": "انتقل"
+    "go": "انتقل",
+    "futureDateError": "هذا التاريخ في المستقبل. ليس لدينا قيم له.",
+    "dateConversionError": "خطأ في تحويل التاريخ. يرجى التحقق من اختيارك.",
+    "dateTooOldError": "التاريخ قديم جداً. البيانات التاريخية متاحة فقط من عام ٢٠١١ فصاعداً.",
+    "invalidPersianDate": "التاريخ الفارسي غير صالح. يرجى التحقق من اختيارك.",
+    "invalidGregorianDate": "التاريخ غير صالح. يرجى التحقق من اختيارك.",
+    "selectPersianYear": "اختر السنة الفارسية",
+    "selectPersianMonth": "اختر الشهر الفارسي",
+    "selectPersianDay": "اختر اليوم الفارسي",
+    "selectGregorianYear": "اختر السنة",
+    "selectGregorianMonth": "اختر الشهر",
+    "selectGregorianDay": "اختر اليوم"
   },
   "DataSection": {
     "currencies": "العملات",

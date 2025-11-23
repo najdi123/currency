@@ -24,7 +24,18 @@
     "openDatePicker": "Open Date Picker",
     "openDatePickerPersian": "Open Persian Calendar",
     "openDatePickerGregorian": "Open Gregorian Calendar",
-    "go": "Go"
+    "go": "Go",
+    "futureDateError": "This date is in the future. We don't have values for it.",
+    "dateConversionError": "Error converting date. Please check your selection.",
+    "dateTooOldError": "Date is too old. Historical data is only available from 2011 onwards.",
+    "invalidPersianDate": "Invalid Persian date. Please check your selection.",
+    "invalidGregorianDate": "Invalid date. Please check your selection.",
+    "selectPersianYear": "Select Persian year",
+    "selectPersianMonth": "Select Persian month",
+    "selectPersianDay": "Select Persian day",
+    "selectGregorianYear": "Select year",
+    "selectGregorianMonth": "Select month",
+    "selectGregorianDay": "Select day"
   },
   "DataSection": {
     "currencies": "Currencies",

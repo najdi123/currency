@@ -24,7 +24,18 @@
     "openDatePicker": "باز کردن تقویم",
     "openDatePickerPersian": "باز کردن تقویم شمسی",
     "openDatePickerGregorian": "باز کردن تقویم میلادی",
-    "go": "برو"
+    "go": "برو",
+    "futureDateError": "این تاریخ در آینده است. ما اطلاعاتی برای آن نداریم.",
+    "dateConversionError": "خطا در تبدیل تاریخ. لطفاً انتخاب خود را بررسی کنید.",
+    "dateTooOldError": "تاریخ خیلی قدیمی است. اطلاعات تاریخی فقط از سال ۲۰۱۱ به بعد در دسترس است.",
+    "invalidPersianDate": "تاریخ شمسی نامعتبر است. لطفاً انتخاب خود را بررسی کنید.",
+    "invalidGregorianDate": "تاریخ نامعتبر است. لطفاً انتخاب خود را بررسی کنید.",
+    "selectPersianYear": "انتخاب سال شمسی",
+    "selectPersianMonth": "انتخاب ماه شمسی",
+    "selectPersianDay": "انتخاب روز شمسی",
+    "selectGregorianYear": "انتخاب سال",
+    "selectGregorianMonth": "انتخاب ماه",
+    "selectGregorianDay": "انتخاب روز"
   },
   "DataSection": {
     "currencies": "ارزها",

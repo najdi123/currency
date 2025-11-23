@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { FiChevronLeft, FiChevronRight, FiCalendar, FiX } from 'react-icons/fi'
+import { getTehranToday } from '@/lib/utils/dateUtils'
+import jalaali from 'jalaali-js'
 
 interface DatePickerProps {
   /**
@@ -172,9 +174,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     return true
   }
 
-  // Check if date is today
+  // Check if date is today (using Tehran timezone)
   const isToday = (date: Date): boolean => {
-    const today = new Date()
+    const today = getTehranToday()
     return (
       date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
@@ -274,32 +276,33 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       onDateSelect(date)
       onClose()
     } else {
-      // For Persian calendar, we need to convert to Gregorian
-      // Since we're using Intl API for display, we'll just use the Gregorian date
-      // and let the Intl formatter handle the conversion
-      // Note: This is a simplified approach - for production, consider using a proper Jalali conversion library
-
+      // For Persian calendar, convert to Gregorian using jalaali-js
       if (month < 1 || month > 12) {
         setInputError(t('invalidMonth'))
         return
       }
 
-      // Approximate conversion (this is not accurate - just for basic validation)
-      // For proper Persian date handling, you'd need a library like @persian-tools/persian-tools
-      const date = new Date(year, month - 1, day)
+      // Convert Persian date to Gregorian using jalaali-js
+      try {
+        const gregorian = jalaali.toGregorian(year, month, day)
+        const date = new Date(gregorian.gy, gregorian.gm - 1, gregorian.gd)
 
-      if (date > maxDate) {
-        setInputError(t('futureDate'))
+        if (date > maxDate) {
+          setInputError(t('futureDate'))
+          return
+        }
+
+        if (minDate && date < minDate) {
+          setInputError(t('tooOld'))
+          return
+        }
+
+        onDateSelect(date)
+        onClose()
+      } catch (error) {
+        setInputError(t('invalidDate'))
         return
       }
-
-      if (minDate && date < minDate) {
-        setInputError(t('tooOld'))
-        return
-      }
-
-      onDateSelect(date)
-      onClose()
     }
   }
 
