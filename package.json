@@ -23,6 +23,7 @@
   "license": "ISC",
   "dependencies": {
     "@nestjs/throttler": "^6.4.0",
-    "ioredis": "^5.8.2"
+    "ioredis": "^5.8.2",
+    "jspdf": "^3.0.4"
   }
 }
