@@ -58,7 +58,8 @@
     "toman": "Toman",
     "thousandToman": "K Toman",
     "millionToman": "M Toman",
-    "billionToman": "B Toman"
+    "billionToman": "B Toman",
+    "tapToToggle": "Tap to toggle display"
   },
   "SettingsModal": {
     "title": "Settings",

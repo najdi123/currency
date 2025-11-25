@@ -58,7 +58,8 @@
     "toman": "تومان",
     "thousandToman": "ألف تومان",
     "millionToman": "مليون تومان",
-    "billionToman": "مليار تومان"
+    "billionToman": "مليار تومان",
+    "tapToToggle": "انقر للتبديل"
   },
   "SettingsModal": {
     "title": "الإعدادات",

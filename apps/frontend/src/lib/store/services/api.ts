@@ -71,6 +71,7 @@ export interface OhlcResponse {
   low: number
   close: number
   change: number // Daily change percentage
+  absoluteChange?: number // Absolute change in Toman (close - open) / 10
   dataPoints: OhlcDataPoint[]
   updateCount: number
   firstUpdate: string

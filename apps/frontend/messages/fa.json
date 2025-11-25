@@ -58,7 +58,8 @@
     "toman": "تومان",
     "thousandToman": "هزار تومان",
     "millionToman": "میلیون تومان",
-    "billionToman": "میلیارد تومان"
+    "billionToman": "میلیارد تومان",
+    "tapToToggle": "برای تغییر نمایش لمس کنید"
   },
   "SettingsModal": {
     "title": "تنظیمات",

@@ -265,6 +265,8 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
           dailyChangePercent: typeof ohlcItem.change === 'string'
             ? parseFloat(ohlcItem.change)
             : ohlcItem.change,
+          // Absolute change in Toman from backend
+          absoluteChange: ohlcItem.absoluteChange,
           dataPoints: ohlcItem.dataPoints
         } : undefined
 

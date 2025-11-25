@@ -137,8 +137,14 @@ export class NavasanController {
       res.setHeader("X-Historical-Date", targetDate.toISOString());
       res.setHeader("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
 
+      // Convert from Rial to Toman for display (same as live endpoints)
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
       return res.json({
-        ...response.data,
+        ...convertedData.data,
         _metadata: {
           ...response.metadata,
           isHistorical: true,
@@ -268,8 +274,14 @@ export class NavasanController {
         );
       }
 
+      // Convert from Rial to Toman for display (same as live endpoint)
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
       return res.json({
-        ...response.data,
+        ...convertedData.data,
         _metadata: response.metadata,
       });
     } catch (error) {
@@ -380,8 +392,14 @@ export class NavasanController {
         );
       }
 
+      // Convert from Rial to Toman for display (same as live endpoint)
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
       return res.json({
-        ...response.data,
+        ...convertedData.data,
         _metadata: response.metadata,
       });
     } catch (error) {
@@ -492,8 +510,14 @@ export class NavasanController {
         );
       }
 
+      // Convert from Rial to Toman for display (same as live endpoint)
+      const convertedData = this.currencyConversionService.convertResponse(
+        { data: response.data },
+        { dataKey: 'data', excludeKeys: ['_metadata'] }
+      );
+
       return res.json({
-        ...response.data,
+        ...convertedData.data,
         _metadata: response.metadata,
       });
     } catch (error) {
@@ -660,20 +684,30 @@ export class NavasanController {
 
       const allOhlc = await this.intradayOhlcService.getAllTodayOhlc();
 
-      // Calculate change percentages for each item
-      const ohlcWithChanges = allOhlc.map((ohlc) => ({
-        itemCode: ohlc.itemCode,
-        date: ohlc.date,
-        dateJalali: ohlc.dateJalali,
-        open: ohlc.open,
-        high: ohlc.high,
-        low: ohlc.low,
-        close: ohlc.close,
-        change: parseFloat((((ohlc.close - ohlc.open) / ohlc.open) * 100).toFixed(2)),
-        dataPoints: ohlc.dataPoints,
-        updateCount: ohlc.updateCount,
-        lastUpdate: ohlc.lastUpdate,
-      }));
+      // Calculate change percentages and absolute change for each item
+      const ohlcWithChanges = allOhlc.map((ohlc) => {
+        // Calculate percentage change
+        const changePercent = ohlc.open > 0
+          ? parseFloat((((ohlc.close - ohlc.open) / ohlc.open) * 100).toFixed(2))
+          : 0;
+        // Calculate absolute change in Toman (OHLC values are in Rial, divide by 10)
+        const absoluteChangeToman = Math.round((ohlc.close - ohlc.open) / 10);
+
+        return {
+          itemCode: ohlc.itemCode,
+          date: ohlc.date,
+          dateJalali: ohlc.dateJalali,
+          open: ohlc.open,
+          high: ohlc.high,
+          low: ohlc.low,
+          close: ohlc.close,
+          change: changePercent,
+          absoluteChange: absoluteChangeToman, // Absolute change in Toman
+          dataPoints: ohlc.dataPoints,
+          updateCount: ohlc.updateCount,
+          lastUpdate: ohlc.lastUpdate,
+        };
+      });
 
       return res.json({
         count: ohlcWithChanges.length,

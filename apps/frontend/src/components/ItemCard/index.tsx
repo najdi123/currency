@@ -8,7 +8,7 @@ import { ItemCardHeader } from './ItemCardHeader'
 import { ItemCardBadge } from './ItemCardBadge'
 import { ItemCardPrice } from './ItemCardPrice'
 import { ItemCardSparkline } from './ItemCardSparkline'
-import { DailyChangeBadge } from './DailyChangeBadge'
+import { ToggleableBadge } from './ToggleableBadge'
 import { IntradayMiniChart } from './IntradayMiniChart'
 import { useItemCardData } from './useItemCardData'
 import { isValidIconComponent, formatTomanForScreenReader } from './itemCard.utils'
@@ -133,8 +133,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
         {/* Bottom Section: Badge + Price only (no sparkline) */}
         <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 mt-auto">
-          {ohlc?.dailyChangePercent !== undefined ? (
-            <DailyChangeBadge dailyChangePercent={ohlc.dailyChangePercent} compact={compact} />
+          {ohlc?.absoluteChange !== undefined && ohlc?.dailyChangePercent !== undefined ? (
+            <ToggleableBadge
+              absoluteChange={ohlc.absoluteChange}
+              percentChange={ohlc.dailyChangePercent}
+              compact={compact}
+            />
           ) : (
             <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
           )}
@@ -172,8 +176,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       <div className="flex items-end justify-between gap-2.5 mt-auto">
         {/* Left side: Change badge and Price */}
         <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 flex-1 min-w-0">
-          {ohlc?.dailyChangePercent !== undefined ? (
-            <DailyChangeBadge dailyChangePercent={ohlc.dailyChangePercent} compact={compact} />
+          {ohlc?.absoluteChange !== undefined && ohlc?.dailyChangePercent !== undefined ? (
+            <ToggleableBadge
+              absoluteChange={ohlc.absoluteChange}
+              percentChange={ohlc.dailyChangePercent}
+              compact={compact}
+            />
           ) : (
             <ItemCardBadge change={change} isPositive={isPositive} compact={compact} />
           )}
@@ -247,6 +255,9 @@ export const ItemCard = React.memo<ItemCardProps>(
 
     // Check OHLC data
     if (prevProps.ohlc?.dailyChangePercent !== nextProps.ohlc?.dailyChangePercent) {
+      return false
+    }
+    if (prevProps.ohlc?.absoluteChange !== nextProps.ohlc?.absoluteChange) {
       return false
     }
     if (prevProps.ohlc?.dataPoints?.length !== nextProps.ohlc?.dataPoints?.length) {

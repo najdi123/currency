@@ -25,6 +25,11 @@ export interface OhlcData {
   dailyChangePercent?: number
 
   /**
+   * Absolute change in Toman (close - open) / 10
+   */
+  absoluteChange?: number
+
+  /**
    * Intraday price data points
    */
   dataPoints?: Array<{ time: string; price: number }>
