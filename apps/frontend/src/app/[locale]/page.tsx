@@ -284,73 +284,76 @@ export default function Home() {
       >
         {t('skipToMain')}
       </a>
-      <div className={`max-w-7xl mx-auto ${isCalculatorMode ? 'flex-1 flex flex-col overflow-hidden' : ''} w-full`}>
-        {/* Main Header */}
-        <PageHeader
-          mobileViewMode={mobileViewMode}
-          onViewModeChange={setMobileViewMode}
-          onRefresh={handleRefresh}
-          isRefreshing={marketData.isRefreshing}
-          isFetching={marketData.isFetching}
-          lastUpdated={lastUpdated}
-          isLoading={
-            marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading
-          }
-          historicalNav={historicalNav}
-        />
 
-        {/* Search Bar */}
-        <ErrorBoundary
-          boundaryName="SearchBar"
-          fallback={(_error, reset) => (
-            <div className="px-3 sm:px-6 lg:px-8 mb-6">
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-center">
-                <p className="text-sm text-red-600 dark:text-red-400 mb-2">
-                  {t('search.temporarilyUnavailable')}
-                </p>
-                <button
-                  onClick={reset}
-                  className="text-xs text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 underline"
-                >
-                  {t('search.tryAgain')}
-                </button>
-              </div>
-            </div>
-          )}
-        >
-          <SearchBar
-            currencies={marketData.currencies ?? null}
-            crypto={marketData.crypto ?? null}
-            gold={marketData.gold ?? null}
-            onItemClick={handleItemClick}
+      {/* Scrollable content area in calculator mode - includes header */}
+      <div className={`${isCalculatorMode ? 'flex-1 overflow-y-auto' : ''}`}>
+        <div className="max-w-7xl mx-auto w-full">
+          {/* Main Header */}
+          <PageHeader
+            mobileViewMode={mobileViewMode}
+            onViewModeChange={setMobileViewMode}
+            onRefresh={handleRefresh}
+            isRefreshing={marketData.isRefreshing}
+            isFetching={marketData.isFetching}
+            lastUpdated={lastUpdated}
+            isLoading={
+              marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading
+            }
+            historicalNav={historicalNav}
           />
-        </ErrorBoundary>
 
-        {/* Success Notification */}
-        <SuccessNotification
-          show={showSuccess}
-          isStaleData={isStaleData}
-          staleDataTime={staleDataTime}
-        />
+          {/* Search Bar */}
+          <ErrorBoundary
+            boundaryName="SearchBar"
+            fallback={(_error, reset) => (
+              <div className="px-3 sm:px-6 lg:px-8 mb-6">
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-center">
+                  <p className="text-sm text-red-600 dark:text-red-400 mb-2">
+                    {t('search.temporarilyUnavailable')}
+                  </p>
+                  <button
+                    onClick={reset}
+                    className="text-xs text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 underline"
+                  >
+                    {t('search.tryAgain')}
+                  </button>
+                </div>
+              </div>
+            )}
+          >
+            <SearchBar
+              currencies={marketData.currencies ?? null}
+              crypto={marketData.crypto ?? null}
+              gold={marketData.gold ?? null}
+              onItemClick={handleItemClick}
+            />
+          </ErrorBoundary>
 
-        {/* ARIA Live Region for Screen Readers */}
-        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {(marketData.currenciesFetching ||
-            marketData.cryptoFetching ||
-            marketData.goldFetching) &&
-            t('aria.updating')}
-          {!marketData.currenciesFetching &&
-            !marketData.cryptoFetching &&
-            !marketData.goldFetching &&
-            lastUpdated &&
-            t('aria.updated', { time: new Date(lastUpdated).toLocaleTimeString('fa-IR') })}
-        </div>
+          {/* Success Notification */}
+          <SuccessNotification
+            show={showSuccess}
+            isStaleData={isStaleData}
+            staleDataTime={staleDataTime}
+          />
 
-        {/* Content Container - Scrollable in calculator mode */}
-        <div
-          id="main-content"
-          className={`px-3 xl:px-4 sm:px-6 lg:px-8 ${isCalculatorMode ? 'flex-1 overflow-y-auto' : ''}`}
-        >
+          {/* ARIA Live Region for Screen Readers */}
+          <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {(marketData.currenciesFetching ||
+              marketData.cryptoFetching ||
+              marketData.goldFetching) &&
+              t('aria.updating')}
+            {!marketData.currenciesFetching &&
+              !marketData.cryptoFetching &&
+              !marketData.goldFetching &&
+              lastUpdated &&
+              t('aria.updated', { time: new Date(lastUpdated).toLocaleTimeString('fa-IR') })}
+          </div>
+
+          {/* Content Container */}
+          <div
+            id="main-content"
+            className="px-3 xl:px-4 sm:px-6 lg:px-8"
+          >
           {/* Historical Data Error Banner - Show when historical data unavailable */}
           {!historicalNav.isToday && (marketData.currenciesError || marketData.cryptoError || marketData.goldError) &&
            !marketData.currencies && !marketData.crypto && !marketData.gold && (
@@ -489,124 +492,127 @@ export default function Home() {
               <span>{t('footer.autoUpdate')}</span>
             </p>
           </div>
-
         </div>
+        {/* End of main-content */}
+      </div>
+      {/* End of max-w-7xl wrapper */}
+    </div>
+    {/* End of scrollable area */}
 
-        {/* PDF Error Notification */}
-        {pdfError && (
+    {/* PDF Error Notification */}
+    {pdfError && (
+      <div
+        className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 animate-slide-up"
+        role="alert"
+        aria-live="assertive"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>{pdfError}</span>
+        <button
+          onClick={() => setPdfError(null)}
+          className="ml-2 hover:opacity-75"
+          aria-label="Close error"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    )}
+
+    {/* Calculator Bottom Navigation - Only shown in calculator mode */}
+    {isCalculatorMode && (
+      <CalculatorBottomNav
+        totalValue={calculatorTotal}
+        itemCount={calculatorItems.length}
+        onSeeDetails={handleSeeDetails}
+        onSaveAsPDF={handleSaveAsPDF}
+        isGeneratingPDF={isGeneratingPDF}
+      />
+    )}
+
+    {/* Chart Bottom Sheet - Lazy loaded for performance */}
+    <ErrorBoundary
+      boundaryName="ChartLazyLoad"
+      fallback={(_error, reset) =>
+        // Only show error UI if chart is open
+        chartSheet.isOpen ? (
           <div
-            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 animate-slide-up"
-            role="alert"
-            aria-live="assertive"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={chartSheet.closeChart}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{pdfError}</span>
-            <button
-              onClick={() => setPdfError(null)}
-              className="ml-2 hover:opacity-75"
-              aria-label="Close error"
+            <div
+              className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
+              onClick={(e) => e.stopPropagation()}
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+              <div className="text-center">
+                <div className="mb-4 text-red-500 text-5xl">⚠️</div>
+                <h3 className="text-lg font-semibold text-error-text mb-2">
+                  {t2('loadError')}
+                </h3>
+                <p className="text-text-secondary mb-4 text-sm">
+                  {t2('loadErrorMessage')}
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() => {
+                      reset()
+                      window.location.reload()
+                    }}
+                    className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    {t2('retry')}
+                  </button>
+                  <button
+                    onClick={chartSheet.closeChart}
+                    className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  >
+                    {t2('close')}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-
-        {/* Calculator Bottom Navigation - Only shown in calculator mode */}
-        {isCalculatorMode && (
-          <CalculatorBottomNav
-            totalValue={calculatorTotal}
-            itemCount={calculatorItems.length}
-            onSeeDetails={handleSeeDetails}
-            onSaveAsPDF={handleSaveAsPDF}
-            isGeneratingPDF={isGeneratingPDF}
-          />
-        )}
-
-        {/* Chart Bottom Sheet - Lazy loaded for performance */}
-        <ErrorBoundary
-          boundaryName="ChartLazyLoad"
-          fallback={(_error, reset) =>
-            // Only show error UI if chart is open
+        ) : null
+      }
+    >
+        <Suspense
+          fallback={
+            // Only show loading UI if chart is open
             chartSheet.isOpen ? (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-                onClick={chartSheet.closeChart}
-              >
-                <div
-                  className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="text-center">
-                    <div className="mb-4 text-red-500 text-5xl">⚠️</div>
-                    <h3 className="text-lg font-semibold text-error-text mb-2">
-                      {t2('loadError')}
-                    </h3>
-                    <p className="text-text-secondary mb-4 text-sm">
-                      {t2('loadErrorMessage')}
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-surface rounded-lg p-6 shadow-xl">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-text-primary text-sm">
+                      {t2('loading')}
                     </p>
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={() => {
-                          reset()
-                          window.location.reload()
-                        }}
-                        className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      >
-                        {t2('retry')}
-                      </button>
-                      <button
-                        onClick={chartSheet.closeChart}
-                        className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                      >
-                        {t2('close')}
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
             ) : null
           }
         >
-            <Suspense
-              fallback={
-                // Only show loading UI if chart is open
-                chartSheet.isOpen ? (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="bg-surface rounded-lg p-6 shadow-xl">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-text-primary text-sm">
-                          {t2('loading')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null
-              }
-            >
-              <ChartBottomSheet
-                isOpen={chartSheet.isOpen}
-                onClose={chartSheet.closeChart}
-                item={chartSheet.selectedItem}
-              />
-            </Suspense>
-          </ErrorBoundary>
-
-          {/* Calculator Details Modal */}
-          <CalculatorDetailsModal
-            isOpen={detailsModalOpen}
-            onClose={() => setDetailsModalOpen(false)}
-            items={calculatorItems}
-            totalValue={calculatorTotal}
-            currentDate={calculatorDate}
-            onRemoveItem={handleRemoveItem}
-            onClearAll={handleClearAll}
+          <ChartBottomSheet
+            isOpen={chartSheet.isOpen}
+            onClose={chartSheet.closeChart}
+            item={chartSheet.selectedItem}
           />
-        </div>
-      </div>
+        </Suspense>
+      </ErrorBoundary>
+
+      {/* Calculator Details Modal */}
+      <CalculatorDetailsModal
+        isOpen={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
+        items={calculatorItems}
+        totalValue={calculatorTotal}
+        currentDate={calculatorDate}
+        onRemoveItem={handleRemoveItem}
+        onClearAll={handleClearAll}
+      />
+    </div>
   )
 }
