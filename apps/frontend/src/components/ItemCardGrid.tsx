@@ -1,7 +1,6 @@
 import React, { useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { IconType } from 'react-icons'
-import type { ItemType } from '@/types/chart'
 import { ItemCard, AccentColorVariant } from './ItemCard'
 import { hasVariants, getVariantsForCurrency, getVariantData } from '@/lib/utils/dataItemHelpers'
 import { useGetAllTodayOhlcQuery } from '@/lib/store/services/api'
@@ -13,7 +12,23 @@ import {
   addItem,
   updateItemQuantity,
   removeItem,
+  type ItemType,
 } from '@/lib/store/slices/calculatorSlice'
+
+/**
+ * Map display item types to calculator item types
+ * - 'crypto' and 'coins' both map to 'coin' in calculator
+ * - 'currency' and 'gold' stay the same
+ */
+const mapToCalculatorItemType = (displayType: string): ItemType => {
+  if (displayType === 'crypto' || displayType === 'coins') {
+    return 'coin'
+  }
+  if (displayType === 'currency' || displayType === 'gold') {
+    return displayType as ItemType
+  }
+  return 'custom'
+}
 
 export interface ItemCardGridProps {
   /**
@@ -36,9 +51,9 @@ export interface ItemCardGridProps {
   } | null
 
   /**
-   * Item type for fetching historical data
+   * Item type for fetching historical data (can be chart type or calculator type)
    */
-  itemType: ItemType
+  itemType: string
 
   /**
    * Accent color variant for hover effect
@@ -149,7 +164,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
     } else if (quantity > 0) {
       // Add new item to calculator
       dispatch(addItem({
-        type: itemType,
+        type: mapToCalculatorItemType(itemType),
         subType: itemKey.toUpperCase() as any,
         name: itemName,
         quantity,
