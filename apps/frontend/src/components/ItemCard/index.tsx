@@ -133,9 +133,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
         {/* Bottom Section: Badge + Price only (no sparkline) */}
         <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 mt-auto">
-          {/* Use ToggleableBadge only if OHLC has meaningful data (non-zero values) */}
-          {ohlc?.absoluteChange !== undefined && ohlc?.dailyChangePercent !== undefined &&
-           (ohlc.absoluteChange !== 0 || ohlc.dailyChangePercent !== 0) ? (
+          {/* Use ToggleableBadge if OHLC data is available */}
+          {ohlc?.absoluteChange !== undefined && ohlc?.dailyChangePercent !== undefined ? (
             <ToggleableBadge
               absoluteChange={ohlc.absoluteChange}
               percentChange={ohlc.dailyChangePercent}
@@ -178,9 +177,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       <div className="flex items-end justify-between gap-2.5 mt-auto">
         {/* Left side: Change badge and Price */}
         <div className="flex flex-col items-start [dir=rtl]:items-end gap-1.5 flex-1 min-w-0">
-          {/* Use ToggleableBadge only if OHLC has meaningful data (non-zero values) */}
-          {ohlc?.absoluteChange !== undefined && ohlc?.dailyChangePercent !== undefined &&
-           (ohlc.absoluteChange !== 0 || ohlc.dailyChangePercent !== 0) ? (
+          {/* Use ToggleableBadge if OHLC data is available */}
+          {ohlc?.absoluteChange !== undefined && ohlc?.dailyChangePercent !== undefined ? (
             <ToggleableBadge
               absoluteChange={ohlc.absoluteChange}
               percentChange={ohlc.dailyChangePercent}

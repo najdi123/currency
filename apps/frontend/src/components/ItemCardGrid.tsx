@@ -260,15 +260,42 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
 
         // Get OHLC data for this item if available
         const ohlcItem = ohlcMap[item.key]
-        const ohlcData = ohlcItem ? {
-          // Ensure change is a number (backend may return string from toFixed)
-          dailyChangePercent: typeof ohlcItem.change === 'string'
+
+        // Calculate absolute change and percentage for consistent display
+        // Priority: Use OHLC if available and non-zero, otherwise compute from API data
+        let dailyChangePercent: number
+        let absoluteChange: number
+
+        if (ohlcItem && (ohlcItem.change !== 0 || ohlcItem.absoluteChange !== 0)) {
+          // OHLC has meaningful data
+          dailyChangePercent = typeof ohlcItem.change === 'string'
             ? parseFloat(ohlcItem.change)
-            : ohlcItem.change,
-          // Absolute change in Toman from backend
-          absoluteChange: ohlcItem.absoluteChange,
-          dataPoints: ohlcItem.dataPoints
-        } : undefined
+            : ohlcItem.change
+          absoluteChange = ohlcItem.absoluteChange || 0
+        } else {
+          // No OHLC or OHLC is zero - compute from API change data
+          const apiChange = itemData.change
+
+          // Detect if API change is percentage (< 1 means percentage like 0.035)
+          // or absolute Toman (>= 1 means absolute like 26 for gold)
+          if (Math.abs(apiChange) < 1) {
+            // API returns percentage (e.g., 0.035 for 3.5%)
+            dailyChangePercent = apiChange
+            // Calculate absolute Toman change: value * percentage
+            absoluteChange = itemData.value * apiChange
+          } else {
+            // API returns absolute Toman (e.g., 26 for gold items)
+            absoluteChange = apiChange
+            // Calculate percentage: (change / value)
+            dailyChangePercent = itemData.value !== 0 ? apiChange / itemData.value : 0
+          }
+        }
+
+        const ohlcData = {
+          dailyChangePercent,
+          absoluteChange,
+          dataPoints: ohlcItem?.dataPoints || []
+        }
 
         // Get calculator data for this item
         const calculatorItem = calculatorItemsMap[item.key]
