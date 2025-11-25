@@ -12,20 +12,21 @@ import {
   addItem,
   updateItemQuantity,
   removeItem,
-  type ItemType,
+  type ItemType as CalculatorItemType,
 } from '@/lib/store/slices/calculatorSlice'
+import type { ItemType } from '@/types/chart'
 
 /**
  * Map display item types to calculator item types
  * - 'crypto' and 'coins' both map to 'coin' in calculator
  * - 'currency' and 'gold' stay the same
  */
-const mapToCalculatorItemType = (displayType: string): ItemType => {
+const mapToCalculatorItemType = (displayType: string): CalculatorItemType => {
   if (displayType === 'crypto' || displayType === 'coins') {
     return 'coin'
   }
   if (displayType === 'currency' || displayType === 'gold') {
-    return displayType as ItemType
+    return displayType as CalculatorItemType
   }
   return 'custom'
 }
@@ -278,7 +279,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             iconColor={item.color}
             value={itemData.value}
             change={itemData.change}
-            type={itemType}
+            type={itemType as ItemType}
             compact={viewMode === 'dual'}
             accentColor={accentColor}
             onClick={isCalculatorMode ? undefined : clickHandlers[item.key]}
