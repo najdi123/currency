@@ -3,6 +3,7 @@ import api from './services/api'
 import authApi from './services/authApi'
 import walletApi from './services/walletApi'
 import authReducer from './slices/authSlice'
+import calculatorReducer from './slices/calculatorSlice'
 
 export const makeStore = () => {
   return configureStore({
@@ -11,6 +12,7 @@ export const makeStore = () => {
       [authApi.reducerPath]: authApi.reducer,
       [walletApi.reducerPath]: walletApi.reducer,
       auth: authReducer,
+      calculator: calculatorReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware()

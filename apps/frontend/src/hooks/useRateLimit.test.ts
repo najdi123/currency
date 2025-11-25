@@ -393,8 +393,7 @@ describe('useRateLimit', () => {
     it('should handle different tier responses', async () => {
       const premiumResponse = {
         ...mockSuccessResponse,
-        tier: 'premium' as const,
-        limit: 1000,
+        maxRequestsPerWindow: 1000,
         remaining: 500,
         percentage: 50,
       };
@@ -407,8 +406,8 @@ describe('useRateLimit', () => {
       const { result } = renderHook(() => useRateLimit());
 
       await waitFor(() => {
-        expect(result.current.status?.tier).toBe('premium');
-        expect(result.current.status?.limit).toBe(1000);
+        expect(result.current.status?.maxRequestsPerWindow).toBe(1000);
+        expect(result.current.status?.remaining).toBe(500);
       });
     });
   });

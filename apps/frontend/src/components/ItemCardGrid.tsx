@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { IconType } from 'react-icons'
 import type { ItemType } from '@/types/chart'
@@ -6,6 +6,14 @@ import { ItemCard, AccentColorVariant } from './ItemCard'
 import { hasVariants, getVariantsForCurrency, getVariantData } from '@/lib/utils/dataItemHelpers'
 import { useGetAllTodayOhlcQuery } from '@/lib/store/services/api'
 import type { OhlcResponse } from '@/lib/store/services/api'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
+import {
+  selectCalculatorMode,
+  selectCalculatorItems,
+  addItem,
+  updateItemQuantity,
+  removeItem,
+} from '@/lib/store/slices/calculatorSlice'
 
 export interface ItemCardGridProps {
   /**
@@ -98,6 +106,11 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   onItemClick,
 }) => {
   const t = useTranslations('Home')
+  const dispatch = useAppDispatch()
+
+  // Get calculator state from Redux
+  const isCalculatorMode = useAppSelector(selectCalculatorMode)
+  const calculatorItems = useAppSelector(selectCalculatorItems)
 
   // Fetch OHLC data for all items
   const { data: ohlcData } = useGetAllTodayOhlcQuery()
@@ -110,6 +123,40 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
       return acc
     }, {} as Record<string, OhlcResponse>)
   }, [ohlcData])
+
+  // Create a lookup map for calculator items by item key
+  const calculatorItemsMap = useMemo(() => {
+    return calculatorItems.reduce((acc, item) => {
+      // Map calculator item to the item key (e.g., subType 'USD' -> 'usd_sell')
+      const itemKey = item.subType?.toLowerCase() || item.id
+      acc[itemKey] = item
+      return acc
+    }, {} as Record<string, typeof calculatorItems[0]>)
+  }, [calculatorItems])
+
+  // Handler for quantity changes in calculator mode
+  const handleQuantityChange = useCallback((itemKey: string, itemName: string, unitPrice: number, quantity: number) => {
+    const existingItem = calculatorItemsMap[itemKey]
+
+    if (existingItem) {
+      if (quantity === 0) {
+        // Remove item if quantity is 0
+        dispatch(removeItem(existingItem.id))
+      } else {
+        // Update existing item quantity
+        dispatch(updateItemQuantity({ id: existingItem.id, quantity }))
+      }
+    } else if (quantity > 0) {
+      // Add new item to calculator
+      dispatch(addItem({
+        type: itemType,
+        subType: itemKey.toUpperCase() as any,
+        name: itemName,
+        quantity,
+        unitPrice,
+      }))
+    }
+  }, [calculatorItemsMap, dispatch, itemType])
 
   // Memoize click handlers to prevent creating new functions on every render
   // Creates a stable object mapping item keys to their click handlers
@@ -202,6 +249,10 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
           dataPoints: ohlcItem.dataPoints
         } : undefined
 
+        // Get calculator data for this item
+        const calculatorItem = calculatorItemsMap[item.key]
+        const quantity = calculatorItem?.quantity || 0
+
         return (
           <ItemCard
             key={item.key}
@@ -215,11 +266,14 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             type={itemType}
             compact={viewMode === 'dual'}
             accentColor={accentColor}
-            onClick={clickHandlers[item.key]}
+            onClick={isCalculatorMode ? undefined : clickHandlers[item.key]}
             role="listitem"
             hasVariants={itemHasVariants}
             variants={variants}
             ohlc={ohlcData}
+            calculatorMode={isCalculatorMode}
+            quantity={quantity}
+            onQuantityChange={(qty) => handleQuantityChange(item.key, t(`items.${item.key}`), itemData.value, qty)}
           />
         )
       })}

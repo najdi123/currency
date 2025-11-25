@@ -1,7 +1,7 @@
 'use client'
 
-import { lazy, Suspense, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
+import { lazy, Suspense, useCallback, useState, useEffect } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchBar } from '@/components/SearchBar'
@@ -10,6 +10,8 @@ import { StaleDataWarning } from '@/components/StaleDataWarning'
 import { GlobalErrorDisplay } from '@/components/GlobalErrorDisplay'
 import { RateLimitBanner } from '@/components/RateLimitBanner'
 import { DataSection } from '@/components/DataSection'
+import { CalculatorBottomNav } from '@/components/CalculatorBottomNav'
+import { CalculatorDetailsModal } from '@/components/CalculatorDetailsModal'
 import { useChartBottomSheet } from '@/lib/hooks/useChartBottomSheet'
 import { useViewModePreference } from '@/lib/hooks/useViewModePreference'
 import { useMarketData } from '@/lib/hooks/useMarketData'
@@ -17,6 +19,19 @@ import { useRefreshNotification } from '@/lib/hooks/useRefreshNotification'
 import { useChartPreload } from '@/lib/hooks/useChartPreload'
 import { useLastUpdatedTimestamp } from '@/lib/hooks/useLastUpdatedTimestamp'
 import { useHistoricalNavigation } from '@/hooks/useHistoricalNavigation'
+import { useAppSelector, useAppDispatch } from '@/lib/hooks'
+import {
+  selectCalculatorMode,
+  selectCalculatorTotal,
+  selectCalculatorItems,
+  selectCalculatorDate,
+  removeItem,
+  clearAllItems,
+  setCurrentDate,
+  updateAllPrices,
+} from '@/lib/store/slices/calculatorSlice'
+import type { CalculatorItem } from '@/lib/store/slices/calculatorSlice'
+import { generateCalculatorPDF } from '@/lib/utils/pdfGenerator'
 import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
 import {
   currencyItems,
@@ -49,9 +64,22 @@ export default function Home() {
   const t = useTranslations('Home')
   const t2 = useTranslations('Chart')
   const tHistorical = useTranslations('Historical')
+  const tCalc = useTranslations('Calculator')
+  const tPDF = useTranslations('PDF')
+  const locale = useLocale()
+  const dispatch = useAppDispatch()
 
   // Custom hooks for state management
   const { mobileViewMode, setMobileViewMode } = useViewModePreference()
+
+  // Calculator state from Redux
+  const isCalculatorMode = useAppSelector(selectCalculatorMode)
+  const calculatorTotal = useAppSelector(selectCalculatorTotal)
+  const calculatorItems = useAppSelector(selectCalculatorItems)
+  const calculatorDate = useAppSelector(selectCalculatorDate)
+
+  // Local state for details modal
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false)
 
   // Initialize historical navigation using browser's Tehran timezone calculation
   // This is independent of backend's system clock
@@ -112,8 +140,127 @@ export default function Home() {
     }
   }, [marketData.currencies, marketData.crypto, marketData.gold, chartSheet, t])
 
+  // Calculator bottom nav handlers
+  const handleSeeDetails = useCallback(() => {
+    setDetailsModalOpen(true)
+  }, [])
+
+  const handleSaveAsPDF = useCallback(async () => {
+    try {
+      await generateCalculatorPDF({
+        items: calculatorItems,
+        totalValue: calculatorTotal,
+        currentDate: calculatorDate,
+        locale,
+        translations: {
+          title: tPDF('title'),
+          date: tPDF('date'),
+          time: tPDF('time'),
+          items: tPDF('items'),
+          item: tPDF('item'),
+          qty: tPDF('qty'),
+          unitPrice: tPDF('unitPrice'),
+          total: tPDF('total'),
+          grandTotal: tPDF('grandTotal'),
+          toman: tCalc('toman'),
+          grams: tCalc('grams'),
+          piece: tCalc('piece'),
+          generatedBy: tPDF('generatedBy'),
+          tehranTime: tPDF('tehranTime'),
+        },
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      // TODO: Show error notification
+    }
+  }, [calculatorItems, calculatorTotal, calculatorDate, locale, tPDF, tCalc])
+
+  const handleRemoveItem = useCallback((id: string) => {
+    dispatch(removeItem(id))
+  }, [dispatch])
+
+  const handleClearAll = useCallback(() => {
+    if (confirm('Are you sure you want to clear all items?')) {
+      dispatch(clearAllItems())
+    }
+  }, [dispatch])
+
+  // Helper function to get price for a calculator item from current market data
+  const getPriceForItem = useCallback(
+    (item: CalculatorItem): number => {
+      const { type, subType } = item
+
+      if (!subType) return item.unitPrice
+
+      const key = subType.toLowerCase()
+
+      switch (type) {
+        case 'currency': {
+          return marketData.currencies?.[key]?.value ?? item.unitPrice
+        }
+        case 'gold': {
+          return marketData.gold?.[key]?.value ?? item.unitPrice
+        }
+        case 'coin': {
+          return marketData.crypto?.[key]?.value ?? item.unitPrice
+        }
+        default:
+          return item.unitPrice
+      }
+    },
+    [marketData.currencies, marketData.crypto, marketData.gold]
+  )
+
+  // Date synchronization: Update calculator prices when date changes
+  useEffect(() => {
+    // Skip if not in calculator mode or no items
+    if (!isCalculatorMode || calculatorItems.length === 0) return
+
+    // Skip if market data is still loading
+    if (marketData.currenciesLoading || marketData.cryptoLoading || marketData.goldLoading) return
+
+    // Skip if no market data available
+    if (!marketData.currencies && !marketData.crypto && !marketData.gold) return
+
+    const currentFormattedDate = historicalNav.formattedDate ?? undefined
+
+    // Update calculator date if it changed
+    if (calculatorDate !== currentFormattedDate) {
+      dispatch(setCurrentDate(currentFormattedDate))
+    }
+
+    // Update all item prices based on current market data
+    const priceUpdates = calculatorItems.map((item) => ({
+      id: item.id,
+      unitPrice: getPriceForItem(item),
+    }))
+
+    // Only dispatch if there are actual price changes
+    const hasChanges = priceUpdates.some((update) => {
+      const item = calculatorItems.find((i) => i.id === update.id)
+      return item && item.unitPrice !== update.unitPrice
+    })
+
+    if (hasChanges) {
+      dispatch(updateAllPrices(priceUpdates))
+    }
+  }, [
+    historicalNav.formattedDate,
+    isCalculatorMode,
+    calculatorItems,
+    calculatorDate,
+    marketData.currencies,
+    marketData.crypto,
+    marketData.gold,
+    marketData.currenciesLoading,
+    marketData.cryptoLoading,
+    marketData.goldLoading,
+    dispatch,
+    getPriceForItem,
+  ])
+
   return (
-    <div className="min-h-screen bg-background-base">
+    <div className={`${isCalculatorMode ? 'h-screen flex flex-col' : 'min-h-screen'} bg-background-base`}>
       {/* Skip to main content link for keyboard users */}
       <a
         href="#main-content"
@@ -121,7 +268,7 @@ export default function Home() {
       >
         {t('skipToMain')}
       </a>
-      <div className="max-w-7xl mx-auto">
+      <div className={`max-w-7xl mx-auto ${isCalculatorMode ? 'flex-1 flex flex-col overflow-hidden' : ''} w-full`}>
         {/* Main Header */}
         <PageHeader
           mobileViewMode={mobileViewMode}
@@ -183,8 +330,11 @@ export default function Home() {
             t('aria.updated', { time: new Date(lastUpdated).toLocaleTimeString('fa-IR') })}
         </div>
 
-        {/* Content Container */}
-        <div id="main-content" className="px-3 xl:px-4 sm:px-6 lg:px-8">
+        {/* Content Container - Scrollable in calculator mode */}
+        <div
+          id="main-content"
+          className={`px-3 xl:px-4 sm:px-6 lg:px-8 ${isCalculatorMode ? 'flex-1 overflow-y-auto' : ''}`}
+        >
           {/* Historical Data Error Banner - Show when historical data unavailable */}
           {!historicalNav.isToday && (marketData.currenciesError || marketData.cryptoError || marketData.goldError) &&
            !marketData.currencies && !marketData.crypto && !marketData.gold && (
@@ -324,51 +474,63 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Chart Bottom Sheet - Lazy loaded for performance */}
-          <ErrorBoundary
-            boundaryName="ChartLazyLoad"
-            fallback={(_error, reset) =>
-              // Only show error UI if chart is open
-              chartSheet.isOpen ? (
+        </div>
+
+        {/* Calculator Bottom Navigation - Only shown in calculator mode */}
+        {isCalculatorMode && (
+          <CalculatorBottomNav
+            totalValue={calculatorTotal}
+            itemCount={calculatorItems.length}
+            onSeeDetails={handleSeeDetails}
+            onSaveAsPDF={handleSaveAsPDF}
+          />
+        )}
+
+        {/* Chart Bottom Sheet - Lazy loaded for performance */}
+        <ErrorBoundary
+          boundaryName="ChartLazyLoad"
+          fallback={(_error, reset) =>
+            // Only show error UI if chart is open
+            chartSheet.isOpen ? (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                onClick={chartSheet.closeChart}
+              >
                 <div
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-                  onClick={chartSheet.closeChart}
+                  className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <div
-                    className="bg-surface rounded-lg p-6 shadow-xl max-w-md mx-4"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="text-center">
-                      <div className="mb-4 text-red-500 text-5xl">⚠️</div>
-                      <h3 className="text-lg font-semibold text-error-text mb-2">
-                        {t2('loadError')}
-                      </h3>
-                      <p className="text-text-secondary mb-4 text-sm">
-                        {t2('loadErrorMessage')}
-                      </p>
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => {
-                            reset()
-                            window.location.reload()
-                          }}
-                          className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        >
-                          {t2('retry')}
-                        </button>
-                        <button
-                          onClick={chartSheet.closeChart}
-                          className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
-                        >
-                          {t2('close')}
-                        </button>
-                      </div>
+                  <div className="text-center">
+                    <div className="mb-4 text-red-500 text-5xl">⚠️</div>
+                    <h3 className="text-lg font-semibold text-error-text mb-2">
+                      {t2('loadError')}
+                    </h3>
+                    <p className="text-text-secondary mb-4 text-sm">
+                      {t2('loadErrorMessage')}
+                    </p>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => {
+                          reset()
+                          window.location.reload()
+                        }}
+                        className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      >
+                        {t2('retry')}
+                      </button>
+                      <button
+                        onClick={chartSheet.closeChart}
+                        className="bg-gray-200 dark:bg-gray-700 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        {t2('close')}
+                      </button>
                     </div>
                   </div>
                 </div>
-              ) : null
-            }
-          >
+              </div>
+            ) : null
+          }
+        >
             <Suspense
               fallback={
                 // Only show loading UI if chart is open
@@ -393,8 +555,18 @@ export default function Home() {
               />
             </Suspense>
           </ErrorBoundary>
+
+          {/* Calculator Details Modal */}
+          <CalculatorDetailsModal
+            isOpen={detailsModalOpen}
+            onClose={() => setDetailsModalOpen(false)}
+            items={calculatorItems}
+            totalValue={calculatorTotal}
+            currentDate={calculatorDate}
+            onRemoveItem={handleRemoveItem}
+            onClearAll={handleClearAll}
+          />
         </div>
       </div>
-    </div>
   )
 }

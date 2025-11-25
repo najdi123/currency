@@ -12,6 +12,7 @@
     "viewModeSingleTitle": "عمودان",
     "viewModeDualTitle": "عمود واحد",
     "settings": "الإعدادات",
+    "calculator": "الآلة الحاسبة",
     "refreshingPrices": "جارٍ تحديث الأسعار",
     "refreshPrices": "تحديث الأسعار",
     "previousDay": "اليوم السابق",
@@ -685,5 +686,34 @@
     "futureDate": "لا يمكن تحديد تواريخ مستقبلية",
     "tooOld": "التاريخ قديم جداً",
     "clickToSelect": "انقر لتحديد التاريخ"
+  },
+  "Calculator": {
+    "total": "المجموع",
+    "item": "عنصر",
+    "items": "عناصر",
+    "seeDetails": "عرض التفاصيل",
+    "saveAsPDF": "حفظ كملف PDF",
+    "calculationDetails": "تفاصيل الحساب",
+    "toman": "تومان",
+    "noItems": "لم تتم إضافة أي عناصر بعد",
+    "addItemsPrompt": "أضف عملات أو ذهب أو عملات معدنية",
+    "clearAll": "مسح الكل",
+    "removeItem": "إزالة العنصر",
+    "today": "اليوم",
+    "grams": "جرام",
+    "piece": "قطعة"
+  },
+  "PDF": {
+    "title": "آلة حاسبة لأسعار الصرف",
+    "date": "التاريخ",
+    "time": "الوقت",
+    "items": "العناصر",
+    "item": "العنصر",
+    "qty": "الكمية",
+    "unitPrice": "سعر الوحدة",
+    "total": "المجموع",
+    "grandTotal": "المجموع الإجمالي",
+    "generatedBy": "تم إنشاؤه بواسطة آلة حاسبة أسعار الصرف",
+    "tehranTime": "بتوقيت طهران"
   }
 }

@@ -12,6 +12,7 @@
     "viewModeSingleTitle": "دو ستونه",
     "viewModeDualTitle": "یک ستونه",
     "settings": "تنظیمات",
+    "calculator": "ماشین حساب",
     "refreshingPrices": "در حال بروزرسانی قیمت‌ها",
     "refreshPrices": "بروزرسانی قیمت‌ها",
     "previousDay": "روز قبل",
@@ -685,5 +686,34 @@
     "futureDate": "نمی‌توان تاریخ آینده انتخاب کرد",
     "tooOld": "تاریخ خیلی قدیمی است",
     "clickToSelect": "برای انتخاب تاریخ کلیک کنید"
+  },
+  "Calculator": {
+    "total": "جمع کل",
+    "item": "مورد",
+    "items": "مورد",
+    "seeDetails": "مشاهده جزئیات",
+    "saveAsPDF": "ذخیره به PDF",
+    "calculationDetails": "جزئیات محاسبه",
+    "toman": "تومان",
+    "noItems": "هنوز موردی اضافه نشده",
+    "addItemsPrompt": "ارز، طلا یا سکه اضافه کنید",
+    "clearAll": "پاک کردن همه",
+    "removeItem": "حذف مورد",
+    "today": "امروز",
+    "grams": "گرم",
+    "piece": "عدد"
+  },
+  "PDF": {
+    "title": "ماشین حساب نرخ ارز",
+    "date": "تاریخ",
+    "time": "زمان",
+    "items": "اقلام",
+    "item": "قلم",
+    "qty": "تعداد",
+    "unitPrice": "قیمت واحد",
+    "total": "جمع",
+    "grandTotal": "جمع کل",
+    "generatedBy": "تولید شده توسط ماشین حساب نرخ ارز",
+    "tehranTime": "به وقت تهران"
   }
 }

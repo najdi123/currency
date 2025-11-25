@@ -108,4 +108,19 @@ export interface ItemCardProps {
    * Optional OHLC data for enhanced display
    */
   ohlc?: OhlcData
+
+  /**
+   * Calculator mode - shows quantity input instead of sparkline
+   */
+  calculatorMode?: boolean
+
+  /**
+   * Quantity value for calculator mode
+   */
+  quantity?: number
+
+  /**
+   * Callback when quantity changes in calculator mode
+   */
+  onQuantityChange?: (quantity: number) => void
 }

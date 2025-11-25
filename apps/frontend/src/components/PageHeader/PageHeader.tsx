@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/Button'
 import { SettingsModal } from '@/components/SettingsModal'
 import { LastUpdatedDisplay } from '@/components/LastUpdatedDisplay'
 import { RateLimitBadge } from '@/components/RateLimitBadge'
-import { HiRefresh, HiViewList } from 'react-icons/hi'
+import { HiRefresh, HiViewList, HiCalculator } from 'react-icons/hi'
 import { FiGrid, FiSettings } from 'react-icons/fi'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
+import { toggleCalculatorMode, selectCalculatorMode } from '@/lib/store/slices/calculatorSlice'
 import type { ViewMode } from '@/lib/hooks/useViewModePreference'
 import type { HistoricalNavigationState } from '@/hooks/useHistoricalNavigation'
 
@@ -32,6 +34,8 @@ export const PageHeader = ({
   isLoading,
   historicalNav,
 }: PageHeaderProps) => {
+  const dispatch = useAppDispatch()
+  const isCalculatorMode = useAppSelector(selectCalculatorMode)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const t = useTranslations('PageHeader')
   const tHistorical = useTranslations('Historical')
@@ -65,6 +69,20 @@ export const PageHeader = ({
               ) : (
                 <FiGrid className="w-5 h-5 text-text-primary" />
               )}
+            </button>
+            {/* Calculator Button */}
+            <button
+              onClick={() => dispatch(toggleCalculatorMode())}
+              className={`p-2 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 active-scale-apple ${
+                isCalculatorMode
+                  ? 'bg-accent text-white border-accent'
+                  : 'bg-bg-elevated hover:bg-bg-secondary border-border-light'
+              }`}
+              aria-label={t('calculator')}
+              title={t('calculator')}
+              aria-pressed={isCalculatorMode}
+            >
+              <HiCalculator className={`w-5 h-5 ${isCalculatorMode ? 'text-white' : 'text-text-primary'}`} />
             </button>
             {/* Settings Button */}
             <button

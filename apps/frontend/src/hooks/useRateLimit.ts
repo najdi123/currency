@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { apiUrl } from '@/lib/config';
 
 export interface RateLimitStatus {
   allowed: boolean;
@@ -71,7 +72,7 @@ export function useRateLimit(): UseRateLimitReturn {
 
       // Create new request
       ongoingRequest = (async () => {
-        const response = await fetch('/api/rate-limit/status', {
+        const response = await fetch(`${apiUrl}/rate-limit/status`, {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',

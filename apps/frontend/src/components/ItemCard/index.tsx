@@ -13,6 +13,7 @@ import { IntradayMiniChart } from './IntradayMiniChart'
 import { useItemCardData } from './useItemCardData'
 import { isValidIconComponent, formatTomanForScreenReader } from './itemCard.utils'
 import { CurrencyVariantsDropdown } from '@/components/CurrencyVariantsDropdown'
+import { QuantityInput } from '@/components/QuantityInput'
 import type { ItemCardProps } from './itemCard.types'
 
 /**
@@ -66,6 +67,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   hasVariants = false,
   variants = [],
   ohlc,
+  calculatorMode = false,
+  quantity = 0,
+  onQuantityChange,
 }) => {
   const t = useTranslations('ItemCard')
 
@@ -176,8 +180,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           <ItemCardPrice value={value} compact={compact} />
         </div>
 
-        {/* Right side: Show mini chart if OHLC data available, otherwise sparkline (only with real data) */}
-        {ohlc?.dataPoints && ohlc.dataPoints.length >= 3 ? (
+        {/* Right side: Show quantity input in calculator mode, otherwise show chart */}
+        {calculatorMode ? (
+          <QuantityInput
+            value={quantity}
+            onChange={onQuantityChange}
+            compact={compact}
+            placeholder="0"
+          />
+        ) : ohlc?.dataPoints && ohlc.dataPoints.length >= 3 ? (
           <IntradayMiniChart
             dataPoints={ohlc.dataPoints}
             isPositive={ohlc.dailyChangePercent !== undefined && ohlc.dailyChangePercent >= 0}
@@ -227,7 +238,9 @@ export const ItemCard = React.memo<ItemCardProps>(
       prevProps.type !== nextProps.type ||
       prevProps.accentColor !== nextProps.accentColor ||
       prevProps.compact !== nextProps.compact ||
-      prevProps.hasVariants !== nextProps.hasVariants
+      prevProps.hasVariants !== nextProps.hasVariants ||
+      prevProps.calculatorMode !== nextProps.calculatorMode ||
+      prevProps.quantity !== nextProps.quantity
     ) {
       return false
     }
