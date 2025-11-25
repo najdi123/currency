@@ -7,20 +7,53 @@ let cachedTehranTime: { date: Date; fetchedAt: number } | null = null;
 const CACHE_DURATION = 60000; // 1 minute
 
 /**
- * Calculate Tehran time from UTC using GMT+3:30 offset
+ * Calculate Tehran time using browser's Intl API
+ * This automatically handles Daylight Saving Time (IRST/IRDT)
+ * - Winter (Standard Time): UTC+3:30 (IRST)
+ * - Summer (Daylight Time): UTC+4:30 (IRDT)
  * This is a reliable fallback when APIs are unavailable
  */
 function calculateTehranTimeFromUTC(): Date {
   const now = new Date();
-  // Tehran is UTC+3:30 (3 hours and 30 minutes ahead)
-  const utcTime = now.getTime();
-  const tehranOffset = (3 * 60 + 30) * 60 * 1000; // 3.5 hours in milliseconds
-  return new Date(utcTime + tehranOffset);
+
+  // Use Intl.DateTimeFormat to get Tehran time components
+  // This automatically handles DST transitions
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(now);
+  const dateParts: Record<string, string> = {};
+
+  parts.forEach((part) => {
+    if (part.type !== 'literal') {
+      dateParts[part.type] = part.value;
+    }
+  });
+
+  // Construct Tehran time as a Date object
+  const tehranTime = new Date(
+    parseInt(dateParts.year),
+    parseInt(dateParts.month) - 1,
+    parseInt(dateParts.day),
+    parseInt(dateParts.hour),
+    parseInt(dateParts.minute),
+    parseInt(dateParts.second)
+  );
+
+  return tehranTime;
 }
 
 /**
  * Fetch actual current Tehran time with multiple fallbacks
- * Tries: WorldTimeAPI -> TimeAPI.io -> Calculated offset from UTC
+ * Tries: WorldTimeAPI -> TimeAPI.io -> Browser's Intl API (with DST support)
  */
 export async function fetchTehranTime(): Promise<Date> {
   // Return cached time if available and fresh
@@ -80,8 +113,8 @@ export async function fetchTehranTime(): Promise<Date> {
     console.warn('[TimeAPI] TimeAPI.io failed:', error);
   }
 
-  // Final fallback: Calculate from UTC offset
-  console.warn('[TimeAPI] ⚠️ All APIs failed, using calculated UTC+3:30 offset');
+  // Final fallback: Calculate using browser's Intl API
+  console.warn('[TimeAPI] ⚠️ All APIs failed, using browser Intl API (with DST support)');
   const calculatedTime = calculateTehranTimeFromUTC();
 
   // Cache even the calculated time
