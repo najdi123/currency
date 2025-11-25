@@ -22,10 +22,6 @@ import {
   OhlcSnapshotSchema,
 } from "./schemas/ohlc-snapshot.schema";
 import {
-  IntradayOhlc,
-  IntradayOhlcSchema,
-} from "./schemas/intraday-ohlc.schema";
-import {
   OHLCPermanent,
   OHLCPermanentSchema,
 } from "./schemas/ohlc-permanent.schema";
@@ -44,7 +40,6 @@ import { RateLimitModule } from "../rate-limit/rate-limit.module";
       { name: Cache.name, schema: CacheSchema },
       { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
       { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
-      { name: IntradayOhlc.name, schema: IntradayOhlcSchema },
       { name: OHLCPermanent.name, schema: OHLCPermanentSchema },
       { name: AggregationRule.name, schema: AggregationRuleSchema },
       { name: UpdateLog.name, schema: UpdateLogSchema },

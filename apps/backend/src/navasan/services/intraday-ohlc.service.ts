@@ -1,14 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Cron } from "@nestjs/schedule";
 import { Model } from "mongoose";
 import moment from "moment-timezone";
 import momentJalaali from "moment-jalaali";
 import {
-  IntradayOhlc,
-  IntradayOhlcDocument,
-  DataPoint,
-} from "../schemas/intraday-ohlc.schema";
+  OHLCPermanent,
+  OHLCPermanentDocument,
+} from "../schemas/ohlc-permanent.schema";
 import {
   CurrencyData,
   CryptoData,
@@ -16,10 +14,39 @@ import {
 } from "../../api-providers/api-provider.interface";
 
 /**
+ * Data point for intraday chart
+ */
+interface DataPoint {
+  time: string;
+  price: number;
+}
+
+/**
+ * Response type for OHLC data with change percentage
+ */
+interface OhlcResponse {
+  itemCode: string;
+  date: string;
+  dateJalali?: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  change: number; // Percentage change from open to close
+  dataPoints: DataPoint[];
+  updateCount?: number;
+  firstUpdate?: Date;
+  lastUpdate?: Date;
+}
+
+/**
  * Intraday OHLC Service
  *
- * Tracks today's open, high, low, close prices and intraday data points.
- * Provides data for daily change calculations and mini-charts.
+ * Provides OHLC data from ohlc_permanent collection.
+ * Used for daily change calculations and mini-charts.
+ *
+ * NOTE: All data is now read from ohlc_permanent collection which is
+ * the single source of truth for all OHLC data.
  */
 @Injectable()
 export class IntradayOhlcService {
@@ -27,130 +54,109 @@ export class IntradayOhlcService {
   private readonly timezone = "Asia/Tehran";
 
   constructor(
-    @InjectModel(IntradayOhlc.name)
-    private intradayModel: Model<IntradayOhlcDocument>,
+    @InjectModel(OHLCPermanent.name)
+    private ohlcPermanentModel: Model<OHLCPermanentDocument>,
   ) {}
 
   /**
    * Record data points from API fetch
-   * Updates OHLC values and adds to intraday data points
+   *
+   * NOTE: This method is now a no-op. The ohlc_permanent collection is
+   * populated by the OhlcCollectorService which runs in parallel.
+   * This method is kept for backwards compatibility but does not
+   * write to any collection.
+   *
+   * @deprecated Data is now recorded directly to ohlc_permanent by OhlcCollectorService
    */
-  async recordDataPoints(data: {
+  async recordDataPoints(_data: {
     currencies: CurrencyData[];
     crypto: CryptoData[];
     gold: GoldData[];
   }): Promise<void> {
-    const tehranNow = moment().tz(this.timezone);
-    const dateKey = tehranNow.format("YYYY-MM-DD");
-    const jalaliDate = momentJalaali(tehranNow.toDate()).format(
-      "jYYYY/jMM/jDD",
+    // No-op: ohlc_permanent is populated by OhlcCollectorService
+    // This method is kept for backwards compatibility
+    this.logger.debug(
+      "recordDataPoints called - data is recorded to ohlc_permanent by OhlcCollectorService",
     );
-
-    // DEDUPLICATION FIX: Round time to nearest 10 minutes to prevent duplicate data points
-    const roundedMinute = Math.floor(tehranNow.minute() / 10) * 10;
-    const roundedTime = tehranNow
-      .clone()
-      .minute(roundedMinute)
-      .second(0)
-      .format("HH:mm");
-    const timeKey = roundedTime;
-
-    const allItems = [...data.currencies, ...data.crypto, ...data.gold];
-
-    if (allItems.length === 0) {
-      this.logger.debug("No data points to record");
-      return;
-    }
-
-    const bulkOps = [];
-
-    for (const item of allItems) {
-      const price =
-        typeof item.price === "number"
-          ? item.price
-          : parseFloat(String(item.price));
-
-      if (isNaN(price) || price <= 0) {
-        this.logger.warn(`Invalid price for ${item.code}: ${item.price}`);
-        continue;
-      }
-
-      bulkOps.push({
-        updateOne: {
-          filter: { itemCode: item.code, date: dateKey },
-          update: {
-            $setOnInsert: {
-              itemCode: item.code,
-              date: dateKey,
-              dateJalali: jalaliDate,
-              open: price,
-              high: price,
-              low: price,
-              firstUpdate: new Date(),
-            },
-            $max: { high: price },
-            $min: { low: price },
-            $set: {
-              close: price,
-              lastUpdate: new Date(),
-            },
-            $push: {
-              dataPoints: {
-                $each: [{ time: timeKey, price }],
-                $slice: -144, // Keep max 144 points (24h at 10min intervals)
-              },
-            },
-            $inc: { updateCount: 1 },
-          },
-          upsert: true,
-        },
-      });
-    }
-
-    if (bulkOps.length > 0) {
-      try {
-        // RELIABILITY FIX: Use ordered: false to continue processing if one item fails
-        await this.intradayModel.bulkWrite(bulkOps, { ordered: false });
-        this.logger.log(
-          `📊 Recorded ${bulkOps.length} intraday OHLC updates for ${dateKey} at ${timeKey}`,
-        );
-      } catch (error) {
-        const err = error as Error;
-
-        // Ignore duplicate key errors (expected in race conditions)
-        if (err.message?.includes("duplicate key")) {
-          this.logger.debug("OHLC record already exists, skipping");
-          return;
-        }
-
-        // Log validation errors as warnings
-        if (err.message?.includes("validation")) {
-          this.logger.warn(`Invalid OHLC data: ${err.message}`);
-          return;
-        }
-
-        // Log other errors as errors
-        this.logger.error(
-          `Failed to record intraday OHLC: ${err.message}`,
-          err.stack,
-        );
-      }
-    }
   }
 
   /**
    * Get today's OHLC data for a specific item
+   * Queries ohlc_permanent collection which has the actual data
    */
-  async getTodayOhlc(itemCode: string): Promise<IntradayOhlc | null> {
-    const dateKey = moment().tz(this.timezone).format("YYYY-MM-DD");
+  async getTodayOhlc(itemCode: string): Promise<OhlcResponse | null> {
+    const today = moment().tz(this.timezone).format("YYYY-MM-DD");
+    const jalaliDate = momentJalaali().format("jYYYY/jMM/jDD");
+    const startOfDay = new Date(today + "T00:00:00.000Z");
+    const endOfDay = new Date(today + "T23:59:59.999Z");
 
     try {
-      return await this.intradayModel
+      // Query ohlc_permanent for today's 1d data
+      // Use UPPERCASE itemCode to match ohlc_permanent storage format
+      const dailyRecord = await this.ohlcPermanentModel
         .findOne({
-          itemCode,
-          date: dateKey,
+          itemCode: itemCode.toUpperCase(),
+          timeframe: "1d",
+          timestamp: { $gte: startOfDay, $lte: endOfDay },
         })
-        .lean();
+        .exec();
+
+      if (dailyRecord) {
+        const changePercent =
+          ((dailyRecord.close - dailyRecord.open) / dailyRecord.open) * 100;
+        return {
+          itemCode: itemCode.toLowerCase(),
+          date: today,
+          dateJalali: jalaliDate,
+          open: dailyRecord.open,
+          high: dailyRecord.high,
+          low: dailyRecord.low,
+          close: dailyRecord.close,
+          change: parseFloat(changePercent.toFixed(2)),
+          dataPoints: [],
+        };
+      }
+
+      // Fallback: aggregate from 1m data
+      const minuteData = await this.ohlcPermanentModel
+        .aggregate([
+          {
+            $match: {
+              itemCode: itemCode.toUpperCase(),
+              timeframe: "1m",
+              timestamp: { $gte: startOfDay, $lte: endOfDay },
+            },
+          },
+          { $sort: { timestamp: 1 } },
+          {
+            $group: {
+              _id: null,
+              open: { $first: "$open" },
+              high: { $max: "$high" },
+              low: { $min: "$low" },
+              close: { $last: "$close" },
+            },
+          },
+        ])
+        .exec();
+
+      if (minuteData.length > 0) {
+        const data = minuteData[0];
+        const changePercent = ((data.close - data.open) / data.open) * 100;
+        return {
+          itemCode: itemCode.toLowerCase(),
+          date: today,
+          dateJalali: jalaliDate,
+          open: data.open,
+          high: data.high,
+          low: data.low,
+          close: data.close,
+          change: parseFloat(changePercent.toFixed(2)),
+          dataPoints: [],
+        };
+      }
+
+      return null;
     } catch (error) {
       const err = error as Error;
       this.logger.error(
@@ -163,20 +169,43 @@ export class IntradayOhlcService {
 
   /**
    * Get yesterday's OHLC data for comparison
+   * Queries ohlc_permanent collection for yesterday's 1d data
    */
-  async getYesterdayOhlc(itemCode: string): Promise<IntradayOhlc | null> {
-    const yesterdayDate = moment()
-      .tz(this.timezone)
-      .subtract(1, "day")
-      .format("YYYY-MM-DD");
+  async getYesterdayOhlc(itemCode: string): Promise<OhlcResponse | null> {
+    const yesterday = moment().tz(this.timezone).subtract(1, "day");
+    const yesterdayDate = yesterday.format("YYYY-MM-DD");
+    const jalaliDate = momentJalaali(yesterday.toDate()).format("jYYYY/jMM/jDD");
+    const startOfDay = new Date(yesterdayDate + "T00:00:00.000Z");
+    const endOfDay = new Date(yesterdayDate + "T23:59:59.999Z");
 
     try {
-      return await this.intradayModel
+      // Query ohlc_permanent for yesterday's 1d data
+      const dailyRecord = await this.ohlcPermanentModel
         .findOne({
-          itemCode,
-          date: yesterdayDate,
+          itemCode: itemCode.toUpperCase(),
+          timeframe: "1d",
+          timestamp: { $gte: startOfDay, $lte: endOfDay },
         })
-        .lean();
+        .lean()
+        .exec();
+
+      if (dailyRecord) {
+        const changePercent =
+          ((dailyRecord.close - dailyRecord.open) / dailyRecord.open) * 100;
+        return {
+          itemCode: itemCode.toLowerCase(),
+          date: yesterdayDate,
+          dateJalali: jalaliDate,
+          open: dailyRecord.open,
+          high: dailyRecord.high,
+          low: dailyRecord.low,
+          close: dailyRecord.close,
+          change: parseFloat(changePercent.toFixed(2)),
+          dataPoints: [],
+        };
+      }
+
+      return null;
     } catch (error) {
       const err = error as Error;
       this.logger.error(
@@ -204,13 +233,79 @@ export class IntradayOhlcService {
 
   /**
    * Get all items' OHLC for today
+   * Queries ohlc_permanent collection for today's 1d data
    * Useful for dashboard/listing pages
    */
-  async getAllTodayOhlc(): Promise<IntradayOhlc[]> {
-    const dateKey = moment().tz(this.timezone).format("YYYY-MM-DD");
+  async getAllTodayOhlc(): Promise<OhlcResponse[]> {
+    const today = moment().tz(this.timezone).format("YYYY-MM-DD");
+    const jalaliDate = momentJalaali().format("jYYYY/jMM/jDD");
+    const startOfDay = new Date(today + "T00:00:00.000Z");
+    const endOfDay = new Date(today + "T23:59:59.999Z");
 
     try {
-      return await this.intradayModel.find({ date: dateKey }).lean();
+      // Query ohlc_permanent for all items with 1d timeframe for today
+      const dailyRecords = await this.ohlcPermanentModel
+        .find({
+          timeframe: "1d",
+          timestamp: { $gte: startOfDay, $lte: endOfDay },
+        })
+        .lean()
+        .exec();
+
+      if (dailyRecords.length > 0) {
+        return dailyRecords.map((record) => {
+          const changePercent =
+            ((record.close - record.open) / record.open) * 100;
+          return {
+            itemCode: record.itemCode.toLowerCase(),
+            date: today,
+            dateJalali: jalaliDate,
+            open: record.open,
+            high: record.high,
+            low: record.low,
+            close: record.close,
+            change: parseFloat(changePercent.toFixed(2)),
+            dataPoints: [],
+          };
+        });
+      }
+
+      // Fallback: aggregate from 1m data for all items
+      const minuteData = await this.ohlcPermanentModel
+        .aggregate([
+          {
+            $match: {
+              timeframe: "1m",
+              timestamp: { $gte: startOfDay, $lte: endOfDay },
+            },
+          },
+          { $sort: { timestamp: 1 } },
+          {
+            $group: {
+              _id: "$itemCode",
+              open: { $first: "$open" },
+              high: { $max: "$high" },
+              low: { $min: "$low" },
+              close: { $last: "$close" },
+            },
+          },
+        ])
+        .exec();
+
+      return minuteData.map((data) => {
+        const changePercent = ((data.close - data.open) / data.open) * 100;
+        return {
+          itemCode: data._id.toLowerCase(),
+          date: today,
+          dateJalali: jalaliDate,
+          open: data.open,
+          high: data.high,
+          low: data.low,
+          close: data.close,
+          change: parseFloat(changePercent.toFixed(2)),
+          dataPoints: [],
+        };
+      });
     } catch (error) {
       const err = error as Error;
       this.logger.error(
@@ -223,18 +318,43 @@ export class IntradayOhlcService {
 
   /**
    * Get OHLC data for a specific date (for historical calendar view)
+   * Queries ohlc_permanent collection for the specified date
    */
   async getOhlcByDate(
     itemCode: string,
     date: string,
-  ): Promise<IntradayOhlc | null> {
+  ): Promise<OhlcResponse | null> {
+    const jalaliDate = momentJalaali(new Date(date)).format("jYYYY/jMM/jDD");
+    const startOfDay = new Date(date + "T00:00:00.000Z");
+    const endOfDay = new Date(date + "T23:59:59.999Z");
+
     try {
-      return await this.intradayModel
+      const dailyRecord = await this.ohlcPermanentModel
         .findOne({
-          itemCode,
-          date,
+          itemCode: itemCode.toUpperCase(),
+          timeframe: "1d",
+          timestamp: { $gte: startOfDay, $lte: endOfDay },
         })
-        .lean();
+        .lean()
+        .exec();
+
+      if (dailyRecord) {
+        const changePercent =
+          ((dailyRecord.close - dailyRecord.open) / dailyRecord.open) * 100;
+        return {
+          itemCode: itemCode.toLowerCase(),
+          date,
+          dateJalali: jalaliDate,
+          open: dailyRecord.open,
+          high: dailyRecord.high,
+          low: dailyRecord.low,
+          close: dailyRecord.close,
+          change: parseFloat(changePercent.toFixed(2)),
+          dataPoints: [],
+        };
+      }
+
+      return null;
     } catch (error) {
       const err = error as Error;
       this.logger.error(
@@ -246,41 +366,7 @@ export class IntradayOhlcService {
   }
 
   /**
-   * Cleanup old intraday data
-   * Runs daily at midnight Tehran time
-   * Deletes records older than 2 days (keeps today + yesterday)
-   */
-  @Cron("0 0 * * *", { timeZone: "Asia/Tehran" })
-  async cleanupOldIntraday(): Promise<void> {
-    const twoDaysAgo = moment()
-      .tz(this.timezone)
-      .subtract(2, "days")
-      .startOf("day")
-      .toDate();
-
-    try {
-      const result = await this.intradayModel.deleteMany({
-        createdAt: { $lt: twoDaysAgo },
-      });
-
-      if (result.deletedCount > 0) {
-        this.logger.log(
-          `🧹 Cleaned up ${result.deletedCount} old intraday OHLC records (older than 2 days)`,
-        );
-      } else {
-        this.logger.debug("No old intraday records to clean up");
-      }
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error(
-        `Failed to cleanup old intraday data: ${err.message}`,
-        err.stack,
-      );
-    }
-  }
-
-  /**
-   * Get statistics about intraday data
+   * Get statistics about OHLC data from ohlc_permanent
    * Useful for monitoring and debugging
    */
   async getStatistics(): Promise<{
@@ -290,33 +376,51 @@ export class IntradayOhlcService {
     oldestRecord: string | null;
     newestRecord: string | null;
   }> {
-    const dateKey = moment().tz(this.timezone).format("YYYY-MM-DD");
-    const yesterdayDate = moment()
-      .tz(this.timezone)
-      .subtract(1, "days")
-      .format("YYYY-MM-DD");
+    const today = moment().tz(this.timezone);
+    const startOfToday = today.clone().startOf("day").toDate();
+    const endOfToday = today.clone().endOf("day").toDate();
+    const startOfYesterday = today.clone().subtract(1, "day").startOf("day").toDate();
+    const endOfYesterday = today.clone().subtract(1, "day").endOf("day").toDate();
 
     try {
       const [totalRecords, todayRecords, yesterdayRecords, oldest, newest] =
         await Promise.all([
-          this.intradayModel.countDocuments(),
-          this.intradayModel.countDocuments({ date: dateKey }),
-          this.intradayModel.countDocuments({ date: yesterdayDate }),
-          this.intradayModel.findOne().sort({ date: 1 }).select("date").lean(),
-          this.intradayModel.findOne().sort({ date: -1 }).select("date").lean(),
+          this.ohlcPermanentModel.countDocuments({ timeframe: "1d" }),
+          this.ohlcPermanentModel.countDocuments({
+            timeframe: "1d",
+            timestamp: { $gte: startOfToday, $lte: endOfToday },
+          }),
+          this.ohlcPermanentModel.countDocuments({
+            timeframe: "1d",
+            timestamp: { $gte: startOfYesterday, $lte: endOfYesterday },
+          }),
+          this.ohlcPermanentModel
+            .findOne({ timeframe: "1d" })
+            .sort({ timestamp: 1 })
+            .select("timestamp")
+            .lean(),
+          this.ohlcPermanentModel
+            .findOne({ timeframe: "1d" })
+            .sort({ timestamp: -1 })
+            .select("timestamp")
+            .lean(),
         ]);
 
       return {
         totalRecords,
         todayRecords,
         yesterdayRecords,
-        oldestRecord: oldest?.date || null,
-        newestRecord: newest?.date || null,
+        oldestRecord: oldest
+          ? moment(oldest.timestamp).format("YYYY-MM-DD")
+          : null,
+        newestRecord: newest
+          ? moment(newest.timestamp).format("YYYY-MM-DD")
+          : null,
       };
     } catch (error) {
       const err = error as Error;
       this.logger.error(
-        `Failed to get intraday statistics: ${err.message}`,
+        `Failed to get OHLC statistics: ${err.message}`,
         err.stack,
       );
       return {

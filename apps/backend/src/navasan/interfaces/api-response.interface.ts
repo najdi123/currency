@@ -3,7 +3,7 @@ export interface ApiResponseMetadata {
   isStale: boolean;
   dataAge?: number; // Age in minutes
   lastUpdated: Date;
-  source: "cache" | "api" | "fallback" | "snapshot" | "ohlc-snapshot";
+  source: "cache" | "api" | "fallback" | "snapshot" | "ohlc-snapshot" | "ohlc_permanent";
   warning?: string;
   isHistorical?: boolean;
   historicalDate?: Date | string;

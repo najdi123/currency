@@ -13,7 +13,6 @@
 import * as mongoose from "mongoose";
 import { TrackedItem, TrackedItemSchema } from "./tracked-item.schema";
 import { CurrentPrice, CurrentPriceSchema } from "./current-price.schema";
-import { IntradayOhlc, IntradayOhlcSchema } from "./intraday-ohlc.schema";
 import {
   HistoricalOhlc,
   HistoricalOhlcSchema,
@@ -89,35 +88,7 @@ async function testSchemaStructure() {
       { itemCode: priceDoc.itemCode, price: priceDoc.price },
     );
 
-    // Test 3: IntradayOhlc Schema
-    const IntradayOhlcModel = mongoose.model(
-      "IntradayOhlc_Test",
-      IntradayOhlcSchema,
-    );
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-
-    const intradayDoc = new IntradayOhlcModel({
-      itemCode: "test_usd",
-      date: now,
-      open: 42000,
-      high: 42500,
-      low: 41500,
-      close: 42300,
-      updateCount: 10,
-      lastUpdate: now,
-      expiresAt: tomorrow,
-    });
-
-    const intradayValidation = intradayDoc.validateSync();
-    logTest(
-      "IntradayOhlc schema structure",
-      !intradayValidation,
-      intradayValidation?.message,
-      { itemCode: intradayDoc.itemCode, high: intradayDoc.high },
-    );
-
-    // Test 4: HistoricalOhlc Schema
+    // Test 3: HistoricalOhlc Schema
     const HistoricalOhlcModel = mongoose.model(
       "HistoricalOhlc_Test",
       HistoricalOhlcSchema,
@@ -177,18 +148,6 @@ async function testIndexDefinitions() {
       undefined,
       { count: currentIndexes.length, indexes: currentIndexes },
     );
-
-    // Test IntradayOhlc indexes (including TTL)
-    const IntradayOhlcModel = mongoose.model("IntradayOhlc_Test");
-    const intradayIndexes = IntradayOhlcModel.schema.indexes();
-    const hasTTL = intradayIndexes.some(
-      (idx: any) => idx[1]?.expireAfterSeconds === 0,
-    );
-
-    logTest("IntradayOhlc has TTL index", hasTTL, undefined, {
-      count: intradayIndexes.length,
-      indexes: intradayIndexes,
-    });
 
     // Test HistoricalOhlc indexes
     const HistoricalOhlcModel = mongoose.model("HistoricalOhlc_Test");
@@ -298,16 +257,6 @@ async function testDocumentOperations() {
     logTest("CurrentPrice upsert operation structure", true, undefined, {
       operation: "bulkWrite with upsert",
       filter: upsertOp.updateOne.filter,
-    });
-
-    // Test TTL expiry calculation
-    const now = new Date();
-    const expiresIn48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    const isValidTTL = expiresIn48Hours > now;
-
-    logTest("IntradayOhlc TTL calculation", isValidTTL, undefined, {
-      now: now.toISOString(),
-      expiresAt: expiresIn48Hours.toISOString(),
     });
 
     // Test compound query structure

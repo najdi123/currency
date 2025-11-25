@@ -1,12 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { Cron } from "@nestjs/schedule";
 import { Model } from "mongoose";
 import moment from "moment-timezone";
 import {
-  IntradayOhlc,
-  IntradayOhlcDocument,
-} from "../schemas/intraday-ohlc.schema";
+  OHLCPermanent,
+  OHLCPermanentDocument,
+} from "../navasan/schemas/ohlc-permanent.schema";
 import {
   HistoricalOhlc,
   HistoricalOhlcDocument,
@@ -16,10 +16,15 @@ import {
 /**
  * OHLC Aggregation Scheduler
  *
- * Aggregates intraday OHLC data into historical timeframes:
- * - Daily: At 00:05 Tehran time - aggregates yesterday's intraday data
- * - Weekly: At 00:10 on Sundays - aggregates last week's daily data
- * - Monthly: At 00:15 on 1st of month - aggregates last month's daily data
+ * NOTE: This scheduler is now DEPRECATED for daily aggregation.
+ * The ohlc_permanent collection is the single source of truth and already
+ * contains 1d (daily) timeframe data.
+ *
+ * This scheduler now only handles:
+ * - Weekly: Aggregates daily data from ohlc_permanent to historical_ohlc
+ * - Monthly: Aggregates daily data from ohlc_permanent to historical_ohlc
+ *
+ * The daily cron job is disabled since ohlc_permanent already has 1d data.
  */
 @Injectable()
 export class OhlcAggregationScheduler {
@@ -27,112 +32,38 @@ export class OhlcAggregationScheduler {
   private readonly timezone = "Asia/Tehran";
 
   constructor(
-    @InjectModel(IntradayOhlc.name)
-    private intradayModel: Model<IntradayOhlcDocument>,
+    @InjectModel(OHLCPermanent.name)
+    private ohlcPermanentModel: Model<OHLCPermanentDocument>,
     @InjectModel(HistoricalOhlc.name)
     private historicalModel: Model<HistoricalOhlcDocument>,
   ) {}
 
   /**
-   * Aggregate yesterday's intraday OHLC to daily historical OHLC
-   * Runs daily at 00:05 Tehran time
+   * Daily aggregation is DISABLED
+   *
+   * ohlc_permanent already stores 1d timeframe data directly.
+   * Use ohlc_permanent with timeframe='1d' instead of historical_ohlc for daily data.
+   *
+   * This method is kept for reference but the cron is disabled.
    */
-  @Cron("5 0 * * *", { timeZone: "Asia/Tehran" })
+  // @Cron("5 0 * * *", { timeZone: "Asia/Tehran" }) // DISABLED
   async aggregateDailyOhlc(): Promise<void> {
-    const startTime = Date.now();
-    this.logger.log("🔄 Starting daily OHLC aggregation...");
-
-    try {
-      // Calculate yesterday's date in Tehran timezone
-      const yesterday = moment()
-        .tz(this.timezone)
-        .subtract(1, "day")
-        .startOf("day");
-
-      const yesterdayKey = yesterday.format("YYYY-MM-DD");
-
-      this.logger.log(`📅 Aggregating data for ${yesterdayKey}`);
-
-      // Get all intraday OHLC from yesterday
-      const intradayData = await this.intradayModel
-        .find({
-          date: yesterdayKey,
-        })
-        .lean();
-
-      if (intradayData.length === 0) {
-        this.logger.warn(`⚠️ No intraday data found for ${yesterdayKey}`);
-        return;
-      }
-
-      this.logger.log(
-        `📊 Found ${intradayData.length} intraday records to aggregate`,
-      );
-
-      // Check for existing daily records to avoid duplicates
-      const existingCodes = await this.historicalModel
-        .find({
-          timeframe: OhlcTimeframe.DAILY,
-          periodStart: {
-            $gte: yesterday.toDate(),
-            $lt: yesterday.clone().add(1, "day").toDate(),
-          },
-        })
-        .distinct("itemCode");
-
-      const existingCodesSet = new Set(existingCodes);
-
-      // Filter out items that already have daily records
-      const newItems = intradayData.filter(
-        (item) => !existingCodesSet.has(item.itemCode),
-      );
-
-      if (newItems.length === 0) {
-        this.logger.log(
-          `✅ Daily aggregation already complete for ${yesterdayKey}`,
-        );
-        return;
-      }
-
-      // Create historical_ohlc entries for each item
-      const historicalEntries = newItems.map((item) => ({
-        itemCode: item.itemCode,
-        timeframe: OhlcTimeframe.DAILY,
-        periodStart: yesterday.toDate(),
-        periodEnd: yesterday.clone().add(1, "day").toDate(),
-        open: item.open,
-        high: item.high,
-        low: item.low,
-        close: item.close,
-        dataPoints: item.updateCount,
-      }));
-
-      // Insert all entries at once
-      await this.historicalModel.insertMany(historicalEntries, {
-        ordered: false,
-      });
-
-      const duration = Date.now() - startTime;
-      this.logger.log(
-        `✅ Daily aggregation complete: ${historicalEntries.length} items aggregated in ${duration}ms`,
-      );
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error(
-        `❌ Failed to aggregate daily OHLC: ${err.message}`,
-        err.stack,
-      );
-    }
+    this.logger.log(
+      "⏭️ Daily aggregation skipped - ohlc_permanent already has 1d data",
+    );
+    // No-op: ohlc_permanent is the source of truth for daily data
   }
 
   /**
    * Aggregate last week's daily OHLC to weekly historical OHLC
    * Runs every Sunday at 00:10 Tehran time
+   *
+   * Sources data from ohlc_permanent (1d timeframe) instead of historical_ohlc
    */
   @Cron("10 0 * * 0", { timeZone: "Asia/Tehran" })
   async aggregateWeeklyOhlc(): Promise<void> {
     const startTime = Date.now();
-    this.logger.log("🔄 Starting weekly OHLC aggregation...");
+    this.logger.log("🔄 Starting weekly OHLC aggregation from ohlc_permanent...");
 
     try {
       // Calculate last week's boundaries (Saturday to Friday in Persian calendar)
@@ -158,11 +89,11 @@ export class OhlcAggregationScheduler {
         return;
       }
 
-      // Get all daily data from last week
-      const dailyData = await this.historicalModel
+      // Get all daily data from ohlc_permanent for last week
+      const dailyData = await this.ohlcPermanentModel
         .find({
-          timeframe: OhlcTimeframe.DAILY,
-          periodStart: {
+          timeframe: "1d",
+          timestamp: {
             $gte: weekStart.toDate(),
             $lte: weekEnd.toDate(),
           },
@@ -170,7 +101,7 @@ export class OhlcAggregationScheduler {
         .lean();
 
       if (dailyData.length === 0) {
-        this.logger.warn(`⚠️ No daily data found for last week`);
+        this.logger.warn(`⚠️ No daily data found in ohlc_permanent for last week`);
         return;
       }
 
@@ -192,11 +123,11 @@ export class OhlcAggregationScheduler {
 
       // Create weekly entries
       const weeklyEntries = Object.entries(grouped).map(([itemCode, items]) => {
-        // Sort by date to ensure correct order
-        items.sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
+        // Sort by timestamp to ensure correct order
+        items.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
         return {
-          itemCode,
+          itemCode: itemCode.toLowerCase(), // Normalize to lowercase for historical_ohlc
           timeframe: OhlcTimeframe.WEEKLY,
           periodStart: weekStart.toDate(),
           periodEnd: weekEnd.clone().add(1, "day").toDate(),
@@ -232,11 +163,13 @@ export class OhlcAggregationScheduler {
   /**
    * Aggregate last month's daily OHLC to monthly historical OHLC
    * Runs on 1st of every month at 00:15 Tehran time
+   *
+   * Sources data from ohlc_permanent (1d timeframe) instead of historical_ohlc
    */
   @Cron("15 0 1 * *", { timeZone: "Asia/Tehran" })
   async aggregateMonthlyOhlc(): Promise<void> {
     const startTime = Date.now();
-    this.logger.log("🔄 Starting monthly OHLC aggregation...");
+    this.logger.log("🔄 Starting monthly OHLC aggregation from ohlc_permanent...");
 
     try {
       // Calculate last month's boundaries
@@ -264,11 +197,11 @@ export class OhlcAggregationScheduler {
         return;
       }
 
-      // Get all daily data from last month
-      const dailyData = await this.historicalModel
+      // Get all daily data from ohlc_permanent for last month
+      const dailyData = await this.ohlcPermanentModel
         .find({
-          timeframe: OhlcTimeframe.DAILY,
-          periodStart: {
+          timeframe: "1d",
+          timestamp: {
             $gte: monthStart.toDate(),
             $lte: monthEnd.toDate(),
           },
@@ -276,7 +209,7 @@ export class OhlcAggregationScheduler {
         .lean();
 
       if (dailyData.length === 0) {
-        this.logger.warn(`⚠️ No daily data found for last month`);
+        this.logger.warn(`⚠️ No daily data found in ohlc_permanent for last month`);
         return;
       }
 
@@ -299,13 +232,11 @@ export class OhlcAggregationScheduler {
       // Create monthly entries
       const monthlyEntries = Object.entries(grouped).map(
         ([itemCode, items]) => {
-          // Sort by date to ensure correct order
-          items.sort(
-            (a, b) => a.periodStart.getTime() - b.periodStart.getTime(),
-          );
+          // Sort by timestamp to ensure correct order
+          items.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
           return {
-            itemCode,
+            itemCode: itemCode.toLowerCase(), // Normalize to lowercase for historical_ohlc
             timeframe: OhlcTimeframe.MONTHLY,
             periodStart: monthStart.toDate(),
             periodEnd: monthEnd.clone().add(1, "day").toDate(),
@@ -340,48 +271,62 @@ export class OhlcAggregationScheduler {
   }
 
   /**
-   * Manual trigger for aggregation (useful for testing or backfilling)
+   * Manual trigger for weekly aggregation (useful for backfilling)
    */
-  async manualAggregateDailyForDate(date: Date): Promise<void> {
+  async manualAggregateWeeklyForDate(date: Date): Promise<void> {
     this.logger.log(
-      `🔧 Manual daily aggregation triggered for ${date.toISOString()}`,
+      `🔧 Manual weekly aggregation triggered for week containing ${date.toISOString()}`,
     );
 
-    const dateKey = moment(date).tz(this.timezone).format("YYYY-MM-DD");
+    const weekStart = moment(date).tz(this.timezone).startOf("week");
+    const weekEnd = moment(date).tz(this.timezone).endOf("week");
 
-    const intradayData = await this.intradayModel
+    const dailyData = await this.ohlcPermanentModel
       .find({
-        date: dateKey,
+        timeframe: "1d",
+        timestamp: {
+          $gte: weekStart.toDate(),
+          $lte: weekEnd.toDate(),
+        },
       })
       .lean();
 
-    if (intradayData.length === 0) {
-      this.logger.warn(`⚠️ No intraday data found for ${dateKey}`);
+    if (dailyData.length === 0) {
+      this.logger.warn(`⚠️ No daily data found for week`);
       return;
     }
 
-    const historicalEntries = intradayData.map((item) => ({
-      itemCode: item.itemCode,
-      timeframe: OhlcTimeframe.DAILY,
-      periodStart: moment(date).tz(this.timezone).startOf("day").toDate(),
-      periodEnd: moment(date)
-        .tz(this.timezone)
-        .add(1, "day")
-        .startOf("day")
-        .toDate(),
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-      dataPoints: item.updateCount,
-    }));
+    // Group by itemCode
+    const grouped = dailyData.reduce(
+      (acc, item) => {
+        if (!acc[item.itemCode]) {
+          acc[item.itemCode] = [];
+        }
+        acc[item.itemCode].push(item);
+        return acc;
+      },
+      {} as Record<string, typeof dailyData>,
+    );
 
-    await this.historicalModel.insertMany(historicalEntries, {
-      ordered: false,
+    const weeklyEntries = Object.entries(grouped).map(([itemCode, items]) => {
+      items.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      return {
+        itemCode: itemCode.toLowerCase(),
+        timeframe: OhlcTimeframe.WEEKLY,
+        periodStart: weekStart.toDate(),
+        periodEnd: weekEnd.clone().add(1, "day").toDate(),
+        open: items[0].open,
+        high: Math.max(...items.map((i) => i.high)),
+        low: Math.min(...items.map((i) => i.low)),
+        close: items[items.length - 1].close,
+        dataPoints: items.length,
+      };
     });
 
+    await this.historicalModel.insertMany(weeklyEntries, { ordered: false });
+
     this.logger.log(
-      `✅ Manual aggregation complete: ${historicalEntries.length} items`,
+      `✅ Manual weekly aggregation complete: ${weeklyEntries.length} items`,
     );
   }
 }

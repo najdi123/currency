@@ -21,6 +21,10 @@ import {
   OhlcSnapshot,
   OhlcSnapshotDocument,
 } from "./schemas/ohlc-snapshot.schema";
+import {
+  OHLCPermanent,
+  OHLCPermanentDocument,
+} from "./schemas/ohlc-permanent.schema";
 import { ApiResponse } from "./interfaces/api-response.interface";
 import {
   NavasanResponse,
@@ -65,6 +69,19 @@ interface HistoryApiResponse {
   success: boolean;
   data: HistoryDataPoint[];
   code: string;
+}
+
+/**
+ * Interface for aggregated OHLC data from MongoDB aggregation pipeline
+ * Used when aggregating 1-minute data to daily data
+ */
+interface AggregatedOhlcData {
+  itemCode: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  timestamp: Date;
 }
 
 @Injectable()
@@ -121,6 +138,8 @@ export class NavasanService {
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
     @InjectModel(OhlcSnapshot.name)
     private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
+    @InjectModel(OHLCPermanent.name)
+    private ohlcPermanentModel: Model<OHLCPermanentDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
     private apiProviderFactory: ApiProviderFactory, // Inject PersianAPI provider
@@ -1566,10 +1585,10 @@ export class NavasanService {
    * for optimal performance, then filters to the target date.
    *
    * Performance: Parallel fetching provides 10-20x speedup vs sequential
-   * Data source: Internal API endpoint that reads from OHLC snapshots
+   * Data source: ohlc_permanent collection (local database)
    *
    * @param category - The data category (currencies, crypto, gold)
-   * @param targetDate - The date to fetch data for (validated against future dates and 90-day limit)
+   * @param targetDate - The date to fetch data for (validated against future dates)
    * @returns Price data for the specified date with metadata about completeness
    */
   async getHistoricalDataFromOHLC(
@@ -1579,22 +1598,10 @@ export class NavasanService {
     // Validate category
     this.validateCategory(category);
 
-    // FIX #4: CIRCUIT BREAKER - Check if circuit breaker allows requests
-    this.checkCircuitBreaker();
-
-    const formattedDate = formatTehranDate(targetDate);
+    const targetDateStr = targetDate.toISOString().split("T")[0];
     this.logger.log(
-      `📊 Fetching historical data for ${category} on ${formattedDate}`,
+      `📊 Fetching historical data for ${category} on ${targetDateStr} from ohlc_permanent`,
     );
-
-    // FIX #2: RESPONSE CACHING - Check Redis cache for historical data (immutable, can cache for 24h)
-    const cacheKey = `navasan:historical:${category}:${targetDate.toISOString().split("T")[0]}`;
-    const cached = await this.cacheService.get<ApiResponse<NavasanResponse>>(cacheKey);
-
-    if (cached) {
-      this.logger.log(`📦 Cache hit for ${cacheKey} (from Redis)`);
-      return cached;
-    }
 
     try {
       // INPUT VALIDATION: Validate date parameters
@@ -1605,248 +1612,93 @@ export class NavasanService {
         throw new BadRequestException("Target date cannot be in the future");
       }
 
-      // Calculate days difference from today
-      const daysDiff = Math.ceil(
-        (today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      // Enforce 90-day limit for historical data
-      if (daysDiff > 90) {
-        throw new BadRequestException(
-          "Historical data is only available for the last 90 days",
-        );
-      }
-
-      // Map category to item codes
+      // Get item codes (UPPERCASE to match ohlc_permanent storage)
       const itemCodes = this.getCategoryItemCodes(category);
-      const targetDateStr = targetDate.toISOString().split("T")[0];
 
-      // Cap daysToFetch at 92 (target day + 2 buffer days) as per specification
-      const daysToFetch = Math.min(Math.max(daysDiff + 2, 7), 92);
+      // Calculate day boundaries (UTC)
+      const startOfDay = new Date(targetDateStr + "T00:00:00.000Z");
+      const endOfDay = new Date(targetDateStr + "T23:59:59.999Z");
 
-      this.logger.log(
-        `🔍 Fetching ${daysToFetch} days of history for ${itemCodes.length} items in parallel (max 5 concurrent)`,
-      );
+      // Query ohlc_permanent for 1d (daily) data first
+      let records: AggregatedOhlcData[] = (
+        await this.ohlcPermanentModel
+          .find({
+            itemCode: { $in: itemCodes },
+            timeframe: "1d",
+            timestamp: { $gte: startOfDay, $lte: endOfDay },
+          })
+          .lean()
+          .exec()
+      ).map((r) => ({
+        itemCode: r.itemCode,
+        open: r.open,
+        high: r.high,
+        low: r.low,
+        close: r.close,
+        timestamp: r.timestamp,
+      }));
 
-      // FIX #1: RATE LIMITING - Wrap parallel fetching in rate limiter to prevent API overload
-      // This limits concurrent requests to 5, preventing server overload from 22+ simultaneous requests
-      const fetchPromises = itemCodes.map((itemCode) =>
-        this.requestLimit(async () => {
-          try {
-            // URL encode itemCode to handle special characters safely
-            const encodedItemCode = encodeURIComponent(itemCode);
-
-            // Build the correct endpoint URL based on category
-            let url: string;
-            if (category === "currencies") {
-              url = `${this.internalApiBaseUrl}/api/currencies/code/${encodedItemCode}/history?days=${daysToFetch}`;
-            } else if (category === "crypto") {
-              url = `${this.internalApiBaseUrl}/api/digital-currencies/symbol/${encodedItemCode}/history?days=${daysToFetch}`;
-            } else if (category === "gold") {
-              url = `${this.internalApiBaseUrl}/api/gold/code/${encodedItemCode}/history?days=${daysToFetch}`;
-            } else {
-              throw new Error(`Unknown category: ${category}`);
-            }
-
-            const response = await axios.get(url, {
-              timeout: 10000,
-            });
-
-            return { itemCode, success: true, data: response.data };
-          } catch (error) {
-            return {
-              itemCode,
-              success: false,
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-        }),
-      );
-
-      // Wait for all requests to complete
-      const results = await Promise.allSettled(fetchPromises);
-
-      // Process results
-      const priceData: Record<string, NavasanPriceItem> = {};
-      let successCount = 0;
-      let errorCount = 0;
-      const failedItems: string[] = [];
-
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          const { itemCode, success, data, error } = result.value;
-
-          if (success && data?.success && data?.data) {
-            // FIX #5: TYPE SAFETY - Use proper type instead of 'any'
-            // SORT DATA: Sort by date to ensure correct ordering for change calculation
-            const sortedData = [...(data.data as HistoryDataPoint[])].sort(
-              (a, b) => {
-                const dateA = new Date(a.date).getTime();
-                const dateB = new Date(b.date).getTime();
-                return dateA - dateB;
-              },
-            );
-
-            // Find the data point for the target date
-            const pointIndex = sortedData.findIndex(
-              (point) => point.date === targetDateStr,
-            );
-
-            if (pointIndex !== -1) {
-              const dataPoint = sortedData[pointIndex];
-
-              if (dataPoint && dataPoint.price !== undefined) {
-                // CHANGE CALCULATION: Use null instead of 0 for missing previous data
-                const previousPoint =
-                  pointIndex > 0 ? sortedData[pointIndex - 1] : null;
-                const change =
-                  previousPoint && previousPoint.price !== undefined
-                    ? dataPoint.price - previousPoint.price
-                    : null; // Use null instead of 0 when no previous data exists
-
-                // TIMESTAMP CONVERSION: Validate and convert timestamp properly
-                let timestamp = dataPoint.timestamp;
-
-                // Validate timestamp exists and is a number
-                if (timestamp === undefined || timestamp === null) {
-                  this.logger.warn(
-                    `Missing timestamp for ${itemCode} on ${targetDateStr}`,
-                  );
-                  timestamp = targetDate.getTime() / 1000; // Fallback to target date
-                } else {
-                  timestamp = Number(timestamp);
-
-                  // Detect if timestamp is in seconds vs milliseconds
-                  // Timestamps before year 2000 in milliseconds would be < 946684800000
-                  // Timestamps after year 2000 in seconds would be > 946684800
-                  if (timestamp < 10000000000) {
-                    // Likely in seconds, keep as is
-                  } else {
-                    // Likely in milliseconds, convert to seconds
-                    timestamp = timestamp / 1000;
-                  }
-
-                  // Validate timestamp is in reasonable range (between 2000 and 2100)
-                  const minTimestamp = 946684800; // Jan 1, 2000
-                  const maxTimestamp = 4102444800; // Jan 1, 2100
-
-                  if (timestamp < minTimestamp || timestamp > maxTimestamp) {
-                    this.logger.warn(
-                      `Invalid timestamp ${timestamp} for ${itemCode}, using target date`,
-                    );
-                    timestamp = targetDate.getTime() / 1000;
-                  }
-                }
-
-                const timestampMs = timestamp * 1000;
-                const dateObj = new Date(timestampMs);
-
-                priceData[itemCode] = {
-                  value: String(dataPoint.price),
-                  change: change,
-                  utc: dateObj.toISOString(),
-                  date: targetDateStr,
-                  dt: dateObj.toTimeString().split(" ")[0],
-                };
-                successCount++;
-                this.logger.debug(
-                  `✅ Got history for ${itemCode}: ${dataPoint.price}`,
-                );
-              } else {
-                errorCount++;
-                failedItems.push(itemCode);
-                this.logger.debug(
-                  `No price data for ${itemCode} on ${targetDateStr}`,
-                );
-              }
-            } else {
-              errorCount++;
-              failedItems.push(itemCode);
-              this.logger.debug(
-                `No data point found for ${itemCode} on ${targetDateStr}`,
-              );
-            }
-          } else {
-            errorCount++;
-            failedItems.push(itemCode);
-            this.logger.debug(
-              `Failed to fetch history for ${itemCode}: ${error}`,
-            );
-          }
-        } else {
-          // Promise was rejected
-          errorCount++;
-          this.logger.debug(`Promise rejected for item: ${result.reason}`);
-        }
-      }
-
-      // IMPROVED ERROR HANDLING: Log at appropriate level based on failure rate
-      const totalItems = itemCodes.length;
-      const failureRate = errorCount / totalItems;
-
-      if (failureRate > 0.5) {
-        this.logger.error(
-          `📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`,
-        );
-        // FIX #4: CIRCUIT BREAKER - Record failure for high failure rates
-        this.recordCircuitBreakerFailure();
-      } else if (failureRate > 0.1) {
-        this.logger.warn(
-          `📊 History fetch complete: ${successCount}/${totalItems} success (${Math.round(failureRate * 100)}% failure rate)`,
-        );
-      } else {
+      // If no 1d data, aggregate from 1m data
+      if (records.length === 0) {
         this.logger.log(
-          `📊 History fetch complete: ${successCount}/${totalItems} success, ${errorCount} errors`,
+          `No 1d data found for ${targetDateStr}, aggregating from 1m data...`,
         );
-        // FIX #4: CIRCUIT BREAKER - Record success for low failure rates
-        this.recordCircuitBreakerSuccess();
+        records = await this.aggregateMinuteToDaily(
+          itemCodes,
+          startOfDay,
+          endOfDay,
+        );
       }
 
-      // If we have no data at all, throw 404
-      if (Object.keys(priceData).length === 0) {
+      if (records.length === 0) {
         this.logger.warn(
-          `No history data found for ${category} on ${targetDateStr}`,
+          `No historical data found for ${category} on ${targetDateStr}`,
         );
         throw new NotFoundException(
           `No historical data available for ${targetDateStr}`,
         );
       }
 
-      // METADATA: Add completeness information and warning if needed
-      const completenessPercentage = Math.round(
-        (successCount / totalItems) * 100,
+      // Transform to response format (lowercase keys for API consistency)
+      const priceData: Record<string, NavasanPriceItem> = {};
+      for (const record of records) {
+        const key = record.itemCode.toLowerCase();
+        const changeAmount = record.close - record.open;
+        priceData[key] = {
+          value: String(record.close),
+          change: changeAmount,
+          utc: record.timestamp.toISOString(),
+          date: targetDateStr,
+          dt: record.timestamp.toTimeString().split(" ")[0],
+        };
+      }
+
+      const totalItems = itemCodes.length;
+      const successCount = records.length;
+
+      this.logger.log(
+        `📊 Historical data retrieved: ${successCount}/${totalItems} items for ${targetDateStr}`,
       );
-      const hasWarning = failureRate > 0.1;
 
       // Build response object
       const response: ApiResponse<NavasanResponse> = {
         data: priceData,
         metadata: {
-          isFresh: false, // Historical data is never "fresh"
-          isStale: false, // But it's not stale either - it's historical
-          dataAge: Math.round((Date.now() - targetDate.getTime()) / 60000), // Age in minutes
-          source: "api" as const,
+          isFresh: false,
+          isStale: false,
+          dataAge: Math.round((Date.now() - targetDate.getTime()) / 60000),
+          source: "ohlc_permanent" as const,
           lastUpdated: targetDate,
           isHistorical: true,
           historicalDate: targetDate,
           completeness: {
             successCount,
             totalCount: totalItems,
-            percentage: completenessPercentage,
-            failedItems: failedItems.length > 0 ? failedItems : undefined,
+            percentage: Math.round((successCount / totalItems) * 100),
           },
-          warning: hasWarning
-            ? `Only ${completenessPercentage}% of items retrieved successfully`
-            : undefined,
         },
       };
 
-      // FIX #2: RESPONSE CACHING - Store response in Redis for 24 hours (historical data is immutable)
-      const ttlSeconds = Math.floor(this.CACHE_DURATION / 1000); // Convert ms to seconds (24 hours)
-      await this.cacheService.set(cacheKey, response, ttlSeconds);
-      this.logger.log(`💾 Cached ${cacheKey} in Redis for 24 hours`);
-
-      // Return the response in the expected format with enhanced metadata
       return response;
     } catch (error) {
       if (
@@ -1869,61 +1721,107 @@ export class NavasanService {
   }
 
   /**
+   * Aggregate 1-minute OHLC data to daily OHLC
+   * Used as fallback when 1d data is not available
+   */
+  private async aggregateMinuteToDaily(
+    itemCodes: string[],
+    startOfDay: Date,
+    endOfDay: Date,
+  ): Promise<AggregatedOhlcData[]> {
+    const aggregation = await this.ohlcPermanentModel
+      .aggregate([
+        {
+          $match: {
+            itemCode: { $in: itemCodes },
+            timeframe: "1m",
+            timestamp: { $gte: startOfDay, $lte: endOfDay },
+          },
+        },
+        { $sort: { timestamp: 1 } },
+        {
+          $group: {
+            _id: "$itemCode",
+            open: { $first: "$open" },
+            high: { $max: "$high" },
+            low: { $min: "$low" },
+            close: { $last: "$close" },
+            timestamp: { $first: "$timestamp" },
+          },
+        },
+        {
+          $project: {
+            itemCode: "$_id",
+            open: 1,
+            high: 1,
+            low: 1,
+            close: 1,
+            timestamp: 1,
+          },
+        },
+      ])
+      .exec();
+
+    return aggregation as AggregatedOhlcData[];
+  }
+
+  /**
    * Get item codes for a category
-   * Maps category names to the item codes used in OHLC snapshots
+   * Maps category names to the item codes used in ohlc_permanent collection
+   * Returns UPPERCASE codes to match ohlc_permanent storage format
    */
   private getCategoryItemCodes(category: string): string[] {
     switch (category.toLowerCase()) {
       case "currencies":
         return [
-          "usd_sell",
-          "usd_buy",
-          "eur",
-          "gbp",
-          "cad",
-          "aud",
-          "aed",
-          "aed_sell",
-          "dirham_dubai",
-          "cny_hav",
-          "try_hav",
-          "chf",
-          "jpy_hav",
-          "rub",
-          "inr",
-          "pkr",
-          "iqd",
-          "kwd",
-          "sar",
-          "qar",
-          "omr",
-          "bhd",
+          "USD_SELL",
+          "USD_BUY",
+          "EUR",
+          "GBP",
+          "CAD",
+          "AUD",
+          "AED",
+          "AED_SELL",
+          "DIRHAM_DUBAI",
+          "CNY",
+          "TRY",
+          "CHF",
+          "JPY",
+          "RUB",
+          "INR",
+          "PKR",
+          "IQD",
+          "KWD",
+          "SAR",
+          "QAR",
+          "OMR",
+          "BHD",
         ];
 
       case "crypto":
         return [
-          "usdt",
-          "btc",
-          "eth",
-          "bnb",
-          "xrp",
-          "ada",
-          "doge",
-          "sol",
-          "matic",
-          "dot",
-          "ltc",
+          "USDT",
+          "BTC",
+          "ETH",
+          "BNB",
+          "XRP",
+          "ADA",
+          "DOGE",
+          "SOL",
+          "MATIC",
+          "DOT",
+          "LTC",
         ];
 
       case "gold":
         return [
-          "sekkeh",
-          "bahar",
-          "nim",
-          "rob",
-          "gerami",
-          "18ayar",
-          "abshodeh",
+          "SEKKEH",
+          "BAHAR",
+          "NIM",
+          "ROB",
+          "GERAMI",
+          "18AYAR",
+          "ABSHODEH",
         ];
 
       default:

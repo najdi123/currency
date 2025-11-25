@@ -4,10 +4,6 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { OhlcAggregationScheduler } from "./ohlc-aggregation.scheduler";
 import { DataRetentionScheduler } from "./data-retention.scheduler";
 import {
-  IntradayOhlc,
-  IntradayOhlcSchema,
-} from "../schemas/intraday-ohlc.schema";
-import {
   HistoricalOhlc,
   HistoricalOhlcSchema,
 } from "../schemas/historical-ohlc.schema";
@@ -19,22 +15,29 @@ import {
   OhlcSnapshot,
   OhlcSnapshotSchema,
 } from "../navasan/schemas/ohlc-snapshot.schema";
+import {
+  OHLCPermanent,
+  OHLCPermanentSchema,
+} from "../navasan/schemas/ohlc-permanent.schema";
 
 /**
  * Scheduler Module
  *
  * Manages all scheduled tasks for the application:
- * - OHLC data aggregation (daily, weekly, monthly)
+ * - OHLC data aggregation (weekly, monthly) - daily is disabled
  * - Data retention and cleanup
+ *
+ * Note: OHLCPermanent is the primary data source.
+ * Daily aggregation is disabled since ohlc_permanent already has 1d data.
  */
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     MongooseModule.forFeature([
-      { name: IntradayOhlc.name, schema: IntradayOhlcSchema },
       { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
       { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
       { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
+      { name: OHLCPermanent.name, schema: OHLCPermanentSchema },
     ]),
   ],
   providers: [OhlcAggregationScheduler, DataRetentionScheduler],

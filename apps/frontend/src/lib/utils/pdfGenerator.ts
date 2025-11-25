@@ -1,5 +1,6 @@
 import { formatToman } from './formatters'
 import type { CalculatorItem } from '@/lib/store/slices/calculatorSlice'
+import { loadCustomFonts, setFontForLocale, areFontsAvailable } from './pdfFonts'
 
 interface GeneratePDFOptions {
   items: CalculatorItem[]
@@ -22,6 +23,7 @@ interface GeneratePDFOptions {
     generatedBy: string
     tehranTime: string
   }
+  pdfLanguage?: string // Optional: specify PDF language different from current locale
 }
 
 export const generateCalculatorPDF = async ({
@@ -30,12 +32,16 @@ export const generateCalculatorPDF = async ({
   currentDate,
   locale,
   translations,
+  pdfLanguage,
 }: GeneratePDFOptions) => {
   // Dynamic import of jsPDF to reduce bundle size
   const { default: jsPDF } = await import('jspdf')
 
+  // Determine the target language for PDF (can be different from current locale)
+  const targetLocale = pdfLanguage || locale
+
   // Determine if RTL language
-  const isRTL = locale === 'fa' || locale === 'ar'
+  const isRTL = targetLocale === 'fa' || targetLocale === 'ar'
 
   // Create PDF document
   const doc = new jsPDF({
@@ -44,9 +50,17 @@ export const generateCalculatorPDF = async ({
     format: 'a4',
   })
 
-  // Add font support for Persian/Arabic
-  // Note: For production, you'd want to embed custom fonts for proper RTL rendering
-  // For now, we'll use built-in fonts and handle RTL text reversal manually
+  // Try to load custom fonts for Persian/Arabic
+  if (isRTL) {
+    await loadCustomFonts(doc)
+    setFontForLocale(doc, targetLocale)
+
+    if (!areFontsAvailable(targetLocale)) {
+      const langName = targetLocale === 'fa' ? 'Persian' : 'Arabic'
+      console.warn(`⚠️  Custom ${langName} font not available. Text may not display correctly.`)
+      console.warn('📖 To fix: Follow instructions in apps/frontend/src/lib/utils/fonts/README.md')
+    }
+  }
 
   // Set document properties
   doc.setProperties({
@@ -62,42 +76,32 @@ export const generateCalculatorPDF = async ({
   const secondaryTextColor = '#666666'
   const borderColor = '#E5E5E5'
 
-  // Page margins
+  // Page layout constants
   const marginLeft = 20
   const marginRight = 20
   const marginTop = 20
   const pageWidth = 210
+  const pageBreakThreshold = 270
+
+  // Table column layout (LTR)
+  const TABLE_COLS_LTR = {
+    item: { x: marginLeft + 2, width: 75 },
+    qty: { x: marginLeft + 80, width: 18 },
+    unitPrice: { x: marginLeft + 100, width: 40 },
+    total: { x: pageWidth - marginRight - 2, align: 'right' as const },
+  }
+
+  // Table column layout (RTL) - measured from right edge
+  const TABLE_COLS_RTL = {
+    total: { x: pageWidth - marginLeft - 2, width: 35 },
+    unitPrice: { x: pageWidth - marginLeft - 40, width: 45 },
+    qty: { x: pageWidth - marginLeft - 90, width: 18 },
+    item: { x: pageWidth - marginLeft - 110, width: 75 },
+  }
+
   let currentY = marginTop
 
-  // Helper function to reverse text for RTL (simple approach)
-  const processText = (text: string): string => {
-    if (!isRTL) return text
-    // For RTL, we reverse the string
-    // Note: This is a basic approach. For production, use a proper RTL library or embedded fonts
-    return text.split('').reverse().join('')
-  }
-
-  // Helper function to get x position for RTL
-  const getX = (x: number, align?: 'left' | 'center' | 'right'): number => {
-    if (!isRTL) return x
-
-    // For RTL, flip horizontal positions
-    if (align === 'center') return x
-    if (align === 'right') return marginLeft + (x - marginLeft)
-    // Default left becomes right in RTL
-    return pageWidth - x
-  }
-
-  // Helper function to get alignment for RTL
-  const getAlign = (align?: 'left' | 'center' | 'right'): 'left' | 'center' | 'right' => {
-    if (!isRTL || align === 'center') return align || 'left'
-    // Flip left/right for RTL
-    if (align === 'left') return 'right'
-    if (align === 'right') return 'left'
-    return 'right' // default left becomes right in RTL
-  }
-
-  // Helper function to add text
+  // Helper function to add text with proper RTL support
   const addText = (
     text: string,
     x: number,
@@ -105,22 +109,45 @@ export const generateCalculatorPDF = async ({
     options?: { fontSize?: number; fontStyle?: string; color?: string; align?: 'left' | 'center' | 'right' }
   ) => {
     if (options?.fontSize) doc.setFontSize(options.fontSize)
-    if (options?.fontStyle) doc.setFont('helvetica', options.fontStyle)
+
+    // Set font with locale support
+    if (options?.fontStyle) {
+      if (isRTL && areFontsAvailable(targetLocale)) {
+        setFontForLocale(doc, targetLocale)
+        // Custom fonts might not have bold/italic variants
+        doc.setFont(doc.getFont().fontName, options.fontStyle === 'bold' ? 'normal' : options.fontStyle)
+      } else {
+        doc.setFont('helvetica', options.fontStyle)
+      }
+    } else if (isRTL) {
+      setFontForLocale(doc, targetLocale)
+    }
+
     if (options?.color) doc.setTextColor(options.color)
 
-    const processedText = processText(text)
-    const actualX = getX(x, options?.align)
-    const actualAlign = getAlign(options?.align)
+    // For RTL languages, jsPDF handles BiDi algorithm automatically
+    const actualAlign = options?.align || (isRTL ? 'right' : 'left')
 
-    doc.text(processedText, actualX, y, { align: actualAlign })
+    doc.text(text, x, y, {
+      align: actualAlign,
+      renderingMode: 'fill',
+      baseline: 'alphabetic',
+      // jsPDF 3.0+ has built-in RTL support through BiDi algorithm
+      isInputVisual: false, // Text is in logical order
+    })
 
     // Reset defaults
     doc.setTextColor(textColor)
-    doc.setFont('helvetica', 'normal')
+    if (isRTL) {
+      setFontForLocale(doc, targetLocale)
+    } else {
+      doc.setFont('helvetica', 'normal')
+    }
   }
 
   // Title
-  addText(translations.title, isRTL ? pageWidth - marginLeft : marginLeft, currentY, {
+  const titleX = isRTL ? pageWidth - marginLeft : marginLeft
+  addText(translations.title, titleX, currentY, {
     fontSize: 24,
     fontStyle: 'bold',
     color: primaryColor,
@@ -130,31 +157,32 @@ export const generateCalculatorPDF = async ({
 
   // Date and Time
   const dateStr = currentDate
-    ? new Date(currentDate).toLocaleDateString(locale, {
+    ? new Date(currentDate).toLocaleDateString(targetLocale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       })
-    : new Date().toLocaleDateString(locale, {
+    : new Date().toLocaleDateString(targetLocale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       })
 
-  const timeStr = new Date().toLocaleTimeString(locale, {
+  const timeStr = new Date().toLocaleTimeString(targetLocale, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Tehran',
   })
 
-  addText(`${translations.date}: ${dateStr}`, isRTL ? pageWidth - marginLeft : marginLeft, currentY, {
+  const dateX = isRTL ? pageWidth - marginLeft : marginLeft
+  addText(`${translations.date}: ${dateStr}`, dateX, currentY, {
     fontSize: 12,
     color: secondaryTextColor,
     align: isRTL ? 'right' : 'left',
   })
   currentY += 7
 
-  addText(`${translations.time}: ${timeStr} ${translations.tehranTime}`, isRTL ? pageWidth - marginLeft : marginLeft, currentY, {
+  addText(`${translations.time}: ${timeStr} ${translations.tehranTime}`, dateX, currentY, {
     fontSize: 12,
     color: secondaryTextColor,
     align: isRTL ? 'right' : 'left',
@@ -168,7 +196,7 @@ export const generateCalculatorPDF = async ({
   currentY += 10
 
   // Items header
-  addText(translations.items, isRTL ? pageWidth - marginLeft : marginLeft, currentY, {
+  addText(translations.items, dateX, currentY, {
     fontSize: 16,
     fontStyle: 'bold',
     align: isRTL ? 'right' : 'left',
@@ -181,23 +209,23 @@ export const generateCalculatorPDF = async ({
 
   if (isRTL) {
     // RTL table headers (right to left)
-    addText(translations.total, pageWidth - marginLeft - 2, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
-    addText(translations.unitPrice, pageWidth - marginLeft - 40, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
-    addText(translations.qty, pageWidth - marginLeft - 90, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
-    addText(translations.item, pageWidth - marginLeft - 110, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
+    addText(translations.total, TABLE_COLS_RTL.total.x, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
+    addText(translations.unitPrice, TABLE_COLS_RTL.unitPrice.x, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
+    addText(translations.qty, TABLE_COLS_RTL.qty.x, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
+    addText(translations.item, TABLE_COLS_RTL.item.x, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
   } else {
     // LTR table headers (left to right)
-    addText(translations.item, marginLeft + 2, currentY, { fontSize: 10, fontStyle: 'bold' })
-    addText(translations.qty, marginLeft + 80, currentY, { fontSize: 10, fontStyle: 'bold' })
-    addText(translations.unitPrice, marginLeft + 100, currentY, { fontSize: 10, fontStyle: 'bold' })
-    addText(translations.total, pageWidth - marginRight - 2, currentY, { fontSize: 10, fontStyle: 'bold', align: 'right' })
+    addText(translations.item, TABLE_COLS_LTR.item.x, currentY, { fontSize: 10, fontStyle: 'bold' })
+    addText(translations.qty, TABLE_COLS_LTR.qty.x, currentY, { fontSize: 10, fontStyle: 'bold' })
+    addText(translations.unitPrice, TABLE_COLS_LTR.unitPrice.x, currentY, { fontSize: 10, fontStyle: 'bold' })
+    addText(translations.total, TABLE_COLS_LTR.total.x, currentY, { fontSize: 10, fontStyle: 'bold', align: TABLE_COLS_LTR.total.align })
   }
   currentY += 10
 
   // Items
   items.forEach((item, index) => {
     // Check if we need a new page
-    if (currentY > 270) {
+    if (currentY > pageBreakThreshold) {
       doc.addPage()
       currentY = marginTop
     }
@@ -209,16 +237,16 @@ export const generateCalculatorPDF = async ({
 
     if (isRTL) {
       // RTL item row (right to left)
-      addText(totalText, pageWidth - marginLeft - 2, currentY, { fontSize: 10, align: 'right' })
-      addText(unitPriceText, pageWidth - marginLeft - 40, currentY, { fontSize: 10, align: 'right' })
-      addText(qtyText, pageWidth - marginLeft - 90, currentY, { fontSize: 10, align: 'right' })
-      addText(itemName, pageWidth - marginLeft - 110, currentY, { fontSize: 10, align: 'right' })
+      addText(totalText, TABLE_COLS_RTL.total.x, currentY, { fontSize: 10, align: 'right' })
+      addText(unitPriceText, TABLE_COLS_RTL.unitPrice.x, currentY, { fontSize: 10, align: 'right' })
+      addText(qtyText, TABLE_COLS_RTL.qty.x, currentY, { fontSize: 10, align: 'right' })
+      addText(itemName, TABLE_COLS_RTL.item.x, currentY, { fontSize: 10, align: 'right' })
     } else {
       // LTR item row (left to right)
-      addText(itemName, marginLeft + 2, currentY, { fontSize: 10 })
-      addText(qtyText, marginLeft + 80, currentY, { fontSize: 10 })
-      addText(unitPriceText, marginLeft + 100, currentY, { fontSize: 10 })
-      addText(totalText, pageWidth - marginRight - 2, currentY, { fontSize: 10, align: 'right' })
+      addText(itemName, TABLE_COLS_LTR.item.x, currentY, { fontSize: 10 })
+      addText(qtyText, TABLE_COLS_LTR.qty.x, currentY, { fontSize: 10 })
+      addText(unitPriceText, TABLE_COLS_LTR.unitPrice.x, currentY, { fontSize: 10 })
+      addText(totalText, TABLE_COLS_LTR.total.x, currentY, { fontSize: 10, align: TABLE_COLS_LTR.total.align })
     }
 
     currentY += 8
@@ -283,7 +311,8 @@ export const generateCalculatorPDF = async ({
 
   // Generate filename
   const timestamp = new Date().toISOString().split('T')[0]
-  const filename = `calculator-${timestamp}.pdf`
+  const langSuffix = targetLocale !== locale ? `-${targetLocale}` : ''
+  const filename = `calculator-${timestamp}${langSuffix}.pdf`
 
   // Save PDF
   doc.save(filename)

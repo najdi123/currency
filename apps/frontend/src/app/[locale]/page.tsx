@@ -32,6 +32,7 @@ import {
 } from '@/lib/store/slices/calculatorSlice'
 import type { CalculatorItem } from '@/lib/store/slices/calculatorSlice'
 import { generateCalculatorPDF } from '@/lib/utils/pdfGenerator'
+import { loadPDFTranslations } from '@/lib/utils/pdfTranslations'
 import { mapItemCodeToApi } from '@/lib/utils/chartUtils'
 import {
   currencyItems,
@@ -78,8 +79,10 @@ export default function Home() {
   const calculatorItems = useAppSelector(selectCalculatorItems)
   const calculatorDate = useAppSelector(selectCalculatorDate)
 
-  // Local state for details modal
+  // Local state for details modal and PDF generation
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   // Initialize historical navigation using browser's Tehran timezone calculation
   // This is independent of backend's system clock
@@ -145,35 +148,48 @@ export default function Home() {
     setDetailsModalOpen(true)
   }, [])
 
-  const handleSaveAsPDF = useCallback(async () => {
+  const handleSaveAsPDF = useCallback(async (pdfLanguage?: string) => {
+    // Clear previous error
+    setPdfError(null)
+
+    // Set loading state
+    setIsGeneratingPDF(true)
+
     try {
+      // Determine target language for PDF (can be different from current UI language)
+      const targetLang = pdfLanguage || locale
+
+      // Load translations dynamically for the target language
+      const translations = await loadPDFTranslations(targetLang)
+
       await generateCalculatorPDF({
         items: calculatorItems,
         totalValue: calculatorTotal,
         currentDate: calculatorDate,
         locale,
-        translations: {
-          title: tPDF('title'),
-          date: tPDF('date'),
-          time: tPDF('time'),
-          items: tPDF('items'),
-          item: tPDF('item'),
-          qty: tPDF('qty'),
-          unitPrice: tPDF('unitPrice'),
-          total: tPDF('total'),
-          grandTotal: tPDF('grandTotal'),
-          toman: tCalc('toman'),
-          grams: tCalc('grams'),
-          piece: tCalc('piece'),
-          generatedBy: tPDF('generatedBy'),
-          tehranTime: tPDF('tehranTime'),
-        },
+        pdfLanguage: targetLang,
+        translations,
       })
+
+      // Success - PDF downloaded
+      console.log('✅ PDF generated successfully')
     } catch (error) {
       console.error('Error generating PDF:', error)
-      // TODO: Show error notification
+
+      // Set user-friendly error message
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Failed to generate PDF. Please try again.'
+
+      setPdfError(errorMessage)
+
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setPdfError(null), 5000)
+    } finally {
+      // Clear loading state
+      setIsGeneratingPDF(false)
     }
-  }, [calculatorItems, calculatorTotal, calculatorDate, locale, tPDF, tCalc])
+  }, [calculatorItems, calculatorTotal, calculatorDate, locale])
 
   const handleRemoveItem = useCallback((id: string) => {
     dispatch(removeItem(id))
@@ -476,6 +492,29 @@ export default function Home() {
 
         </div>
 
+        {/* PDF Error Notification */}
+        {pdfError && (
+          <div
+            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 animate-slide-up"
+            role="alert"
+            aria-live="assertive"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{pdfError}</span>
+            <button
+              onClick={() => setPdfError(null)}
+              className="ml-2 hover:opacity-75"
+              aria-label="Close error"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Calculator Bottom Navigation - Only shown in calculator mode */}
         {isCalculatorMode && (
           <CalculatorBottomNav
@@ -483,6 +522,7 @@ export default function Home() {
             itemCount={calculatorItems.length}
             onSeeDetails={handleSeeDetails}
             onSaveAsPDF={handleSaveAsPDF}
+            isGeneratingPDF={isGeneratingPDF}
           />
         )}
 
