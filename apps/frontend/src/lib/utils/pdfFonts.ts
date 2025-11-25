@@ -36,11 +36,23 @@ export async function loadCustomFonts(doc: jsPDF): Promise<{ persian: boolean; a
     if (persianResponse && persianResponse.ok && !loadedFonts.vazirmatn) {
       try {
         const fontScript = await persianResponse.text()
-        // Font scripts from jsPDF converter are safe - they only register fonts
-        const loadFont = new Function(fontScript)
-        loadFont()
-        loadedFonts.vazirmatn = true
-        console.log('✅ Persian font (Vazirmatn) loaded successfully')
+
+        // Extract base64 font data from the font file
+        // Format: var font = 'base64data...'
+        const match = fontScript.match(/var\s+font\s*=\s*['"]([^'"]+)['"]/)
+
+        if (match && match[1]) {
+          const base64Font = match[1]
+
+          // Use jsPDF's addFileToVFS method to properly load the font
+          doc.addFileToVFS('Vazirmatn-normal.ttf', base64Font)
+          doc.addFont('Vazirmatn-normal.ttf', 'Vazirmatn', 'normal')
+
+          loadedFonts.vazirmatn = true
+          console.log('✅ Persian font (Vazirmatn) loaded successfully')
+        } else {
+          console.error('Failed to extract base64 data from Persian font file')
+        }
       } catch (error) {
         console.error('Failed to load Persian font:', error)
       }
@@ -50,10 +62,22 @@ export async function loadCustomFonts(doc: jsPDF): Promise<{ persian: boolean; a
     if (arabicResponse && arabicResponse.ok && !loadedFonts.amiri) {
       try {
         const fontScript = await arabicResponse.text()
-        const loadFont = new Function(fontScript)
-        loadFont()
-        loadedFonts.amiri = true
-        console.log('✅ Arabic font (Amiri) loaded successfully')
+
+        // Extract base64 font data from the font file
+        const match = fontScript.match(/var\s+font\s*=\s*['"]([^'"]+)['"]/)
+
+        if (match && match[1]) {
+          const base64Font = match[1]
+
+          // Use jsPDF's addFileToVFS method to properly load the font
+          doc.addFileToVFS('Amiri-normal.ttf', base64Font)
+          doc.addFont('Amiri-normal.ttf', 'Amiri', 'normal')
+
+          loadedFonts.amiri = true
+          console.log('✅ Arabic font (Amiri) loaded successfully')
+        } else {
+          console.error('Failed to extract base64 data from Arabic font file')
+        }
       } catch (error) {
         console.error('Failed to load Arabic font:', error)
       }

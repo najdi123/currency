@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 
 /**
  * Metrics Service
@@ -6,6 +6,11 @@ import { Injectable, Logger } from "@nestjs/common";
  * Tracks operational metrics for monitoring and alerting.
  * Focuses on database operation failures and snapshot save errors.
  * Provides threshold-based alerts for consecutive failures.
+ *
+ * Memory Management:
+ * - Rate limit Maps have size limits (MAX_RATE_LIMIT_ENTRIES)
+ * - Periodic cleanup runs every hour to clear old entries
+ * - Maps are pruned when they exceed size limits
  */
 
 export interface SnapshotFailureMetric {
@@ -27,16 +32,62 @@ export interface DbOperationFailureMetric {
 }
 
 @Injectable()
-export class MetricsService {
+export class MetricsService implements OnModuleDestroy {
   private readonly logger = new Logger(MetricsService.name);
 
   // Alert thresholds
   private readonly CONSECUTIVE_FAILURE_ALERT_THRESHOLD = 3;
   private readonly CRITICAL_FAILURE_ALERT_THRESHOLD = 10;
 
+  // Memory management limits
+  private readonly MAX_RATE_LIMIT_ENTRIES = 1000; // Max unique identifiers to track
+  private readonly CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  private cleanupInterval: NodeJS.Timeout;
+
   // In-memory tracking of failures (in production, use Redis or similar)
   private snapshotFailures = new Map<string, SnapshotFailureMetric>();
   private dbOperationFailures = new Map<string, DbOperationFailureMetric>();
+
+  constructor() {
+    // Start periodic cleanup to prevent memory leaks
+    this.cleanupInterval = setInterval(() => {
+      this.pruneRateLimitMaps();
+    }, this.CLEANUP_INTERVAL_MS);
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+  }
+
+  /**
+   * Prune rate limit maps to prevent unbounded memory growth
+   * Called periodically and when maps exceed size limits
+   */
+  private pruneRateLimitMaps(): void {
+    const consumedSize = this.rateLimitQuotaConsumed.size;
+    const exhaustedSize = this.rateLimitQuotaExhausted.size;
+
+    if (consumedSize > this.MAX_RATE_LIMIT_ENTRIES) {
+      // Keep only the top N entries by count
+      const sorted = Array.from(this.rateLimitQuotaConsumed.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, Math.floor(this.MAX_RATE_LIMIT_ENTRIES * 0.8));
+      this.rateLimitQuotaConsumed.clear();
+      sorted.forEach(([key, value]) => this.rateLimitQuotaConsumed.set(key, value));
+      this.logger.log(`Pruned rateLimitQuotaConsumed from ${consumedSize} to ${this.rateLimitQuotaConsumed.size} entries`);
+    }
+
+    if (exhaustedSize > this.MAX_RATE_LIMIT_ENTRIES) {
+      const sorted = Array.from(this.rateLimitQuotaExhausted.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, Math.floor(this.MAX_RATE_LIMIT_ENTRIES * 0.8));
+      this.rateLimitQuotaExhausted.clear();
+      sorted.forEach(([key, value]) => this.rateLimitQuotaExhausted.set(key, value));
+      this.logger.log(`Pruned rateLimitQuotaExhausted from ${exhaustedSize} to ${this.rateLimitQuotaExhausted.size} entries`);
+    }
+  }
 
   /**
    * Track a snapshot save failure
@@ -325,15 +376,23 @@ export class MetricsService {
 
   /**
    * Track quota consumption
+   * Uses simpler key structure to reduce memory usage
    */
   trackRateLimitQuotaConsumed(
     identifier: string,
     endpoint?: string,
-    itemType?: string,
+    _itemType?: string,
   ): void {
-    const key = `${identifier}:${endpoint || "unknown"}:${itemType || "unknown"}`;
+    // Use simpler key: just identifier (IP) to reduce memory footprint
+    // Endpoint is only used for logging, not for unique key generation
+    const key = identifier;
     const current = this.rateLimitQuotaConsumed.get(key) || 0;
     this.rateLimitQuotaConsumed.set(key, current + 1);
+
+    // Trigger pruning if map gets too large
+    if (this.rateLimitQuotaConsumed.size > this.MAX_RATE_LIMIT_ENTRIES) {
+      this.pruneRateLimitMaps();
+    }
 
     this.logger.debug(`Rate limit quota consumed: ${identifier} (${endpoint})`);
   }
@@ -376,17 +435,10 @@ export class MetricsService {
     totalErrors: number;
     topConsumers: Array<{ identifier: string; count: number }>;
     topExhausted: Array<{ identifier: string; count: number }>;
+    mapSizes: { consumed: number; exhausted: number };
   } {
-    // Aggregate by identifier (remove endpoint/itemType breakdown)
-    const consumedByIdentifier = new Map<string, number>();
-    for (const [key, count] of this.rateLimitQuotaConsumed.entries()) {
-      const identifier = key.split(":")[0];
-      const current = consumedByIdentifier.get(identifier) || 0;
-      consumedByIdentifier.set(identifier, current + count);
-    }
-
-    // Get top consumers
-    const topConsumers = Array.from(consumedByIdentifier.entries())
+    // Get top consumers (keys are now just identifiers)
+    const topConsumers = Array.from(this.rateLimitQuotaConsumed.entries())
       .map(([identifier, count]) => ({ identifier, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
@@ -397,7 +449,7 @@ export class MetricsService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const totalQuotaConsumed = Array.from(consumedByIdentifier.values()).reduce(
+    const totalQuotaConsumed = Array.from(this.rateLimitQuotaConsumed.values()).reduce(
       (sum, count) => sum + count,
       0,
     );
@@ -411,6 +463,10 @@ export class MetricsService {
       totalErrors: this.rateLimitErrors,
       topConsumers,
       topExhausted,
+      mapSizes: {
+        consumed: this.rateLimitQuotaConsumed.size,
+        exhausted: this.rateLimitQuotaExhausted.size,
+      },
     };
   }
 

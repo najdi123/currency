@@ -7,8 +7,12 @@ export class CacheService implements OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
   private redis: Redis | null = null;
   private readonly useRedis: boolean;
-  private memoryCache = new Map<string, { value: string; expiry: number }>();
+  private memoryCache = new Map<string, { value: string; expiry: number; lastAccess: number }>();
   private cleanupInterval: NodeJS.Timeout;
+
+  // Memory cache size limit to prevent unbounded growth when Redis is unavailable
+  private readonly MAX_MEMORY_CACHE_ENTRIES = 5000;
+  private readonly MEMORY_CACHE_PRUNE_SIZE = 4000; // Prune to this size when limit exceeded
 
   // Metrics tracking
   private metrics = {
@@ -17,6 +21,7 @@ export class CacheService implements OnModuleDestroy {
     sets: 0,
     deletes: 0,
     errors: 0,
+    evictions: 0, // Track LRU evictions
     hitsByNamespace: new Map<string, number>(),
     missesByNamespace: new Map<string, number>(),
   };
@@ -86,20 +91,48 @@ export class CacheService implements OnModuleDestroy {
           await this.redis.set(key, serialized);
         }
       } else {
+        // Enforce size limit before adding new entry
+        if (this.memoryCache.size >= this.MAX_MEMORY_CACHE_ENTRIES) {
+          this.evictLRUEntries();
+        }
+        const now = Date.now();
         const expiry = ttlSeconds
-          ? Date.now() + ttlSeconds * 1000
+          ? now + ttlSeconds * 1000
           : Number.MAX_SAFE_INTEGER;
-        this.memoryCache.set(key, { value: serialized, expiry });
+        this.memoryCache.set(key, { value: serialized, expiry, lastAccess: now });
       }
       this.metrics.sets++;
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Failed to set cache key "${key}": ${err.message}`);
       this.metrics.errors++;
+      // Enforce size limit for fallback too
+      if (this.memoryCache.size >= this.MAX_MEMORY_CACHE_ENTRIES) {
+        this.evictLRUEntries();
+      }
+      const now = Date.now();
       const expiry = ttlSeconds
-        ? Date.now() + ttlSeconds * 1000
+        ? now + ttlSeconds * 1000
         : Number.MAX_SAFE_INTEGER;
-      this.memoryCache.set(key, { value: JSON.stringify(value), expiry });
+      this.memoryCache.set(key, { value: JSON.stringify(value), expiry, lastAccess: now });
+    }
+  }
+
+  /**
+   * Evict least recently used entries when cache is full
+   * Uses LRU strategy - removes entries with oldest lastAccess time
+   */
+  private evictLRUEntries(): void {
+    const entries = Array.from(this.memoryCache.entries())
+      .sort((a, b) => a[1].lastAccess - b[1].lastAccess);
+
+    const toRemove = entries.length - this.MEMORY_CACHE_PRUNE_SIZE;
+    if (toRemove > 0) {
+      for (let i = 0; i < toRemove; i++) {
+        this.memoryCache.delete(entries[i][0]);
+        this.metrics.evictions++;
+      }
+      this.logger.log(`Evicted ${toRemove} LRU cache entries (size: ${this.memoryCache.size})`);
     }
   }
 
@@ -111,12 +144,15 @@ export class CacheService implements OnModuleDestroy {
       } else {
         const cached = this.memoryCache.get(key);
         if (cached) {
-          if (cached.expiry < Date.now()) {
+          const now = Date.now();
+          if (cached.expiry < now) {
             this.memoryCache.delete(key);
             this.metrics.misses++;
             this.trackNamespaceMetric(key, "miss");
             return null;
           }
+          // Update lastAccess for LRU tracking
+          cached.lastAccess = now;
           serialized = cached.value;
         }
       }
@@ -189,6 +225,8 @@ export class CacheService implements OnModuleDestroy {
     type: "redis" | "memory";
     keys: number;
     memoryUsage?: string;
+    evictions?: number;
+    maxEntries?: number;
   }> {
     try {
       if (this.redis) {
@@ -205,12 +243,16 @@ export class CacheService implements OnModuleDestroy {
         return {
           type: "memory",
           keys: this.memoryCache.size,
+          evictions: this.metrics.evictions,
+          maxEntries: this.MAX_MEMORY_CACHE_ENTRIES,
         };
       }
     } catch (error) {
       return {
         type: "memory",
         keys: this.memoryCache.size,
+        evictions: this.metrics.evictions,
+        maxEntries: this.MAX_MEMORY_CACHE_ENTRIES,
       };
     }
   }
@@ -315,6 +357,7 @@ export class CacheService implements OnModuleDestroy {
     this.metrics.sets = 0;
     this.metrics.deletes = 0;
     this.metrics.errors = 0;
+    this.metrics.evictions = 0;
     this.metrics.hitsByNamespace.clear();
     this.metrics.missesByNamespace.clear();
     this.logger.log("Cache metrics reset");

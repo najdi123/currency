@@ -1,11 +1,11 @@
 import React from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { FiArrowUp, FiArrowDown } from 'react-icons/fi'
-import { formatChangeParts } from '@/lib/utils/formatters'
+import { toPersianDigits } from '@/lib/utils/formatters'
 
 interface ItemCardBadgeProps {
   /**
-   * Change amount (can be positive or negative)
+   * Change percentage as decimal (e.g., 0.035 for 3.5%, -0.012 for -1.2%)
    */
   change: number
 
@@ -26,9 +26,12 @@ interface ItemCardBadgeProps {
  * Features:
  * - Color-coded based on positive (green) or negative (red) change
  * - Includes directional arrow icon (up/down)
- * - Formatted change text with sign and suffix
+ * - Displays percentage with sign (e.g., +3.5%, -1.2%)
  * - Responsive sizing for compact mode
  * - Persian/Farsi digits when locale is 'fa'
+ *
+ * Note: The `change` prop is expected to be a decimal percentage from the API
+ * (e.g., 0.035 for 3.5%). This is converted to display format (3.5%).
  *
  * Accessibility:
  * - ARIA label describes the change direction in Persian
@@ -42,34 +45,51 @@ export const ItemCardBadge: React.FC<ItemCardBadgeProps> = ({
 }) => {
   const locale = useLocale()
   const t = useTranslations('ItemCard')
-  const { label, signedNumber } = formatChangeParts(change, locale, {
-    toman: t('toman'),
-    thousandToman: t('thousandToman'),
-    millionToman: t('millionToman'),
-    billionToman: t('billionToman')
-  })
+
+  // Format percentage: convert decimal to percentage display
+  // e.g., 0.035 -> "+3.5%", -0.012 -> "-1.2%"
+  const formatPercent = () => {
+    const sign = change >= 0 ? '+' : ''
+    // Convert decimal to percentage (0.035 -> 3.5)
+    const percentValue = Math.abs(change * 100)
+    // Format with appropriate precision
+    const formatted = percentValue < 0.01
+      ? '0'
+      : percentValue < 1
+        ? percentValue.toFixed(2)
+        : percentValue < 10
+          ? percentValue.toFixed(1)
+          : percentValue.toFixed(0)
+    const displayValue = locale === 'fa' ? toPersianDigits(formatted) : formatted
+    return `${sign}${change < 0 ? '-' : ''}${displayValue}%`
+  }
+
+  const isZero = change === 0
 
   return (
     <div
       className={
-        isPositive
+        isZero
           ? compact
-            ? 'badge-pill-success badge-pill-success-compact'
-            : 'badge-pill-success'
-          : compact
-          ? 'badge-pill-error badge-pill-error-compact'
-          : 'badge-pill-error'
+            ? 'badge-pill-neutral badge-pill-neutral-compact'
+            : 'badge-pill-neutral'
+          : isPositive
+            ? compact
+              ? 'badge-pill-success badge-pill-success-compact'
+              : 'badge-pill-success'
+            : compact
+              ? 'badge-pill-error badge-pill-error-compact'
+              : 'badge-pill-error'
       }
       dir="ltr"
       aria-label={isPositive ? t('priceIncrease') : t('priceDecrease')}
     >
-      <span>{label}</span>
-      <span>{signedNumber}</span>
-      {isPositive ? (
-        <FiArrowUp className="text-xs sm:text-sm mb-1" aria-hidden="true" />
+      <span>{formatPercent()}</span>
+      {!isZero && (isPositive ? (
+        <FiArrowUp className="text-xs sm:text-sm" aria-hidden="true" />
       ) : (
-        <FiArrowDown className="text-xs sm:text-sm mb-1" aria-hidden="true" />
-      )}
+        <FiArrowDown className="text-xs sm:text-sm" aria-hidden="true" />
+      ))}
     </div>
   )
 }
