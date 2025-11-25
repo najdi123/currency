@@ -55,6 +55,94 @@ export class OhlcAggregationScheduler {
   }
 
   /**
+   * Daily data health check
+   * Runs daily at 06:00 Tehran time to check for data gaps
+   * Logs warnings if expected data is missing
+   */
+  @Cron("0 6 * * *", { timeZone: "Asia/Tehran" })
+  async checkDataHealth(): Promise<void> {
+    const startTime = Date.now();
+    this.logger.log("🏥 Starting daily data health check...");
+
+    try {
+      const yesterday = moment()
+        .tz(this.timezone)
+        .subtract(1, "day")
+        .startOf("day");
+
+      const today = moment().tz(this.timezone).startOf("day");
+
+      // Check ohlc_permanent for yesterday's 1d data
+      const yesterdayData = await this.ohlcPermanentModel
+        .find({
+          timeframe: "1d",
+          timestamp: {
+            $gte: yesterday.toDate(),
+            $lt: today.toDate(),
+          },
+        })
+        .lean();
+
+      // Expected items to have data
+      const expectedItems = [
+        "USD_SELL",
+        "EUR",
+        "GBP",
+        "BTC",
+        "ETH",
+        "USDT",
+        "SEKKEH",
+      ];
+
+      const foundItems = new Set(yesterdayData.map((d) => d.itemCode));
+      const missingItems = expectedItems.filter(
+        (item) => !foundItems.has(item),
+      );
+
+      if (missingItems.length > 0) {
+        this.logger.warn(
+          `⚠️ DATA GAP DETECTED: Missing 1d data for ${missingItems.length} items: ${missingItems.join(", ")}`,
+        );
+        this.logger.warn(
+          `📅 Date: ${yesterday.format("YYYY-MM-DD")} | Found: ${foundItems.size} | Expected: ${expectedItems.length}`,
+        );
+      } else {
+        this.logger.log(
+          `✅ Data health check passed: ${foundItems.size} items with 1d data for ${yesterday.format("YYYY-MM-DD")}`,
+        );
+      }
+
+      // Check for any item with no data in the last 24 hours
+      const last24h = moment().tz(this.timezone).subtract(24, "hours");
+      const recentData = await this.ohlcPermanentModel
+        .find({
+          timeframe: "1m",
+          timestamp: { $gte: last24h.toDate() },
+        })
+        .distinct("itemCode");
+
+      if (recentData.length === 0) {
+        this.logger.error(
+          "❌ CRITICAL: No 1m data recorded in the last 24 hours!",
+        );
+      } else {
+        this.logger.log(
+          `📊 Recent data: ${recentData.length} items with 1m data in last 24h`,
+        );
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.log(`🏥 Health check completed in ${duration}ms`);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `❌ Health check failed: ${err.message}`,
+        err.stack,
+      );
+    }
+  }
+
+  /**
    * Aggregate last week's daily OHLC to weekly historical OHLC
    * Runs every Sunday at 00:10 Tehran time
    *

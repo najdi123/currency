@@ -2,7 +2,9 @@
 
 ## Overview
 
-This directory contains the new simplified database schema architecture with 4 clean collections designed for optimal performance and automatic data retention.
+This directory contains the new simplified database schema architecture with 3 clean collections designed for optimal performance and automatic data retention.
+
+Note: IntradayOhlc has been removed - all OHLC data now uses OHLCPermanent from navasan/schemas as the single source of truth.
 
 ## Schema Files
 
@@ -84,55 +86,7 @@ export class PriceService {
 
 ---
 
-### 3. `intraday-ohlc.schema.ts`
-Today's OHLC data with automatic 48-hour TTL cleanup.
-
-**Purpose**: Track today's open, high, low, close prices.
-
-**Usage Example**:
-```typescript
-import { IntradayOhlc, IntradayOhlcDocument } from '@/schemas';
-import * as moment from 'moment-timezone';
-
-@Injectable()
-export class IntradayService {
-  constructor(
-    @InjectModel(IntradayOhlc.name)
-    private intradayOhlcModel: Model<IntradayOhlcDocument>,
-  ) {}
-
-  async updateTodayOhlc(itemCode: string, price: number) {
-    const today = moment().tz('Asia/Tehran').startOf('day').toDate();
-    const expiresAt = moment(today).add(48, 'hours').toDate();
-
-    return this.intradayOhlcModel.updateOne(
-      { itemCode, date: today },
-      {
-        $setOnInsert: {
-          itemCode,
-          date: today,
-          open: price,
-          expiresAt,
-        },
-        $max: { high: price },
-        $min: { low: price },
-        $set: { close: price, lastUpdate: new Date() },
-        $inc: { updateCount: 1 },
-      },
-      { upsert: true }
-    );
-  }
-
-  async getTodayOhlc(itemCode: string) {
-    const today = moment().tz('Asia/Tehran').startOf('day').toDate();
-    return this.intradayOhlcModel.findOne({ itemCode, date: today });
-  }
-}
-```
-
----
-
-### 4. `historical-ohlc.schema.ts`
+### 3. `historical-ohlc.schema.ts`
 Long-term tiered storage (hourly, daily, weekly, monthly).
 
 **Purpose**: Store historical OHLC data with different timeframes.
@@ -185,7 +139,7 @@ export class HistoricalService {
 
 ---
 
-### 5. `schemas.module.ts`
+### 4. `schemas.module.ts`
 NestJS module for schema registration.
 
 **Purpose**: Centralized module for all schemas.
@@ -207,7 +161,7 @@ export class MyFeatureModule {}
 
 ---
 
-### 6. `index.ts`
+### 5. `index.ts`
 Barrel export for clean imports.
 
 **Purpose**: Simplify imports from a single location.
@@ -217,13 +171,12 @@ Barrel export for clean imports.
 // Instead of:
 import { TrackedItem } from './schemas/tracked-item.schema';
 import { CurrentPrice } from './schemas/current-price.schema';
-import { IntradayOhlc } from './schemas/intraday-ohlc.schema';
+import { HistoricalOhlc } from './schemas/historical-ohlc.schema';
 
 // Use:
 import {
   TrackedItem,
   CurrentPrice,
-  IntradayOhlc,
   HistoricalOhlc,
   OhlcTimeframe,
   SchemasModule
@@ -264,10 +217,6 @@ All schemas include optimized indexes for common query patterns:
 - `{ priceTimestamp: -1 }` - Time-based queries
 - `{ updatedAt: -1 }` - Recent updates
 
-### IntradayOhlc Indexes
-- `{ itemCode: 1, date: -1 }` - Compound query
-- `{ expiresAt: 1 }` - TTL cleanup
-
 ### HistoricalOhlc Indexes
 - `{ itemCode: 1, timeframe: 1, periodStart: -1 }` - Primary queries
 - `{ itemCode: 1, periodStart: -1 }` - Cross-timeframe queries
@@ -284,10 +233,6 @@ All schemas include optimized indexes for common query patterns:
 ### CurrentPrices
 - **Retention**: Permanent (upsert pattern keeps only latest)
 - **Cleanup**: None needed (constant size)
-
-### IntradayOhlc
-- **Retention**: 48 hours
-- **Cleanup**: Automatic via MongoDB TTL index
 
 ### HistoricalOhlc
 - **Retention**: Tiered
@@ -308,7 +253,6 @@ All schemas export proper TypeScript types:
 import {
   TrackedItemDocument,
   CurrentPriceDocument,
-  IntradayOhlcDocument,
   HistoricalOhlcDocument
 } from '@/schemas';
 
@@ -316,7 +260,6 @@ import {
 import {
   TrackedItem,
   CurrentPrice,
-  IntradayOhlc,
   HistoricalOhlc
 } from '@/schemas';
 

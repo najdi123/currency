@@ -469,8 +469,10 @@ export class NavasanService {
         this.logger.log(
           `✅ Returning FRESH cached data for category: ${category}`,
         );
+        // Enrich cached data with OHLC-based change values
+        const enrichedData = await this.enrichChangeValues(freshCache.data as NavasanResponse);
         return {
-          data: freshCache.data as Record<string, unknown>,
+          data: enrichedData as Record<string, unknown>,
           metadata: {
             isFresh: true,
             isStale: false,
@@ -511,8 +513,11 @@ export class NavasanService {
 
         this.logger.log(`✅ API fetch successful for category: ${category}`);
 
+        // 📈 Enrich change values from OHLC data if API returns 0
+        const enrichedData = await this.enrichChangeValues(apiResponse.data);
+
         return {
-          data: apiResponse.data,
+          data: enrichedData,
           metadata: {
             isFresh: true,
             isStale: false,
@@ -558,8 +563,11 @@ export class NavasanService {
             },
           );
 
+          // Enrich stale cached data with OHLC-based change values
+          const enrichedStaleData = await this.enrichChangeValues(staleCache.data as NavasanResponse);
+
           return {
-            data: staleCache.data as Record<string, unknown>,
+            data: enrichedStaleData as Record<string, unknown>,
             metadata: {
               isFresh: false,
               isStale: true,
@@ -730,6 +738,59 @@ export class NavasanService {
   ): NavasanResponse {
     // Delegate to transformer
     return this.persianApiTransformer.transformToNavasanFormat(data) as NavasanResponse;
+  }
+
+  /**
+   * Enrich change values in the response using OHLC data
+   * When API doesn't provide change values (or returns 0), calculate from OHLC data
+   * Change = ((close - open) / open) * 100
+   */
+  private async enrichChangeValues(
+    data: NavasanResponse,
+  ): Promise<NavasanResponse> {
+    try {
+      // Get all today's OHLC data
+      const ohlcData = await this.intradayOhlcService.getAllTodayOhlc();
+
+      if (!ohlcData || ohlcData.length === 0) {
+        this.logger.debug("No OHLC data available for enriching change values");
+        return data;
+      }
+
+      // Create a map for quick lookup
+      const ohlcMap = new Map<string, { change: number }>();
+      for (const ohlc of ohlcData) {
+        ohlcMap.set(ohlc.itemCode.toLowerCase(), { change: ohlc.change });
+      }
+
+      // Enrich each item with OHLC-based change if API change is 0 or missing
+      const enrichedData = { ...data };
+      let enrichedCount = 0;
+
+      for (const [key, value] of Object.entries(enrichedData)) {
+        if (key === '_metadata') continue;
+
+        const item = value as NavasanPriceItem;
+        const ohlc = ohlcMap.get(key.toLowerCase());
+
+        // Only enrich if current change is 0 or undefined AND we have OHLC data
+        if (ohlc && (item.change === 0 || item.change === undefined)) {
+          item.change = ohlc.change;
+          enrichedCount++;
+        }
+      }
+
+      if (enrichedCount > 0) {
+        this.logger.log(`📈 Enriched ${enrichedCount} items with OHLC-based change values`);
+      }
+
+      return enrichedData;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to enrich change values from OHLC: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return data; // Return original data if enrichment fails
+    }
   }
 
   /**

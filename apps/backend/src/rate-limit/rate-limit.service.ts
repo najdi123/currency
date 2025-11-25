@@ -21,7 +21,7 @@ export interface RateLimitCheckResult {
 /**
  * Rate Limit Service - 2-hour window system
  *
- * Implements: 20 fresh requests per 2-hour window per user
+ * Implements: 50 fresh requests per 2-hour window per user
  * Windows: 00:00-02:00, 02:00-04:00, ..., 22:00-00:00
  * Quota exceeded: Show stale data with friendly message
  */
@@ -41,7 +41,7 @@ export class RateLimitService {
     const windowHours = this.parseConfig("RATE_LIMIT_WINDOW_HOURS", 2, 1, 24);
     const maxRequests = this.parseConfig(
       "RATE_LIMIT_MAX_REQUESTS",
-      20,
+      50,
       1,
       1000,
     );

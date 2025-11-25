@@ -3,6 +3,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { MongooseModule } from "@nestjs/mongoose";
 import { OhlcAggregationScheduler } from "./ohlc-aggregation.scheduler";
 import { DataRetentionScheduler } from "./data-retention.scheduler";
+import { OhlcCleanupSchedulerService } from "./ohlc-cleanup-scheduler.service";
 import {
   HistoricalOhlc,
   HistoricalOhlcSchema,
@@ -26,6 +27,7 @@ import {
  * Manages all scheduled tasks for the application:
  * - OHLC data aggregation (weekly, monthly) - daily is disabled
  * - Data retention and cleanup
+ * - OHLC snapshot cleanup (removes old snapshots based on retention policies)
  *
  * Note: OHLCPermanent is the primary data source.
  * Daily aggregation is disabled since ohlc_permanent already has 1d data.
@@ -40,7 +42,15 @@ import {
       { name: OHLCPermanent.name, schema: OHLCPermanentSchema },
     ]),
   ],
-  providers: [OhlcAggregationScheduler, DataRetentionScheduler],
-  exports: [OhlcAggregationScheduler, DataRetentionScheduler],
+  providers: [
+    OhlcAggregationScheduler,
+    DataRetentionScheduler,
+    OhlcCleanupSchedulerService,
+  ],
+  exports: [
+    OhlcAggregationScheduler,
+    DataRetentionScheduler,
+    OhlcCleanupSchedulerService,
+  ],
 })
 export class SchedulerModule {}

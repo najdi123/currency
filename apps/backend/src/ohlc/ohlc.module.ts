@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ScheduleModule } from "@nestjs/schedule";
 import { NavasanModule } from "../navasan/navasan.module";
 import { ChartModule } from "../chart/chart.module";
 import { OHLCManagerService } from "./ohlc-manager.service";
@@ -8,6 +9,7 @@ import { OHLCController } from "./ohlc.controller";
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(), // Required for @Cron decorators in OHLCCollectorService
     NavasanModule, // For access to schemas and NavasanService
     ChartModule, // For ChartService
   ],
