@@ -48,8 +48,12 @@ export const DailyChangeBadge: React.FC<DailyChangeBadgeProps> = ({
   className = '',
 }) => {
   const t = useTranslations('ItemCard')
-  const isPositive = dailyChangePercent >= 0
-  const isZero = dailyChangePercent === 0
+  // Ensure dailyChangePercent is a number (backend may return string)
+  const changeValue = typeof dailyChangePercent === 'string'
+    ? parseFloat(dailyChangePercent)
+    : dailyChangePercent
+  const isPositive = changeValue >= 0
+  const isZero = changeValue === 0
 
   const bgColor = isZero
     ? 'bg-gray-100 dark:bg-gray-800'
@@ -79,7 +83,7 @@ export const DailyChangeBadge: React.FC<DailyChangeBadgeProps> = ({
       {!isZero && <ArrowIcon className={compact ? 'text-xs' : 'text-sm'} aria-hidden="true" />}
       <span>
         {isPositive && '+'}
-        {dailyChangePercent.toFixed(2)}%
+        {changeValue.toFixed(2)}%
       </span>
     </div>
   )

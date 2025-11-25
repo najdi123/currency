@@ -261,7 +261,10 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
         // Get OHLC data for this item if available
         const ohlcItem = ohlcMap[item.key]
         const ohlcData = ohlcItem ? {
-          dailyChangePercent: ohlcItem.change,
+          // Ensure change is a number (backend may return string from toFixed)
+          dailyChangePercent: typeof ohlcItem.change === 'string'
+            ? parseFloat(ohlcItem.change)
+            : ohlcItem.change,
           dataPoints: ohlcItem.dataPoints
         } : undefined
 

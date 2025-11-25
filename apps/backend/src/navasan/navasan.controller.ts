@@ -669,7 +669,7 @@ export class NavasanController {
         high: ohlc.high,
         low: ohlc.low,
         close: ohlc.close,
-        change: (((ohlc.close - ohlc.open) / ohlc.open) * 100).toFixed(2),
+        change: parseFloat((((ohlc.close - ohlc.open) / ohlc.open) * 100).toFixed(2)),
         dataPoints: ohlc.dataPoints,
         updateCount: ohlc.updateCount,
         lastUpdate: ohlc.lastUpdate,
