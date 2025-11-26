@@ -5,6 +5,9 @@ import { OhlcAggregationScheduler } from "./ohlc-aggregation.scheduler";
 import { DataRetentionScheduler } from "./data-retention.scheduler";
 import { OhlcCleanupSchedulerService } from "./ohlc-cleanup-scheduler.service";
 import { OhlcPermanentCleanupScheduler } from "./ohlc-permanent-cleanup.scheduler";
+import { NavasanSchedulerService } from "./navasan-scheduler.service";
+import { ScheduleConfigService } from "./schedule-config.service";
+import { SchedulerController } from "./scheduler.controller";
 import {
   HistoricalOhlc,
   HistoricalOhlcSchema,
@@ -21,6 +24,8 @@ import {
   OHLCPermanent,
   OHLCPermanentSchema,
 } from "../navasan/schemas/ohlc-permanent.schema";
+import { MarketDataModule } from "../market-data/market-data.module";
+import { AuthModule } from "../auth/auth.module";
 
 /**
  * Scheduler Module
@@ -43,18 +48,24 @@ import {
       { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
       { name: OHLCPermanent.name, schema: OHLCPermanentSchema },
     ]),
+    MarketDataModule, // For MarketDataOrchestratorService
+    AuthModule, // For JwtAuthGuard in SchedulerController
   ],
+  controllers: [SchedulerController],
   providers: [
     OhlcAggregationScheduler,
     DataRetentionScheduler,
     OhlcCleanupSchedulerService,
     OhlcPermanentCleanupScheduler,
+    NavasanSchedulerService,
+    ScheduleConfigService,
   ],
   exports: [
     OhlcAggregationScheduler,
     DataRetentionScheduler,
     OhlcCleanupSchedulerService,
     OhlcPermanentCleanupScheduler,
+    NavasanSchedulerService,
   ],
 })
 export class SchedulerModule {}

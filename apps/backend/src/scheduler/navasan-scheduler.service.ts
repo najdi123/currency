@@ -7,7 +7,7 @@ import {
 import { SchedulerRegistry, CronExpression } from "@nestjs/schedule";
 import { ConfigService } from "@nestjs/config";
 import { CronJob } from "cron";
-import { NavasanService } from "../navasan/navasan.service";
+import { MarketDataOrchestratorService } from "../market-data/market-data-orchestrator.service";
 import { ScheduleConfigService } from "./schedule-config.service";
 
 @Injectable()
@@ -19,7 +19,7 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
   private useDynamicScheduling: boolean = false;
 
   constructor(
-    private readonly navasanService: NavasanService,
+    private readonly marketDataService: MarketDataOrchestratorService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly configService: ConfigService,
     private readonly scheduleConfig: ScheduleConfigService,
@@ -229,9 +229,9 @@ export class NavasanSchedulerService implements OnModuleInit, OnModuleDestroy {
     try {
       // Use forceFetchAndCache for guaranteed API hits (bypasses fresh cache)
       const results = await Promise.allSettled([
-        this.navasanService.forceFetchAndCache("currencies"),
-        this.navasanService.forceFetchAndCache("crypto"),
-        this.navasanService.forceFetchAndCache("gold"),
+        this.marketDataService.forceFetchAndCache("currencies"),
+        this.marketDataService.forceFetchAndCache("crypto"),
+        this.marketDataService.forceFetchAndCache("gold"),
       ]);
 
       const [currencies, crypto, gold] = results;

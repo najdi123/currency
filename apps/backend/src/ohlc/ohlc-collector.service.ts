@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { ConfigService } from "@nestjs/config";
-import { NavasanService } from "../navasan/navasan.service";
+import { MarketDataOrchestratorService } from "../market-data/market-data-orchestrator.service";
 import { ChartService } from "../chart/chart.service";
 import { OHLCManagerService } from "./ohlc-manager.service";
 
@@ -109,7 +109,7 @@ export class OHLCCollectorService implements OnModuleInit {
   ];
 
   constructor(
-    private readonly navasanService: NavasanService,
+    private readonly marketDataService: MarketDataOrchestratorService,
     private readonly chartService: ChartService,
     private readonly ohlcManager: OHLCManagerService,
     private readonly configService: ConfigService,
@@ -156,11 +156,11 @@ export class OHLCCollectorService implements OnModuleInit {
     this.logger.debug("Starting minute OHLC collection");
 
     try {
-      // Get current prices from Navasan
-      const response = await this.navasanService.getLatestRates();
+      // Get current prices from MarketData service
+      const response = await this.marketDataService.getLatestRates();
 
       if (!response || !response.data) {
-        this.logger.warn("No data received from Navasan");
+        this.logger.warn("No data received from MarketData service");
         return;
       }
 
