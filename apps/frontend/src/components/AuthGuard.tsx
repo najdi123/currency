@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAppSelector } from '@/lib/hooks'
 import { selectIsAuthenticated, selectIsInitialized } from '@/lib/store/slices/authSlice'
 
@@ -14,11 +14,16 @@ interface AuthGuardProps {
 export function AuthGuard({
   children,
   requireAuth = true,
-  redirectTo = '/login',
+  redirectTo,
 }: AuthGuardProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const isInitialized = useAppSelector(selectIsInitialized)
+
+  // Extract locale from pathname (e.g., /fa/admin -> fa)
+  const locale = pathname.split('/')[1] || 'fa'
+  const loginPath = redirectTo || `/${locale}/login`
 
   useEffect(() => {
     if (!isInitialized) {
@@ -26,9 +31,9 @@ export function AuthGuard({
     }
 
     if (requireAuth && !isAuthenticated) {
-      router.push(redirectTo)
+      router.push(loginPath)
     }
-  }, [isAuthenticated, isInitialized, requireAuth, redirectTo, router])
+  }, [isAuthenticated, isInitialized, requireAuth, loginPath, router])
 
   // Show loading state while initializing
   if (!isInitialized) {

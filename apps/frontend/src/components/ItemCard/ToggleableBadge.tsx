@@ -28,7 +28,7 @@ interface ToggleableBadgeProps {
 }
 
 /**
- * ToggleableBadge - Displays price change with tap-to-toggle between Toman and percentage
+ * ToggleableBadge - Touch-friendly badge for toggling between Toman and percentage
  *
  * Features:
  * - Default: Shows absolute change in Toman (e.g., "+500 تومان", "-2.5 هزار تومان")
@@ -39,9 +39,17 @@ interface ToggleableBadgeProps {
  * - Dark mode support
  * - Smooth transitions with scale effect on tap
  *
+ * Touch Optimizations:
+ * - WCAG Level AA/AAA compliant touch targets (44x44px / 48x48px)
+ * - Proper touch event handling (no double-firing)
+ * - Event propagation prevention (doesn't trigger parent card)
+ * - Optimized for mobile (touch-manipulation, no tap delay)
+ * - Haptic feedback on supported devices
+ *
  * Accessibility:
  * - Interactive button for keyboard/screen reader users
- * - ARIA label describes the change and toggle functionality
+ * - ARIA label describes current state and toggle functionality
+ * - ARIA live region announces state changes
  * - Focus ring for keyboard navigation
  */
 export const ToggleableBadge: React.FC<ToggleableBadgeProps> = ({
@@ -57,8 +65,15 @@ export const ToggleableBadge: React.FC<ToggleableBadgeProps> = ({
   const [showPercent, setShowPercent] = useState(false)
 
   // Toggle between Toman and percentage display
-  const handleToggle = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation() // Prevent card click
+  const handleToggle = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()    // Prevent default behavior
+    e.stopPropagation()   // Prevent card click
+
+    // Haptic feedback for mobile devices
+    if ('vibrate' in navigator) {
+      navigator.vibrate(10)
+    }
+
     setShowPercent(prev => !prev)
   }, [])
 
@@ -95,9 +110,10 @@ export const ToggleableBadge: React.FC<ToggleableBadgeProps> = ({
     ? 'text-green-600 dark:text-green-400'
     : 'text-red-600 dark:text-red-400'
 
+  // WCAG compliant touch target sizes: minimum 44x44px (AA) and 48x48px (AAA)
   const sizeClasses = compact
-    ? 'text-xs px-1.5 py-0.5 gap-0.5'
-    : 'text-sm px-2 py-1 gap-1'
+    ? 'text-xs px-3 py-2 gap-1 min-w-[44px] min-h-[44px]'
+    : 'text-sm px-4 py-2.5 gap-1.5 min-w-[48px] min-h-[48px]'
 
   const ArrowIcon = isPositive ? FiArrowUp : FiArrowDown
 
@@ -105,18 +121,20 @@ export const ToggleableBadge: React.FC<ToggleableBadgeProps> = ({
     <button
       type="button"
       onClick={handleToggle}
-      onTouchEnd={handleToggle}
       className={`
-        inline-flex items-center rounded-lg font-semibold transition-all duration-150
+        inline-flex items-center justify-center rounded-lg font-semibold
         ${bgColor} ${textColor} ${sizeClasses} ${className}
         cursor-pointer select-none
-        hover:opacity-90 active:scale-95
+        touch-manipulation [-webkit-tap-highlight-color:transparent]
+        hover:opacity-90 active:opacity-80
+        transition-opacity duration-100
         focus:outline-none focus:ring-2 focus:ring-offset-1
         ${isZero ? 'focus:ring-gray-400' : isPositive ? 'focus:ring-green-400' : 'focus:ring-red-400'}
       `}
       role="button"
-      aria-label={`${isPositive ? t('priceIncrease') : t('priceDecrease')}. ${t('tapToToggle') || 'Tap to toggle'}`}
+      aria-label={`${isPositive ? t('priceIncrease') : t('priceDecrease')}. ${showPercent ? `${t('showingPercent')}: ${formatPercent()}` : `${t('showingToman')}: ${signedNumber} ${label}`}. ${t('tapToToggle') || 'Tap to toggle'}`}
       aria-pressed={showPercent}
+      aria-live="polite"
       dir="ltr"
     >
       {!isZero && <ArrowIcon className={compact ? 'text-xs' : 'text-sm'} aria-hidden="true" />}

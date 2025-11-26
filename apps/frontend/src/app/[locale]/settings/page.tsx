@@ -26,7 +26,7 @@ export default function SettingsPage() {
 
   // Redirect if not authenticated
   if (!isAuthenticated || !user) {
-    router.push('/login')
+    router.push(`/${locale}/login`)
     return null
   }
 
@@ -39,7 +39,7 @@ export default function SettingsPage() {
         console.error('Logout failed:', error)
       }
     }
-    router.push('/login')
+    router.push(`/${locale}/login`)
   }
 
   const getUserInitials = () => {

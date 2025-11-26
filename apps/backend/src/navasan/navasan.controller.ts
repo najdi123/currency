@@ -22,6 +22,11 @@ import {
 import { RateLimitGuard } from "../rate-limit/rate-limit.guard";
 import { CurrencyConversionService } from "../common/services/currency-conversion.service";
 
+/**
+ * @deprecated This controller is deprecated. Use /api/market-data/* instead.
+ * The Navasan controller will be removed in a future version.
+ * All endpoints have equivalent replacements in MarketDataController.
+ */
 @Controller("navasan")
 @UseGuards(RateLimitGuard) // Apply rate limiting to all endpoints
 export class NavasanController {
@@ -32,6 +37,23 @@ export class NavasanController {
     private readonly intradayOhlcService: IntradayOhlcService,
     private readonly currencyConversionService: CurrencyConversionService,
   ) {}
+
+  /**
+   * Add deprecation headers to response
+   * @private
+   */
+  private addDeprecationHeaders(res: Response): void {
+    res.setHeader("Deprecation", "true");
+    res.setHeader("Sunset", "2025-06-01");
+    res.setHeader(
+      "Link",
+      '</api/market-data>; rel="successor-version"',
+    );
+    res.setHeader(
+      "X-Deprecation-Notice",
+      "This endpoint is deprecated. Please migrate to /api/market-data/*",
+    );
+  }
 
   /**
    * Sanitize header value to prevent HTTP header injection
@@ -50,6 +72,7 @@ export class NavasanController {
   @Get("latest")
   async getLatest(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log("GET /api/navasan/latest - Fetching all latest rates");
 
       const response = await this.navasanService.getLatestRates();
@@ -97,6 +120,7 @@ export class NavasanController {
     res: Response,
   ) {
     try {
+      this.addDeprecationHeaders(res);
       let targetDate: Date;
 
       if (dateStr) {
@@ -238,6 +262,7 @@ export class NavasanController {
   @Get("currencies/yesterday")
   async getCurrenciesYesterday(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log(
         "GET /api/navasan/currencies/yesterday - Fetching yesterday's currency rates",
       );
@@ -296,6 +321,7 @@ export class NavasanController {
   @Get("currencies")
   async getCurrencies(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log("GET /api/navasan/currencies - Fetching currency rates");
 
       const response = await this.navasanService.getCurrencies();
@@ -357,6 +383,7 @@ export class NavasanController {
   @Get("crypto/yesterday")
   async getCryptoYesterday(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log(
         "GET /api/navasan/crypto/yesterday - Fetching yesterday's crypto rates",
       );
@@ -414,6 +441,7 @@ export class NavasanController {
   @Get("crypto")
   async getCrypto(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log("GET /api/navasan/crypto - Fetching crypto rates");
 
       const response = await this.navasanService.getCrypto();
@@ -475,6 +503,7 @@ export class NavasanController {
   @Get("gold/yesterday")
   async getGoldYesterday(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log(
         "GET /api/navasan/gold/yesterday - Fetching yesterday's gold prices",
       );
@@ -532,6 +561,7 @@ export class NavasanController {
   @Get("gold")
   async getGold(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log("GET /api/navasan/gold - Fetching gold prices");
 
       const response = await this.navasanService.getGold();
@@ -578,6 +608,7 @@ export class NavasanController {
   @Get("coins")
   async getCoins(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log("GET /api/navasan/coins - Fetching coin prices");
 
       const response = await this.navasanService.getCoins();
@@ -621,6 +652,7 @@ export class NavasanController {
     @Res() res: Response,
   ) {
     try {
+      this.addDeprecationHeaders(res);
       // SECURITY FIX: Validate itemCode to prevent NoSQL injection
       if (!itemCode || typeof itemCode !== "string") {
         throw new BadRequestException("Invalid item code");
@@ -678,6 +710,7 @@ export class NavasanController {
   @Get("ohlc/all")
   async getAllTodayOhlc(@Res() res: Response) {
     try {
+      this.addDeprecationHeaders(res);
       this.logger.log(
         "GET /api/navasan/ohlc/all - Fetching all today's OHLC data",
       );

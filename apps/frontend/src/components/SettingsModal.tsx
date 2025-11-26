@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useTranslations } from 'next-intl'
 import { useAppSelector } from '@/lib/hooks'
@@ -50,6 +50,7 @@ const Divider = () => (
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
@@ -57,6 +58,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const user = useAppSelector(selectUser)
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
+
+  // Extract locale from pathname
+  const locale = pathname.split('/')[1] || 'fa'
 
   // Refs for focus management
   const modalRef = useRef<HTMLDivElement>(null)
@@ -153,7 +157,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleLogin = () => {
     onClose()
-    router.push('/login')
+    router.push(`/${locale}/login`)
   }
 
   const getRoleText = (role: string) => {

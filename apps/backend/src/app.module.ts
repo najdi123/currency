@@ -9,6 +9,7 @@ import { CurrenciesModule } from "./currencies/currencies.module";
 import { DigitalCurrenciesModule } from "./digital-currencies/digital-currencies.module";
 import { GoldModule } from "./gold/gold.module";
 import { NavasanModule } from "./navasan/navasan.module";
+import { MarketDataModule } from "./market-data/market-data.module";
 import { ChartModule } from "./chart/chart.module";
 import { HealthModule } from "./health/health.module";
 import { MetricsModule } from "./metrics/metrics.module";
@@ -110,6 +111,7 @@ import { CacheModule } from "./cache/cache.module";
     DigitalCurrenciesModule,
     GoldModule,
     NavasanModule,
+    MarketDataModule, // New provider-agnostic market data module (replaces NavasanModule)
     ChartModule,
     HealthModule,
     WalletsModule,
