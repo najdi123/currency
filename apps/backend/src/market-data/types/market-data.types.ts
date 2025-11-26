@@ -48,6 +48,23 @@ export interface PriceItem {
 export type MarketDataResponse = Record<string, PriceItem>;
 
 /**
+ * Enrichment metadata added to responses
+ */
+export interface EnrichmentMetadata {
+  source: string;
+  enrichedAt: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Market data response with enrichment metadata
+ */
+export interface MarketDataWithMetadata {
+  data: MarketDataResponse;
+  _metadata: EnrichmentMetadata;
+}
+
+/**
  * Currency Data Types
  */
 export interface CurrencyData {

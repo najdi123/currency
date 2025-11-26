@@ -325,6 +325,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             {t('createUser')}
                           </span>
                         </button>
+                        <button
+                          onClick={() => {
+                            onClose()
+                            router.push('/admin/currencies')
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-4 py-3.5",
+                            "bg-bg-base hover:bg-bg-secondary rounded-lg border border-border-light",
+                            "transition-colors text-right active-scale-apple",
+                            "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+                          )}
+                        >
+                          <FiGlobe className={cn(ICON_SIZES.md, "text-text-secondary")} />
+                          <span className="text-apple-body font-medium text-text-primary">
+                            {t('manageCurrencies')}
+                          </span>
+                        </button>
                       </div>
                     </section>
 

@@ -30,6 +30,7 @@ import { UpdateLog, UpdateLogSchema } from '../navasan/schemas/update-log.schema
 import { MetricsModule } from '../metrics/metrics.module';
 import { ApiProvidersModule } from '../api-providers/api-providers.module';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
+import { AdminModule } from '../admin/admin.module';
 
 /**
  * MarketDataModule
@@ -65,6 +66,7 @@ import { RateLimitModule } from '../rate-limit/rate-limit.module';
     MetricsModule,
     ApiProvidersModule,
     RateLimitModule,
+    AdminModule,
   ],
   controllers: [
     MarketDataController,

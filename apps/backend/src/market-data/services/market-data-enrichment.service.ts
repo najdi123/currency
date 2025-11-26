@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IntradayOhlcService } from '../../navasan/services/intraday-ohlc.service';
 import { GOLD_MULTIPLIER_ITEMS } from '../constants/market-data.constants';
-import { MarketDataResponse, PriceItem } from '../types/market-data.types';
+import { MarketDataResponse, PriceItem, MarketDataWithMetadata } from '../types/market-data.types';
 
 /**
  * MarketDataEnrichmentService
@@ -107,16 +107,15 @@ export class MarketDataEnrichmentService {
 
   /**
    * Add standard metadata to response
-   * Returns a combined object with data and metadata
-   * Note: Uses Record<string, unknown> to allow mixed PriceItem and metadata types
+   * Returns a structured object with data and metadata
    */
   addMetadata(
     data: MarketDataResponse,
     source: string,
     additionalMetadata?: Record<string, unknown>,
-  ): Record<string, unknown> {
+  ): MarketDataWithMetadata {
     return {
-      ...data,
+      data,
       _metadata: {
         source,
         enrichedAt: new Date().toISOString(),

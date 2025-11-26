@@ -23,6 +23,7 @@ import { RateLimitModule } from "./rate-limit/rate-limit.module";
 import { RateLimitGuard } from "./rate-limit/rate-limit.guard";
 import { SchemasModule } from "./schemas/schemas.module";
 import { CacheModule } from "./cache/cache.module";
+import { AdminModule } from "./admin/admin.module";
 
 @Module({
   imports: [
@@ -119,6 +120,7 @@ import { CacheModule } from "./cache/cache.module";
     SchedulerModule,
     OHLCModule,
     RateLimitModule,
+    AdminModule, // Admin module for managing items and price overrides
   ],
   controllers: [AppController],
   providers: [

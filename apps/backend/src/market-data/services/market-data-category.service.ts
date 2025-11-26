@@ -1,45 +1,40 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import {
   ItemCategory,
   VALID_CATEGORIES,
   CATEGORY_ITEMS,
   CATEGORY_ITEM_CODES,
   GOLD_MULTIPLIER_ITEMS,
-  VALIDATION,
-  ERROR_MESSAGES,
 } from '../constants/market-data.constants';
+import { MarketDataValidationService } from './market-data-validation.service';
 
 /**
  * MarketDataCategoryService
  *
  * Responsible for category management and item code mapping
- * - Validates category inputs
  * - Maps categories to item codes
  * - Determines category from item strings
  * - Provides category-specific configurations
+ *
+ * Note: Input validation is delegated to MarketDataValidationService
  */
 @Injectable()
 export class MarketDataCategoryService {
   private readonly logger = new Logger(MarketDataCategoryService.name);
 
+  constructor(
+    @Inject(forwardRef(() => MarketDataValidationService))
+    private readonly validationService: MarketDataValidationService,
+  ) {}
+
   /**
-   * Validate category parameter to prevent NoSQL injection
-   * Only allows alphanumeric characters, underscores, hyphens, and reasonable length
+   * Validate category parameter
+   * Delegates to ValidationService for security checks
    *
    * @throws BadRequestException if category is invalid
    */
   validateCategory(category: string): void {
-    if (!category || typeof category !== 'string') {
-      throw new BadRequestException('Category must be a non-empty string');
-    }
-
-    if (category.length > VALIDATION.MAX_CATEGORY_LENGTH) {
-      throw new BadRequestException(ERROR_MESSAGES.CATEGORY_TOO_LONG);
-    }
-
-    if (!VALIDATION.SAFE_CATEGORY_PATTERN.test(category)) {
-      throw new BadRequestException(ERROR_MESSAGES.CATEGORY_INVALID_CHARS);
-    }
+    this.validationService.validateCategory(category);
   }
 
   /**

@@ -4,10 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 
 // Services
@@ -21,9 +18,7 @@ import { IntradayOhlcService } from '../navasan/services/intraday-ohlc.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ApiProviderFactory } from '../api-providers/api-provider.factory';
 import { PersianApiTransformer } from '../api-providers/persianapi.transformer';
-
-// Schemas
-import { OHLCPermanent, OHLCPermanentDocument } from '../navasan/schemas/ohlc-permanent.schema';
+import { AdminOverrideService } from '../admin/admin-override.service';
 
 // Types
 import { ItemCategory } from './constants/market-data.constants';
@@ -74,8 +69,7 @@ export class MarketDataOrchestratorService {
     private readonly apiProviderFactory: ApiProviderFactory,
     private readonly persianApiTransformer: PersianApiTransformer,
     private readonly configService: ConfigService,
-    @InjectModel(OHLCPermanent.name)
-    private ohlcPermanentModel: Model<OHLCPermanentDocument>,
+    private readonly adminOverrideService: AdminOverrideService,
   ) {
     // Validate internal API URL on startup
     const internalApiUrl = this.configService.get<string>('INTERNAL_API_URL') || 'http://localhost:4000';
@@ -115,8 +109,11 @@ export class MarketDataOrchestratorService {
     // Apply gold multipliers
     const transformedData = this.enrichmentService.applyGoldMultipliers(response.data);
 
+    // Apply admin overrides (fetchWithCache already applies overrides, but gold multipliers may override them)
+    const dataWithOverrides = await this.applyOverridesSafely(transformedData);
+
     return {
-      data: transformedData,
+      data: dataWithOverrides,
       metadata: response.metadata,
     };
   }
@@ -209,15 +206,15 @@ export class MarketDataOrchestratorService {
       const startOfDay = new Date(targetDateStr + 'T00:00:00.000Z');
       const endOfDay = new Date(targetDateStr + 'T23:59:59.999Z');
 
-      // Query ohlc_permanent for 1d (daily) data first
-      let records = await this.queryDailyOhlc(itemCodes, startOfDay, endOfDay);
+      // Query ohlc_permanent for 1d (daily) data first via SnapshotService
+      let records = await this.snapshotService.queryDailyOhlc(itemCodes, startOfDay, endOfDay);
 
-      // If no 1d data, aggregate from 1m data
+      // If no 1d data, aggregate from 1m data via SnapshotService
       if (records.length === 0) {
         this.logger.log(
           `No 1d data found for ${targetDateStr}, aggregating from 1m data...`,
         );
-        records = await this.aggregateMinuteToDaily(itemCodes, startOfDay, endOfDay);
+        records = await this.snapshotService.aggregateMinuteToDaily(itemCodes, startOfDay, endOfDay);
       }
 
       if (records.length === 0) {
@@ -229,8 +226,11 @@ export class MarketDataOrchestratorService {
       // Transform to response format
       const priceData = this.transformOhlcToResponse(records, targetDateStr);
 
+      // Apply admin overrides
+      const dataWithOverrides = await this.applyOverridesSafely(priceData);
+
       return {
-        data: priceData,
+        data: dataWithOverrides,
         metadata: {
           isFresh: false,
           isStale: false,
@@ -278,8 +278,9 @@ export class MarketDataOrchestratorService {
         const enrichedData = await this.enrichmentService.enrichChangeValues(
           freshCache.data as MarketDataResponse,
         );
+        const dataWithOverrides = await this.applyOverridesSafely(enrichedData);
         return {
-          data: enrichedData,
+          data: dataWithOverrides,
           metadata: {
             isFresh: true,
             isStale: false,
@@ -320,9 +321,10 @@ export class MarketDataOrchestratorService {
         const enrichedData = await this.enrichmentService.enrichChangeValues(
           apiResponse.data,
         );
+        const dataWithOverrides = await this.applyOverridesSafely(enrichedData);
 
         return {
-          data: enrichedData,
+          data: dataWithOverrides,
           metadata: {
             isFresh: true,
             isStale: false,
@@ -360,9 +362,10 @@ export class MarketDataOrchestratorService {
           const enrichedStaleData = await this.enrichmentService.enrichChangeValues(
             staleCache.data as MarketDataResponse,
           );
+          const staleDataWithOverrides = await this.applyOverridesSafely(enrichedStaleData);
 
           return {
-            data: enrichedStaleData,
+            data: staleDataWithOverrides,
             metadata: {
               isFresh: false,
               isStale: true,
@@ -395,44 +398,50 @@ export class MarketDataOrchestratorService {
   }
 
   /**
-   * Fetch data from API provider
+   * Fetch data from API provider with circuit breaker protection
    */
   private async fetchFromApi(
     category: ItemCategory,
   ): Promise<{ data: MarketDataResponse; metadata: Record<string, unknown> }> {
-    const provider = this.apiProviderFactory.getActiveProvider();
-    let responseData: (CurrencyData | CryptoData | GoldData)[] = [];
+    // Use circuit breaker to protect against cascading failures
+    return this.circuitBreakerService.execute(
+      async () => {
+        const provider = this.apiProviderFactory.getActiveProvider();
+        let responseData: (CurrencyData | CryptoData | GoldData)[] = [];
 
-    if (category === 'all') {
-      const allData = await provider.fetchAll({ limit: 100 });
-      responseData = [...allData.currencies, ...allData.crypto, ...allData.gold];
-    } else if (category === 'currencies') {
-      responseData = await provider.fetchCurrencies({ limit: 100 });
-    } else if (category === 'crypto') {
-      responseData = await provider.fetchCrypto({ limit: 100 });
-    } else if (category === 'gold' || category === 'coins') {
-      try {
-        responseData = await provider.fetchGold({ limit: 100 });
-      } catch (error: any) {
-        this.logger.warn(`Gold endpoint unavailable: ${error.message}`);
-        responseData = [];
-      }
-    }
+        if (category === 'all') {
+          const allData = await provider.fetchAll({ limit: 100 });
+          responseData = [...allData.currencies, ...allData.crypto, ...allData.gold];
+        } else if (category === 'currencies') {
+          responseData = await provider.fetchCurrencies({ limit: 100 });
+        } else if (category === 'crypto') {
+          responseData = await provider.fetchCrypto({ limit: 100 });
+        } else if (category === 'gold' || category === 'coins') {
+          try {
+            responseData = await provider.fetchGold({ limit: 100 });
+          } catch (error: any) {
+            this.logger.warn(`Gold endpoint unavailable: ${error.message}`);
+            responseData = [];
+          }
+        }
 
-    // Transform to standard format
-    const marketData = this.persianApiTransformer.transformToNavasanFormat(responseData);
+        // Transform to standard format
+        const marketData = this.persianApiTransformer.transformToNavasanFormat(responseData);
 
-    // Validate response
-    this.validationService.validateApiResponseOrThrow(marketData, category);
+        // Validate response
+        this.validationService.validateApiResponseOrThrow(marketData, category);
 
-    return {
-      data: marketData as MarketDataResponse,
-      metadata: {
-        provider: 'PersianAPI',
-        itemCount: responseData.length,
-        timestamp: new Date(),
+        return {
+          data: marketData as MarketDataResponse,
+          metadata: {
+            provider: 'PersianAPI',
+            itemCount: responseData.length,
+            timestamp: new Date(),
+          },
+        };
       },
-    };
+      // No fallback here - let fetchWithCache handle the fallback to stale cache
+    );
   }
 
   /**
@@ -554,77 +563,6 @@ export class MarketDataOrchestratorService {
   }
 
   /**
-   * Query daily OHLC data
-   */
-  private async queryDailyOhlc(
-    itemCodes: string[],
-    startOfDay: Date,
-    endOfDay: Date,
-  ): Promise<AggregatedOhlcData[]> {
-    const records = await this.ohlcPermanentModel
-      .find({
-        itemCode: { $in: itemCodes },
-        timeframe: '1d',
-        timestamp: { $gte: startOfDay, $lte: endOfDay },
-      })
-      .lean()
-      .exec();
-
-    return records.map((r) => ({
-      itemCode: r.itemCode,
-      open: r.open,
-      high: r.high,
-      low: r.low,
-      close: r.close,
-      timestamp: r.timestamp,
-    }));
-  }
-
-  /**
-   * Aggregate minute data to daily
-   */
-  private async aggregateMinuteToDaily(
-    itemCodes: string[],
-    startOfDay: Date,
-    endOfDay: Date,
-  ): Promise<AggregatedOhlcData[]> {
-    const aggregation = await this.ohlcPermanentModel
-      .aggregate([
-        {
-          $match: {
-            itemCode: { $in: itemCodes },
-            timeframe: '1m',
-            timestamp: { $gte: startOfDay, $lte: endOfDay },
-          },
-        },
-        { $sort: { timestamp: 1 } },
-        {
-          $group: {
-            _id: '$itemCode',
-            open: { $first: '$open' },
-            high: { $max: '$high' },
-            low: { $min: '$low' },
-            close: { $last: '$close' },
-            timestamp: { $first: '$timestamp' },
-          },
-        },
-        {
-          $project: {
-            itemCode: '$_id',
-            open: 1,
-            high: 1,
-            low: 1,
-            close: 1,
-            timestamp: 1,
-          },
-        },
-      ])
-      .exec();
-
-    return aggregation as AggregatedOhlcData[];
-  }
-
-  /**
    * Transform OHLC records to response format
    */
   private transformOhlcToResponse(
@@ -670,5 +608,20 @@ export class MarketDataOrchestratorService {
     }
 
     return false;
+  }
+
+  /**
+   * Apply admin overrides safely - if it fails, return original data
+   * This ensures that override failures don't break the main data flow
+   */
+  private async applyOverridesSafely(data: MarketDataResponse): Promise<MarketDataResponse> {
+    try {
+      return await this.adminOverrideService.applyOverrides(data);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to apply admin overrides: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return data;
+    }
   }
 }

@@ -3,8 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PriceSnapshot, PriceSnapshotDocument } from '../../navasan/schemas/price-snapshot.schema';
 import { OhlcSnapshot, OhlcSnapshotDocument } from '../../navasan/schemas/ohlc-snapshot.schema';
+import { OHLCPermanent, OHLCPermanentDocument } from '../../navasan/schemas/ohlc-permanent.schema';
 import { SNAPSHOT } from '../constants/market-data.constants';
-import { MarketDataResponse } from '../types/market-data.types';
+import { MarketDataResponse, AggregatedOhlcData } from '../types/market-data.types';
 import { MetricsService } from '../../metrics/metrics.service';
 import { safeDbRead, safeDbWrite } from '../../common/utils/db-error-handler';
 
@@ -26,6 +27,8 @@ export class MarketDataSnapshotService {
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
     @InjectModel(OhlcSnapshot.name)
     private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
+    @InjectModel(OHLCPermanent.name)
+    private ohlcPermanentModel: Model<OHLCPermanentDocument>,
     private metricsService: MetricsService,
   ) {}
 
@@ -350,6 +353,95 @@ export class MarketDataSnapshotService {
         `Failed to cleanup old snapshots: ${error instanceof Error ? error.message : String(error)}`,
       );
       return 0;
+    }
+  }
+
+  // ==================== OHLC PERMANENT QUERIES ====================
+
+  /**
+   * Query daily OHLC data from ohlc_permanent collection
+   */
+  async queryDailyOhlc(
+    itemCodes: string[],
+    startOfDay: Date,
+    endOfDay: Date,
+  ): Promise<AggregatedOhlcData[]> {
+    const records = await safeDbRead(
+      () =>
+        this.ohlcPermanentModel
+          .find({
+            itemCode: { $in: itemCodes },
+            timeframe: '1d',
+            timestamp: { $gte: startOfDay, $lte: endOfDay },
+          })
+          .lean()
+          .exec(),
+      'queryDailyOhlc',
+      this.logger,
+      { itemCodes: itemCodes.length, startOfDay, endOfDay },
+    );
+
+    if (!records) return [];
+
+    return records.map((r) => ({
+      itemCode: r.itemCode,
+      open: r.open,
+      high: r.high,
+      low: r.low,
+      close: r.close,
+      timestamp: r.timestamp,
+    }));
+  }
+
+  /**
+   * Aggregate minute data to daily OHLC
+   * Used as fallback when no 1d data exists
+   */
+  async aggregateMinuteToDaily(
+    itemCodes: string[],
+    startOfDay: Date,
+    endOfDay: Date,
+  ): Promise<AggregatedOhlcData[]> {
+    try {
+      const aggregation = await this.ohlcPermanentModel
+        .aggregate([
+          {
+            $match: {
+              itemCode: { $in: itemCodes },
+              timeframe: '1m',
+              timestamp: { $gte: startOfDay, $lte: endOfDay },
+            },
+          },
+          { $sort: { timestamp: 1 } },
+          {
+            $group: {
+              _id: '$itemCode',
+              open: { $first: '$open' },
+              high: { $max: '$high' },
+              low: { $min: '$low' },
+              close: { $last: '$close' },
+              timestamp: { $first: '$timestamp' },
+            },
+          },
+          {
+            $project: {
+              itemCode: '$_id',
+              open: 1,
+              high: 1,
+              low: 1,
+              close: 1,
+              timestamp: 1,
+            },
+          },
+        ])
+        .exec();
+
+      return aggregation as AggregatedOhlcData[];
+    } catch (error) {
+      this.logger.error(
+        `Failed to aggregate minute data: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return [];
     }
   }
 }
