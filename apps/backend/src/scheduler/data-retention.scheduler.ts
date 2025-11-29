@@ -10,11 +10,11 @@ import {
 import {
   PriceSnapshot,
   PriceSnapshotDocument,
-} from "../navasan/schemas/price-snapshot.schema";
+} from "../market-data/schemas/price-snapshot.schema";
 import {
   OhlcSnapshot,
   OhlcSnapshotDocument,
-} from "../navasan/schemas/ohlc-snapshot.schema";
+} from "../market-data/schemas/ohlc-snapshot.schema";
 
 /**
  * Data Retention Scheduler

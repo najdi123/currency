@@ -7,24 +7,22 @@ import { MarketDataController } from './market-data.controller';
 // Orchestrator service
 import { MarketDataOrchestratorService } from './market-data-orchestrator.service';
 
-// New specialized services
+// Specialized services
 import { MarketDataCategoryService } from './services/market-data-category.service';
 import { MarketDataValidationService } from './services/market-data-validation.service';
 import { MarketDataCacheService } from './services/market-data-cache.service';
 import { MarketDataSnapshotService } from './services/market-data-snapshot.service';
 import { MarketDataEnrichmentService } from './services/market-data-enrichment.service';
 import { MarketDataCircuitBreakerService } from './services/market-data-circuit-breaker.service';
+import { IntradayOhlcService } from './services/intraday-ohlc.service';
 
-// Legacy services (from navasan module - to be used until fully migrated)
-import { IntradayOhlcService } from '../navasan/services/intraday-ohlc.service';
-
-// Schemas (shared with navasan module)
-import { Cache, CacheSchema } from '../navasan/schemas/cache.schema';
-import { PriceSnapshot, PriceSnapshotSchema } from '../navasan/schemas/price-snapshot.schema';
-import { OhlcSnapshot, OhlcSnapshotSchema } from '../navasan/schemas/ohlc-snapshot.schema';
-import { OHLCPermanent, OHLCPermanentSchema } from '../navasan/schemas/ohlc-permanent.schema';
-import { AggregationRule, AggregationRuleSchema } from '../navasan/schemas/aggregation-rule.schema';
-import { UpdateLog, UpdateLogSchema } from '../navasan/schemas/update-log.schema';
+// Schemas
+import { Cache, CacheSchema } from './schemas/cache.schema';
+import { PriceSnapshot, PriceSnapshotSchema } from './schemas/price-snapshot.schema';
+import { OhlcSnapshot, OhlcSnapshotSchema } from './schemas/ohlc-snapshot.schema';
+import { OHLCPermanent, OHLCPermanentSchema } from './schemas/ohlc-permanent.schema';
+import { AggregationRule, AggregationRuleSchema } from './schemas/aggregation-rule.schema';
+import { UpdateLog, UpdateLogSchema } from './schemas/update-log.schema';
 
 // External modules
 import { MetricsModule } from '../metrics/metrics.module';
@@ -83,7 +81,7 @@ import { AdminModule } from '../admin/admin.module';
     MarketDataEnrichmentService,
     MarketDataCircuitBreakerService,
 
-    // Legacy service (shared with NavasanModule)
+    // OHLC service
     IntradayOhlcService,
   ],
   exports: [
@@ -97,7 +95,7 @@ import { AdminModule } from '../admin/admin.module';
     MarketDataSnapshotService,
     MarketDataEnrichmentService,
 
-    // Export legacy service for compatibility
+    // Export OHLC service
     IntradayOhlcService,
 
     // Export MongooseModule to make schemas available

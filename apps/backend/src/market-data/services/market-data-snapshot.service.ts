@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { PriceSnapshot, PriceSnapshotDocument } from '../../navasan/schemas/price-snapshot.schema';
-import { OhlcSnapshot, OhlcSnapshotDocument } from '../../navasan/schemas/ohlc-snapshot.schema';
-import { OHLCPermanent, OHLCPermanentDocument } from '../../navasan/schemas/ohlc-permanent.schema';
+import { PriceSnapshot, PriceSnapshotDocument } from '../schemas/price-snapshot.schema';
+import { OhlcSnapshot, OhlcSnapshotDocument } from '../schemas/ohlc-snapshot.schema';
+import { OHLCPermanent, OHLCPermanentDocument } from '../schemas/ohlc-permanent.schema';
 import { SNAPSHOT } from '../constants/market-data.constants';
 import { MarketDataResponse, AggregatedOhlcData } from '../types/market-data.types';
 import { MetricsService } from '../../metrics/metrics.service';

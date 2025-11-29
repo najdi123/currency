@@ -8,7 +8,6 @@ import { AppService } from "./app.service";
 import { CurrenciesModule } from "./currencies/currencies.module";
 import { DigitalCurrenciesModule } from "./digital-currencies/digital-currencies.module";
 import { GoldModule } from "./gold/gold.module";
-import { NavasanModule } from "./navasan/navasan.module";
 import { MarketDataModule } from "./market-data/market-data.module";
 import { ChartModule } from "./chart/chart.module";
 import { HealthModule } from "./health/health.module";
@@ -111,8 +110,7 @@ import { AdminModule } from "./admin/admin.module";
     CurrenciesModule,
     DigitalCurrenciesModule,
     GoldModule,
-    NavasanModule,
-    MarketDataModule, // New provider-agnostic market data module (replaces NavasanModule)
+    MarketDataModule, // Provider-agnostic market data module
     ChartModule,
     HealthModule,
     WalletsModule,

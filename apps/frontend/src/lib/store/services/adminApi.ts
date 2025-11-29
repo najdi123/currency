@@ -3,21 +3,22 @@ import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolk
 import { config } from '@/lib/config'
 
 // TypeScript interfaces for admin API
-export type ItemCategory = 'currencies' | 'crypto' | 'gold' | 'coins'
+// Note: These must match backend enum values exactly
+export type ItemCategory = 'currencies' | 'crypto' | 'gold'
 export type ItemSource = 'api' | 'manual'
-export type ItemVariant = 'sell' | 'buy' | 'base' | 'cash' | 'havale' | 'default'
+export type ItemVariant = 'sell' | 'buy'
+export type ItemRegion = 'turkey' | 'dubai' | 'herat'
 
 export interface ManagedItem {
   _id: string
   code: string
   ohlcCode: string
   parentCode?: string
-  name: {
-    fa: string
-    en: string
-    ar?: string
-  }
+  name: string // English name
+  nameFa?: string // Farsi name
+  nameAr?: string // Arabic name
   variant: ItemVariant
+  region?: ItemRegion
   category: ItemCategory
   icon?: string
   displayOrder: number
@@ -32,6 +33,10 @@ export interface ManagedItem {
   lastApiUpdate?: string
   createdAt: string
   updatedAt: string
+  // Current price data from ohlc_permanent
+  currentPrice?: number
+  currentChange?: number
+  priceTimestamp?: string
 }
 
 export interface ManagedItemsResponse {
@@ -43,25 +48,23 @@ export interface CreateManagedItemRequest {
   code: string
   ohlcCode?: string
   parentCode?: string
-  name: {
-    fa: string
-    en: string
-    ar?: string
-  }
+  name: string // English name
+  nameFa?: string // Farsi name
+  nameAr?: string // Arabic name
   variant?: ItemVariant
+  region?: ItemRegion
   category: ItemCategory
   icon?: string
   displayOrder?: number
   isActive?: boolean
   source?: ItemSource
+  overridePrice?: number
 }
 
 export interface UpdateManagedItemRequest {
-  name?: {
-    fa?: string
-    en?: string
-    ar?: string
-  }
+  name?: string
+  nameFa?: string
+  nameAr?: string
   parentCode?: string
   icon?: string
   displayOrder?: number

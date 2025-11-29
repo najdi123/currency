@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IntradayOhlcService } from '../../navasan/services/intraday-ohlc.service';
+import { IntradayOhlcService } from './intraday-ohlc.service';
 import { GOLD_MULTIPLIER_ITEMS } from '../constants/market-data.constants';
 import { MarketDataResponse, PriceItem, MarketDataWithMetadata } from '../types/market-data.types';
 

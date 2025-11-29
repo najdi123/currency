@@ -1,5 +1,6 @@
 import { IconType } from 'react-icons'
 import type { ItemType } from '@/types/chart'
+import type { VariantType, RegionType } from '@/lib/utils/dataItemHelpers'
 
 /**
  * Supported accent color variants - DEPRECATED
@@ -13,7 +14,8 @@ export type AccentColorVariant = 'blue' | 'purple' | 'gold'
 export interface VariantData {
   code: string
   apiCode: string
-  variantType: string
+  variantType: VariantType
+  region?: RegionType
   value: string
   change: number
 }

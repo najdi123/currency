@@ -18,7 +18,7 @@ export class ListManagedItemsQueryDto {
   @ApiPropertyOptional({
     description: 'Filter by category',
     enum: ItemCategory,
-    example: 'currency',
+    example: 'currencies',
   })
   @IsOptional()
   @IsEnum(ItemCategory)

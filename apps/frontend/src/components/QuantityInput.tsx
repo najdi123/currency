@@ -37,22 +37,25 @@ export const QuantityInput: React.FC<QuantityInputProps> = ({
   }
 
   return (
-    <div className="flex-shrink-0 self-center">
+    <div className="h-full ">
       <input
         type="number"
         inputMode="numeric"
-        value={value || ''}
+        value={value ?? ''}
         onChange={handleChange}
         onFocus={handleFocus}
         placeholder={placeholder}
         min="0"
         step="any"
         className={`
-          ${compact ? 'w-14 h-6 text-xs' : 'w-20 h-8 text-sm'}
+          ${compact ? 'w-16 text-2xl' : 'w-24 text-3xl'}
+          
+          font-semibold
           bg-surface-elevated
-          border border-border-light
+          border-2
           rounded-lg
           px-2
+          py-4
           text-center
           text-text-primary
           placeholder:text-text-tertiary

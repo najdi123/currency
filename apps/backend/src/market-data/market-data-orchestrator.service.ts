@@ -14,7 +14,7 @@ import { MarketDataCacheService } from './services/market-data-cache.service';
 import { MarketDataSnapshotService } from './services/market-data-snapshot.service';
 import { MarketDataEnrichmentService } from './services/market-data-enrichment.service';
 import { MarketDataCircuitBreakerService } from './services/market-data-circuit-breaker.service';
-import { IntradayOhlcService } from '../navasan/services/intraday-ohlc.service';
+import { IntradayOhlcService } from './services/intraday-ohlc.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ApiProviderFactory } from '../api-providers/api-provider.factory';
 import { PersianApiTransformer } from '../api-providers/persianapi.transformer';

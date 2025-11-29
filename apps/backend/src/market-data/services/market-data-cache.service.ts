@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CacheService } from '../../cache/cache.service';
 import { MetricsService } from '../../metrics/metrics.service';
-import { Cache, CacheDocument } from '../../navasan/schemas/cache.schema';
+import { Cache, CacheDocument } from '../schemas/cache.schema';
 import { safeDbRead, safeDbWrite } from '../../common/utils/db-error-handler';
 import {
   CACHE_DURATIONS,

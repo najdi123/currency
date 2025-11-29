@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { MarketDataOrchestratorService } from './market-data-orchestrator.service';
-import { IntradayOhlcService } from '../navasan/services/intraday-ohlc.service';
+import { IntradayOhlcService } from './services/intraday-ohlc.service';
 import {
   parseTehranDate,
   getTehranToday,

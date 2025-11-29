@@ -17,7 +17,7 @@ import {
 import {
   OHLCPermanent,
   OHLCPermanentDocument,
-} from '../navasan/schemas/ohlc-permanent.schema';
+} from '../market-data/schemas/ohlc-permanent.schema';
 import {
   CreateManagedItemDto,
   UpdateManagedItemDto,
@@ -179,6 +179,7 @@ export class AdminService {
       nameAr: dto.nameAr,
       nameFa: dto.nameFa,
       variant: dto.variant,
+      region: dto.region,
       category: dto.category,
       icon: dto.icon,
       displayOrder: dto.displayOrder ?? 999,
@@ -401,6 +402,7 @@ export class AdminService {
       nameAr: item.nameAr,
       nameFa: item.nameFa,
       variant: item.variant,
+      region: item.region,
       category: item.category,
       icon: item.icon,
       displayOrder: item.displayOrder,
@@ -542,5 +544,111 @@ export class AdminService {
         { $set: { lastApiUpdate: new Date() } },
       )
       .exec();
+  }
+
+  // ==================== MIGRATION / INITIALIZATION ====================
+
+  /**
+   * Initialize managed_items collection from ohlc_permanent data
+   * This creates entries for all unique items found in ohlc_permanent
+   */
+  async initializeFromOhlc(): Promise<{ created: number; skipped: number; items: string[] }> {
+    this.logger.log('Initializing managed_items from ohlc_permanent...');
+
+    // Get all unique item codes from ohlc_permanent
+    const uniqueItems = await this.ohlcPermanentModel
+      .aggregate([
+        { $group: { _id: '$itemCode', itemType: { $first: '$itemType' } } },
+        { $sort: { _id: 1 } },
+      ])
+      .exec();
+
+    this.logger.log(`Found ${uniqueItems.length} unique items in ohlc_permanent`);
+
+    let created = 0;
+    let skipped = 0;
+    const createdItems: string[] = [];
+
+    // Item name mappings (can be expanded)
+    const itemNames: Record<string, { name: string; nameFa: string; nameAr: string }> = {
+      // Currencies
+      USD_SELL: { name: 'US Dollar (Sell)', nameFa: 'دلار آمریکا (فروش)', nameAr: 'الدولار الأمريكي (بيع)' },
+      USD_BUY: { name: 'US Dollar (Buy)', nameFa: 'دلار آمریکا (خرید)', nameAr: 'الدولار الأمريكي (شراء)' },
+      EUR: { name: 'Euro', nameFa: 'یورو', nameAr: 'اليورو' },
+      GBP: { name: 'British Pound', nameFa: 'پوند انگلیس', nameAr: 'الجنيه الإسترليني' },
+      AED: { name: 'UAE Dirham', nameFa: 'درهم امارات', nameAr: 'الدرهم الإماراتي' },
+      TRY: { name: 'Turkish Lira', nameFa: 'لیر ترکیه', nameAr: 'الليرة التركية' },
+      CAD: { name: 'Canadian Dollar', nameFa: 'دلار کانادا', nameAr: 'الدولار الكندي' },
+      AUD: { name: 'Australian Dollar', nameFa: 'دلار استرالیا', nameAr: 'الدولار الأسترالي' },
+      CHF: { name: 'Swiss Franc', nameFa: 'فرانک سوئیس', nameAr: 'الفرنك السويسري' },
+      CNY: { name: 'Chinese Yuan', nameFa: 'یوان چین', nameAr: 'اليوان الصيني' },
+      JPY: { name: 'Japanese Yen', nameFa: 'ین ژاپن', nameAr: 'الين الياباني' },
+      // Crypto
+      BTC: { name: 'Bitcoin', nameFa: 'بیت‌کوین', nameAr: 'بيتكوين' },
+      ETH: { name: 'Ethereum', nameFa: 'اتریوم', nameAr: 'إيثريوم' },
+      USDT: { name: 'Tether', nameFa: 'تتر', nameAr: 'تيثر' },
+      BNB: { name: 'Binance Coin', nameFa: 'بایننس کوین', nameAr: 'عملة بينانس' },
+      XRP: { name: 'Ripple', nameFa: 'ریپل', nameAr: 'ريبل' },
+      ADA: { name: 'Cardano', nameFa: 'کاردانو', nameAr: 'كاردانو' },
+      DOGE: { name: 'Dogecoin', nameFa: 'دوج‌کوین', nameAr: 'دوجكوين' },
+      SOL: { name: 'Solana', nameFa: 'سولانا', nameAr: 'سولانا' },
+      // Gold
+      SEKKEH: { name: 'Emami Gold Coin', nameFa: 'سکه امامی', nameAr: 'عملة ذهب إمامي' },
+      BAHAR: { name: 'Bahar Azadi Coin', nameFa: 'سکه بهار آزادی', nameAr: 'عملة بهار آزادي' },
+      NIM: { name: 'Half Gold Coin', nameFa: 'نیم سکه', nameAr: 'نصف عملة ذهب' },
+      ROB: { name: 'Quarter Gold Coin', nameFa: 'ربع سکه', nameAr: 'ربع عملة ذهب' },
+      GERAMI: { name: 'Gerami Gold Coin', nameFa: 'سکه گرمی', nameAr: 'عملة ذهب غرامي' },
+      '18AYAR': { name: '18K Gold', nameFa: 'طلای ۱۸ عیار', nameAr: 'ذهب 18 قيراط' },
+      ABSHODEH: { name: 'Melted Gold', nameFa: 'طلای آب‌شده', nameAr: 'ذهب مذاب' },
+    };
+
+    // Category mappings
+    const getCategory = (itemType: string, code: string): string => {
+      if (itemType === 'crypto') return 'crypto';
+      if (itemType === 'gold') return 'gold';
+      return 'currencies';
+    };
+
+    for (const item of uniqueItems) {
+      const code = item._id as string;
+      const itemType = item.itemType as string;
+      const lowerCode = code.toLowerCase();
+
+      // Check if already exists
+      const existing = await this.managedItemModel.findOne({ code: lowerCode }).exec();
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      // Get name mappings or use default
+      const names = itemNames[code] || {
+        name: code.replace(/_/g, ' '),
+        nameFa: code.replace(/_/g, ' '),
+        nameAr: code.replace(/_/g, ' '),
+      };
+
+      // Create managed item
+      const managedItem = new this.managedItemModel({
+        code: lowerCode,
+        ohlcCode: code,
+        name: names.name,
+        nameFa: names.nameFa,
+        nameAr: names.nameAr,
+        category: getCategory(itemType, code),
+        source: ItemSource.API,
+        hasApiData: true,
+        isActive: true,
+        displayOrder: 999,
+      });
+
+      await managedItem.save();
+      created++;
+      createdItems.push(lowerCode);
+    }
+
+    this.logger.log(`Initialization complete: ${created} created, ${skipped} skipped`);
+
+    return { created, skipped, items: createdItems };
   }
 }

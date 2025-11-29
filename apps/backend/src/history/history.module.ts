@@ -5,7 +5,7 @@ import { ChartModule } from "../chart/chart.module";
 import {
   OHLCPermanent,
   OHLCPermanentSchema,
-} from "../navasan/schemas/ohlc-permanent.schema";
+} from "../market-data/schemas/ohlc-permanent.schema";
 
 @Module({
   imports: [

@@ -294,7 +294,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <button
                           onClick={() => {
                             onClose()
-                            router.push('/admin/users')
+                            router.push(`/${locale}/admin/users`)
                           }}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3.5",
@@ -311,7 +311,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <button
                           onClick={() => {
                             onClose()
-                            router.push('/admin/users/create')
+                            router.push(`/${locale}/admin/users/create`)
                           }}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3.5",
@@ -328,7 +328,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <button
                           onClick={() => {
                             onClose()
-                            router.push('/admin/currencies')
+                            router.push(`/${locale}/admin/currencies`)
                           }}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3.5",
@@ -392,7 +392,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <button
                           onClick={() => {
                             onClose()
-                            router.push('/settings')
+                            router.push(`/${locale}/settings`)
                           }}
                           className={cn(
                             "w-full flex items-center justify-between",
@@ -416,7 +416,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <button
                           onClick={() => {
                             onClose()
-                            router.push('/wallet')
+                            router.push(`/${locale}/wallet`)
                           }}
                           className={cn(
                             "w-full flex items-center gap-3 px-4 py-3.5",

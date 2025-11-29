@@ -5,7 +5,7 @@ import { Model } from "mongoose";
 import {
   OhlcSnapshot,
   OhlcSnapshotDocument,
-} from "../navasan/schemas/ohlc-snapshot.schema";
+} from "../market-data/schemas/ohlc-snapshot.schema";
 import { ConfigService } from "@nestjs/config";
 
 /**

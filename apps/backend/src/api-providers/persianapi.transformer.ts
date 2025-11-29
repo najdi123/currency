@@ -5,7 +5,16 @@ import {
   GoldData,
   CoinData,
 } from "./api-provider.interface";
-import { NavasanPriceItem } from "../navasan/interfaces/navasan-response.interface";
+/**
+ * Price item structure for Navasan format compatibility
+ */
+interface NavasanPriceItem {
+  value: string;
+  change: number | null;
+  utc: string;
+  date: string;
+  dt: string;
+}
 
 /**
  * PersianApiTransformer

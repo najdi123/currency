@@ -10,24 +10,28 @@ import { Model } from "mongoose";
 import axios from "axios";
 import { TimeRange, ItemType } from "./dto/chart-query.dto";
 import { ChartDataPoint, ChartResponse } from "./interfaces/chart.interface";
-import { Cache, CacheDocument } from "../navasan/schemas/cache.schema";
+import { Cache, CacheDocument } from "../market-data/schemas/cache.schema";
 import {
   OhlcSnapshot,
   OhlcSnapshotDocument,
-} from "../navasan/schemas/ohlc-snapshot.schema";
+} from "../market-data/schemas/ohlc-snapshot.schema";
 import {
   PriceSnapshot,
   PriceSnapshotDocument,
-} from "../navasan/schemas/price-snapshot.schema";
+} from "../market-data/schemas/price-snapshot.schema";
 import {
   HistoricalOhlc,
   HistoricalOhlcDocument,
   OhlcTimeframe,
 } from "../schemas/historical-ohlc.schema";
+import {
+  OHLCPermanent,
+  OHLCPermanentDocument,
+} from "../market-data/schemas/ohlc-permanent.schema";
 import { safeDbRead, safeDbWrite } from "../common/utils/db-error-handler";
 import { MetricsService } from "../metrics/metrics.service";
-import { NavasanOHLCDataPoint } from "../navasan/interfaces/navasan-response.interface";
-import { isOHLCDataArray } from "../navasan/utils/type-guards";
+import { OhlcData, NavasanOHLCDataPoint } from "../market-data/types/market-data.types";
+import { isOHLCDataArray } from "../market-data/utils/type-guards";
 
 @Injectable()
 export class ChartService {
@@ -46,6 +50,8 @@ export class ChartService {
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
     @InjectModel(HistoricalOhlc.name)
     private historicalOhlcModel: Model<HistoricalOhlcDocument>,
+    @InjectModel(OHLCPermanent.name)
+    private ohlcPermanentModel: Model<OHLCPermanentDocument>,
     private configService: ConfigService,
     private metricsService: MetricsService,
   ) {
@@ -464,7 +470,16 @@ export class ChartService {
   }
 
   /**
-   * Fetch OHLC data with caching and fallback to stale data
+   * Fetch OHLC data from ohlc_permanent collection (SINGLE SOURCE OF TRUTH)
+   *
+   * This method reads from ohlc_permanent as the primary and ONLY data source.
+   * The Navasan API is NOT used for chart data anymore - it's only used by
+   * the OhlcCollectorService to populate ohlc_permanent.
+   *
+   * Data flow:
+   * 1. Read from ohlc_permanent (single source of truth)
+   * 2. Return data if found
+   * 3. Return empty array if no data (no API fallback)
    */
   private async fetchOHLCDataWithCache(
     itemCode: string,
@@ -472,162 +487,119 @@ export class ChartService {
     endTimestamp: number,
     timeRange: TimeRange,
   ): Promise<NavasanOHLCDataPoint[]> {
-    // Generate cache key based on item, time range
-    const cacheKey = `ohlc_${itemCode}_${timeRange}`;
-
-    // Validate cache key to prevent NoSQL injection
-    this.validateCacheKey(cacheKey);
-
     try {
-      // Step 1: Check for fresh cache (< 1 hour old)
-      const freshCache = await this.getFreshCachedOHLCData(cacheKey);
-      if (freshCache) {
-        this.logger.log(
-          `✅ Returning fresh cached OHLC data for ${itemCode} (${timeRange})`,
-        );
-        this.metricsService.trackCacheHit("ohlc", "fresh_cache");
-        return freshCache as NavasanOHLCDataPoint[];
-      }
-
-      // Step 1.5: Check OHLC Snapshot database (persisted data with longer TTL)
-      const snapshotData = await this.getOhlcSnapshotData(itemCode, timeRange);
-      if (snapshotData) {
-        const dataAge = this.getDataAge(snapshotData.timestamp);
-        this.logger.log(
-          `📦 Returning OHLC snapshot data for ${itemCode} (${timeRange}) - ${dataAge} old`,
-        );
-        this.metricsService.trackCacheHit("ohlc", "snapshot_db");
-
-        // Refresh fresh cache for faster subsequent requests (fire-and-forget)
-        this.saveOHLCToFreshCacheWithRetry(
-          cacheKey,
-          snapshotData.data,
-          snapshotData.metadata,
-        ).catch((err) => {
-          this.logger.warn(
-            `Failed to refresh fresh cache from snapshot: ${err.message}`,
-          );
-        });
-
-        return snapshotData.data;
-      }
-
-      // Step 2: Try to fetch from API
+      // SINGLE SOURCE OF TRUTH: Read from ohlc_permanent collection
       this.logger.log(
-        `📡 Fetching OHLC data from Navasan API for ${itemCode} (${timeRange})`,
+        `📊 Fetching chart data from ohlc_permanent for ${itemCode} (${timeRange})`,
       );
-      this.metricsService.trackCacheMiss("ohlc", "api_fetch");
-      try {
-        const apiResponse = await this.fetchOHLCFromApi(
-          itemCode,
-          startTimestamp,
-          endTimestamp,
+
+      const permanentData = await this.fetchFromOhlcPermanent(
+        itemCode,
+        startTimestamp,
+        endTimestamp,
+        timeRange,
+      );
+
+      if (permanentData && permanentData.length > 0) {
+        this.logger.log(
+          `✅ Returning ${permanentData.length} data points from ohlc_permanent for ${itemCode} (${timeRange})`,
         );
-
-        // Success! Save to both fresh and stale caches with error handling
-        await this.saveOHLCToFreshCacheWithRetry(
-          cacheKey,
-          apiResponse.data,
-          apiResponse.metadata,
-        );
-        await this.saveOHLCToStaleCacheWithRetry(
-          cacheKey,
-          apiResponse.data,
-          apiResponse.metadata,
-        );
-
-        // 📸 PERMANENT STORAGE: Save OHLC snapshot for historical record
-        // This data is never deleted and builds a permanent chart history database
-        await this.saveOhlcSnapshot(
-          itemCode,
-          timeRange,
-          apiResponse.data,
-          apiResponse.metadata,
-        );
-
-        return apiResponse.data;
-      } catch (apiError) {
-        // Step 3: API failed, try to serve stale data
-        this.logger.warn(
-          `⚠️  OHLC API failed for ${itemCode}. Attempting fallback to stale data.`,
-        );
-
-        // Capture error message for tracking
-        const errorMessage =
-          apiError instanceof Error ? apiError.message : String(apiError);
-
-        // Check if it's a token error
-        const isTokenError = this.isTokenExpirationError(apiError);
-        if (isTokenError) {
-          this.logger.error(`🔑 TOKEN EXPIRATION detected for OHLC API`);
-        }
-
-        // Try to get stale cache (up to 72 hours old)
-        const staleCache = await this.getStaleCachedOHLCData(cacheKey);
-        if (staleCache) {
-          this.logger.warn(
-            `⚠️  Serving STALE OHLC data for ${itemCode} (${timeRange})`,
-          );
-
-          // Mark cache as fallback with error message for monitoring
-          await this.markOHLCCacheAsFallback(cacheKey, errorMessage).catch(
-            (err) => {
-              this.logger.error(
-                `Failed to mark OHLC cache as fallback: ${err.message}`,
-              );
-            },
-          );
-
-          return staleCache as NavasanOHLCDataPoint[];
-        }
-
-        // Step 4: Try to build chart from price snapshots
-        this.logger.warn(
-          `📸 Attempting price snapshot fallback for ${itemCode}`,
-        );
-        const snapshotData = await this.buildChartFromPriceSnapshots(
-          itemCode,
-          startTimestamp,
-          endTimestamp,
-          timeRange,
-        );
-
-        if (snapshotData) {
-          this.logger.warn(
-            `⚠️  Serving chart data built from PRICE SNAPSHOTS for ${itemCode} (${timeRange})`,
-          );
-          return snapshotData;
-        }
-
-        // Step 5: Try to build chart from historical_ohlc database (newly implemented)
-        this.logger.warn(
-          `🗄️  Attempting historical_ohlc database fallback for ${itemCode}`,
-        );
-        const historicalData = await this.buildChartFromHistoricalOhlc(
-          itemCode,
-          startTimestamp,
-          endTimestamp,
-          timeRange,
-        );
-
-        if (historicalData) {
-          this.logger.warn(
-            `⚠️  Serving chart data from HISTORICAL_OHLC database for ${itemCode} (${timeRange})`,
-          );
-          return historicalData;
-        }
-
-        // No fallback options available
-        this.logger.error(
-          `❌ No fallback data available for ${itemCode}: stale cache, price snapshots, and historical_ohlc all failed`,
-        );
-        throw apiError;
+        this.metricsService.trackCacheHit("ohlc", "ohlc_permanent");
+        return permanentData;
       }
+
+      // No data in ohlc_permanent - return empty array
+      this.logger.warn(
+        `⚠️ No data found in ohlc_permanent for ${itemCode} (${timeRange})`,
+      );
+      this.metricsService.trackCacheMiss("ohlc", "ohlc_permanent_empty");
+      return [];
     } catch (error) {
       this.logger.error(
-        `Failed to fetch OHLC data for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to fetch OHLC data from ohlc_permanent for ${itemCode}: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Fetch OHLC data from ohlc_permanent collection
+   * Maps itemCode to uppercase (storage format) and queries by timeframe
+   */
+  private async fetchFromOhlcPermanent(
+    itemCode: string,
+    startTimestamp: number,
+    endTimestamp: number,
+    timeRange: TimeRange,
+  ): Promise<NavasanOHLCDataPoint[]> {
+    // Map itemCode to uppercase for storage format
+    const upperItemCode = itemCode.toUpperCase();
+
+    // Determine the appropriate timeframe based on time range
+    const timeframe = this.getTimeframeForRange(timeRange);
+
+    const startDate = new Date(startTimestamp * 1000);
+    const endDate = new Date(endTimestamp * 1000);
+
+    this.logger.debug(
+      `Querying ohlc_permanent: itemCode=${upperItemCode}, timeframe=${timeframe}, start=${startDate.toISOString()}, end=${endDate.toISOString()}`,
+    );
+
+    const records = await safeDbRead(
+      () =>
+        this.ohlcPermanentModel
+          .find({
+            itemCode: upperItemCode,
+            timeframe: timeframe,
+            timestamp: {
+              $gte: startDate,
+              $lte: endDate,
+            },
+          })
+          .sort({ timestamp: 1 })
+          .lean()
+          .exec(),
+      "fetchFromOhlcPermanent",
+      this.logger,
+      { itemCode: upperItemCode, timeframe, timeRange },
+    );
+
+    if (!records || records.length === 0) {
+      return [];
+    }
+
+    // Transform ohlc_permanent records to NavasanOHLCDataPoint format
+    return records.map((record) => ({
+      timestamp: Math.floor(record.timestamp.getTime() / 1000),
+      date: record.timestamp.toISOString().split("T")[0],
+      open: record.open,
+      high: record.high,
+      low: record.low,
+      close: record.close,
+    }));
+  }
+
+  /**
+   * Map TimeRange to ohlc_permanent timeframe
+   * - Short ranges (1d, 1w) use 1d timeframe for granularity
+   * - Longer ranges use 1d timeframe aggregated
+   */
+  private getTimeframeForRange(timeRange: TimeRange): string {
+    switch (timeRange) {
+      case TimeRange.ONE_DAY:
+        return "1d"; // Use daily data for 1 day view
+      case TimeRange.ONE_WEEK:
+        return "1d"; // Use daily data for 1 week view
+      case TimeRange.ONE_MONTH:
+        return "1d"; // Use daily data for 1 month view
+      case TimeRange.THREE_MONTHS:
+        return "1d"; // Use daily data for 3 months view
+      case TimeRange.ONE_YEAR:
+        return "1d"; // Use daily data for 1 year view
+      case TimeRange.ALL:
+        return "1d"; // Use daily data for all time view
+      default:
+        return "1d";
     }
   }
 
@@ -1114,8 +1086,17 @@ export class ChartService {
       const close =
         typeof point.close === "number" ? point.close : parseFloat(point.close);
 
-      // Convert Unix timestamp to ISO 8601 string
-      const timestamp = new Date(point.timestamp * 1000).toISOString();
+      // Convert timestamp to ISO 8601 string
+      let timestamp: string;
+      if (typeof point.timestamp === 'number') {
+        timestamp = new Date(point.timestamp * 1000).toISOString();
+      } else if (point.timestamp instanceof Date) {
+        timestamp = point.timestamp.toISOString();
+      } else if (typeof point.timestamp === 'string') {
+        timestamp = new Date(point.timestamp).toISOString();
+      } else {
+        timestamp = new Date().toISOString();
+      }
 
       return {
         timestamp,

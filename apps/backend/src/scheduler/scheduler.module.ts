@@ -15,15 +15,15 @@ import {
 import {
   PriceSnapshot,
   PriceSnapshotSchema,
-} from "../navasan/schemas/price-snapshot.schema";
+} from "../market-data/schemas/price-snapshot.schema";
 import {
   OhlcSnapshot,
   OhlcSnapshotSchema,
-} from "../navasan/schemas/ohlc-snapshot.schema";
+} from "../market-data/schemas/ohlc-snapshot.schema";
 import {
   OHLCPermanent,
   OHLCPermanentSchema,
-} from "../navasan/schemas/ohlc-permanent.schema";
+} from "../market-data/schemas/ohlc-permanent.schema";
 import { MarketDataModule } from "../market-data/market-data.module";
 import { AuthModule } from "../auth/auth.module";
 

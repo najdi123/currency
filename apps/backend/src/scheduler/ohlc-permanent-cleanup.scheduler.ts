@@ -6,7 +6,7 @@ import moment from "moment-timezone";
 import {
   OHLCPermanent,
   OHLCPermanentDocument,
-} from "../navasan/schemas/ohlc-permanent.schema";
+} from "../market-data/schemas/ohlc-permanent.schema";
 import { ConfigService } from "@nestjs/config";
 
 /**

@@ -3,13 +3,14 @@ import { AppModule } from '../src/app.module';
 import { Model } from 'mongoose';
 import { getModelToken } from '@nestjs/mongoose';
 import { HistoricalOhlc, OhlcTimeframe } from '../src/schemas/historical-ohlc.schema';
-import { CurrentPrice } from '../src/schemas/current-price.schema';
 
 /**
  * Historical OHLC Data Import Script
  *
  * This script imports historical OHLC data for USD from provided CSV data
- * and populates both historical_ohlc and current_prices collections.
+ * and populates the historical_ohlc collection.
+ *
+ * Note: CurrentPrice is no longer used - prices come from ohlc_permanent.
  */
 
 // USD Historical Data (from your CSV)
@@ -57,14 +58,10 @@ async function importHistoricalData() {
     const historicalOhlcModel = app.get<Model<HistoricalOhlc>>(
       getModelToken(HistoricalOhlc.name),
     );
-    const currentPriceModel = app.get<Model<CurrentPrice>>(
-      getModelToken(CurrentPrice.name),
-    );
 
     console.log('📊 Processing USD historical data...\n');
 
     let insertedCount = 0;
-    let updatedCount = 0;
     let skippedCount = 0;
 
     // Process each data point
@@ -107,62 +104,17 @@ async function importHistoricalData() {
       console.log(`✅ Inserted ${gregorian}: O=${open} H=${high} L=${low} C=${close}`);
     }
 
-    console.log('\n📈 Updating current price with latest data...\n');
-
-    // Get the most recent data point (first in array since it's sorted newest first)
-    const latestData = USD_HISTORICAL_DATA[0];
-    const previousData = USD_HISTORICAL_DATA[1];
-
-    // Calculate percentage change
-    const change = previousData
-      ? ((latestData.close - previousData.close) / previousData.close) * 100
-      : 0;
-
-    // Parse the latest Gregorian date
-    const [year, month, day] = latestData.gregorian.split('-').map(Number);
-    const priceTimestamp = new Date(year, month - 1, day, 12, 0, 0, 0); // Noon
-
-    // Update or create current price
-    const currentPriceUpdate = {
-      itemCode: 'price_dollar',
-      price: latestData.close,
-      change: parseFloat(change.toFixed(2)),
-      previousPrice: previousData?.close,
-      priceTimestamp,
-      source: 'manual_import',
-      rawData: {
-        importDate: new Date().toISOString(),
-        dataSource: 'historical_csv',
-      },
-    };
-
-    const result = await currentPriceModel.findOneAndUpdate(
-      { itemCode: 'price_dollar' },
-      currentPriceUpdate,
-      { upsert: true, new: true },
-    );
-
-    if (result) {
-      updatedCount++;
-      console.log(`✅ Updated current price: ${latestData.close} (${change > 0 ? '+' : ''}${change.toFixed(2)}%)\n`);
-    }
-
     // Print summary
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📊 Import Summary');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`✅ Inserted:      ${insertedCount} records`);
     console.log(`⏭️  Skipped:       ${skippedCount} records (already exist)`);
-    console.log(`🔄 Current Price: ${updatedCount} updated`);
     console.log(`📅 Date Range:    ${USD_HISTORICAL_DATA[USD_HISTORICAL_DATA.length - 1].gregorian} to ${USD_HISTORICAL_DATA[0].gregorian}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     console.log('✨ Import completed successfully!\n');
-    console.log('You can now:');
-    console.log('  • Navigate to yesterday\'s data');
-    console.log('  • View 1-week charts (7 data points)');
-    console.log('  • View 1-month charts (~30 data points)');
-    console.log('\n');
+    console.log('Note: Current prices now come from ohlc_permanent collection.\n');
 
   } catch (error) {
     console.error('❌ Error during import:', error);

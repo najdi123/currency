@@ -11,7 +11,7 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ItemCategory, ItemSource, ItemVariant } from '../../schemas/managed-item.schema';
+import { ItemCategory, ItemSource, ItemVariant, ItemRegion } from '../../schemas/managed-item.schema';
 
 /**
  * DTO for creating a new managed item
@@ -85,10 +85,19 @@ export class CreateManagedItemDto {
   @IsEnum(ItemVariant)
   variant?: ItemVariant;
 
+  @ApiPropertyOptional({
+    description: 'Regional variant (turkey, dubai, herat)',
+    enum: ItemRegion,
+    example: 'turkey',
+  })
+  @IsOptional()
+  @IsEnum(ItemRegion)
+  region?: ItemRegion;
+
   @ApiProperty({
     description: 'Item category',
     enum: ItemCategory,
-    example: 'currency',
+    example: 'currencies',
   })
   @IsEnum(ItemCategory)
   category!: ItemCategory;

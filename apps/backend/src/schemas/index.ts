@@ -1,14 +1,18 @@
 /**
- * New Simplified Schema Exports
+ * Schema Exports
  *
- * Note: IntradayOhlc has been removed - all OHLC data now uses
- * OHLCPermanent from navasan/schemas as the single source of truth.
+ * Notes:
+ * - OHLCPermanent from navasan/schemas is the single source of truth for price data
+ * - ManagedItem provides admin layer for item management
+ * - HistoricalOhlc is used for weekly/monthly aggregation
+ * - UserRateLimit is exported from rate-limit module (encapsulated)
  *
- * Note: UserRateLimit is exported from rate-limit module, not here,
- * to keep rate limiting concerns properly encapsulated.
+ * Removed schemas (Phase 9 cleanup):
+ * - TrackedItem: Replaced by ManagedItem
+ * - CurrentPrice: Replaced by OHLCPermanent
+ * - IntradayOhlc: Replaced by OHLCPermanent
  */
 
-export * from "./tracked-item.schema";
-export * from "./current-price.schema";
 export * from "./historical-ohlc.schema";
+export * from "./managed-item.schema";
 export * from "./schemas.module";

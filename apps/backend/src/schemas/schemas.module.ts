@@ -1,25 +1,26 @@
 import { Module } from "@nestjs/common";
 import { MongooseModule } from "@nestjs/mongoose";
-import { TrackedItem, TrackedItemSchema } from "./tracked-item.schema";
-import { CurrentPrice, CurrentPriceSchema } from "./current-price.schema";
 import { HistoricalOhlc, HistoricalOhlcSchema } from "./historical-ohlc.schema";
 
 /**
  * Schemas Module
  *
- * Registers simplified schemas with Mongoose.
+ * Registers shared schemas with Mongoose.
  *
- * Note: IntradayOhlc has been removed - all OHLC data now uses
- * OHLCPermanent from navasan/schemas as the single source of truth.
+ * Notes:
+ * - OHLCPermanent from navasan/schemas is the single source of truth for price data
+ * - HistoricalOhlc is used for weekly/monthly aggregation and chart fallbacks
+ * - ManagedItem from schemas/managed-item.schema is the admin layer
+ * - UserRateLimit is registered in RateLimitModule (encapsulated)
  *
- * Note: UserRateLimit is registered in RateLimitModule, not here,
- * to keep rate limiting concerns properly encapsulated.
+ * Removed schemas (Phase 9 cleanup):
+ * - TrackedItem: Replaced by ManagedItem
+ * - CurrentPrice: Replaced by OHLCPermanent
+ * - IntradayOhlc: Replaced by OHLCPermanent
  */
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: TrackedItem.name, schema: TrackedItemSchema },
-      { name: CurrentPrice.name, schema: CurrentPriceSchema },
       { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
     ]),
   ],

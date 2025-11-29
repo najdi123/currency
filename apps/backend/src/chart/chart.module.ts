@@ -3,19 +3,23 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { ConfigModule } from "@nestjs/config";
 import { ChartController } from "./chart.controller";
 import { ChartService } from "./chart.service";
-import { Cache, CacheSchema } from "../navasan/schemas/cache.schema";
+import { Cache, CacheSchema } from "../market-data/schemas/cache.schema";
 import {
   OhlcSnapshot,
   OhlcSnapshotSchema,
-} from "../navasan/schemas/ohlc-snapshot.schema";
+} from "../market-data/schemas/ohlc-snapshot.schema";
 import {
   PriceSnapshot,
   PriceSnapshotSchema,
-} from "../navasan/schemas/price-snapshot.schema";
+} from "../market-data/schemas/price-snapshot.schema";
 import {
   HistoricalOhlc,
   HistoricalOhlcSchema,
 } from "../schemas/historical-ohlc.schema";
+import {
+  OHLCPermanent,
+  OHLCPermanentSchema,
+} from "../market-data/schemas/ohlc-permanent.schema";
 import { MetricsModule } from "../metrics/metrics.module";
 
 @Module({
@@ -26,6 +30,7 @@ import { MetricsModule } from "../metrics/metrics.module";
       { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
       { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
       { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
+      { name: OHLCPermanent.name, schema: OHLCPermanentSchema },
     ]),
     MetricsModule,
   ],

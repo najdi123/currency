@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ItemCategory, ItemSource, ItemVariant } from '../../schemas/managed-item.schema';
+import { ItemCategory, ItemSource, ItemVariant, ItemRegion } from '../../schemas/managed-item.schema';
 
 /**
  * Response DTO for managed item with current price
@@ -25,6 +25,9 @@ export class ManagedItemResponseDto {
 
   @ApiPropertyOptional({ description: 'Variant type', enum: ItemVariant })
   variant?: ItemVariant;
+
+  @ApiPropertyOptional({ description: 'Regional variant', enum: ItemRegion })
+  region?: ItemRegion;
 
   @ApiProperty({ description: 'Item category', enum: ItemCategory })
   category!: ItemCategory;

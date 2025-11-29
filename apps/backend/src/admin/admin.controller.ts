@@ -261,4 +261,28 @@ export class AdminController {
   ): Promise<DiagnosticDataResponseDto> {
     return this.adminService.getDiagnosticData(itemCode);
   }
+
+  // ==================== MIGRATION ====================
+
+  @Post('migrate/initialize')
+  @ApiOperation({
+    summary: 'Initialize managed items from OHLC data',
+    description:
+      'Populates the managed_items collection from ohlc_permanent. Creates entries for all unique items found in the database. Safe to run multiple times - existing items are skipped.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Migration result',
+    schema: {
+      type: 'object',
+      properties: {
+        created: { type: 'number', description: 'Number of items created' },
+        skipped: { type: 'number', description: 'Number of items skipped (already exist)' },
+        items: { type: 'array', items: { type: 'string' }, description: 'List of created item codes' },
+      },
+    },
+  })
+  async initializeFromOhlc(): Promise<{ created: number; skipped: number; items: string[] }> {
+    return this.adminService.initializeFromOhlc();
+  }
 }

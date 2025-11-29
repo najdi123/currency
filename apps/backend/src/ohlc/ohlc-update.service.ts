@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { OHLCManagerService } from "./ohlc-manager.service";
-import { OHLCPermanent } from "../navasan/schemas/ohlc-permanent.schema";
+import { OHLCPermanent } from "../market-data/schemas/ohlc-permanent.schema";
 
 @Injectable()
 export class OHLCUpdateService {

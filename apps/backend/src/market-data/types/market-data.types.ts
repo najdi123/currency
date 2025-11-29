@@ -123,6 +123,23 @@ export interface OhlcData {
   change?: number;
 }
 
+/**
+ * OHLC Data Point from API (Navasan format)
+ * Used for chart data points from external APIs
+ * Compatible with OhlcData for ease of use
+ */
+export interface NavasanOHLCDataPoint {
+  timestamp?: number | string | Date; // Unix timestamp or Date
+  date?: string; // Persian date YYYY-MM-DD
+  open: number | string; // Opening price
+  high: number | string; // Highest price
+  low: number | string; // Lowest price
+  close: number | string; // Closing price
+  volume?: number | string;
+  itemCode?: string;
+  change?: number;
+}
+
 export interface AggregatedOhlcData {
   itemCode: string;
   open: number;

@@ -5,9 +5,10 @@ export type ManagedItemDocument = ManagedItem & Document;
 
 /**
  * ItemCategory - Type of market item
+ * Note: Using 'currencies' (plural) to match existing database data
  */
 export enum ItemCategory {
-  CURRENCY = 'currency',
+  CURRENCIES = 'currencies',
   CRYPTO = 'crypto',
   GOLD = 'gold',
 }
@@ -26,6 +27,15 @@ export enum ItemSource {
 export enum ItemVariant {
   SELL = 'sell',
   BUY = 'buy',
+}
+
+/**
+ * ItemRegion - Regional variants for currencies
+ */
+export enum ItemRegion {
+  TURKEY = 'turkey',
+  DUBAI = 'dubai',
+  HERAT = 'herat',
 }
 
 /**
@@ -91,6 +101,12 @@ export class ManagedItem {
    */
   @Prop({ enum: ItemVariant })
   variant?: ItemVariant;
+
+  /**
+   * Regional variant (turkey, dubai, herat) for manual regional prices
+   */
+  @Prop({ enum: ItemRegion, index: true })
+  region?: ItemRegion;
 
   /**
    * Item category (currency, crypto, gold)
@@ -192,6 +208,9 @@ ManagedItemSchema.index({ category: 1, isActive: 1, displayOrder: 1 });
 
 // Index for parent code queries (grouping variants)
 ManagedItemSchema.index({ parentCode: 1, isActive: 1 });
+
+// Index for regional variants
+ManagedItemSchema.index({ parentCode: 1, region: 1 });
 
 // Index for override tracking
 ManagedItemSchema.index({ isOverridden: 1, overrideAt: -1 });

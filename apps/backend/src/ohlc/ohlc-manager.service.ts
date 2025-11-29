@@ -4,11 +4,11 @@ import { Model } from "mongoose";
 import {
   OHLCPermanent,
   OHLCPermanentDocument,
-} from "../navasan/schemas/ohlc-permanent.schema";
+} from "../market-data/schemas/ohlc-permanent.schema";
 import {
   UpdateLog,
   UpdateLogDocument,
-} from "../navasan/schemas/update-log.schema";
+} from "../market-data/schemas/update-log.schema";
 
 @Injectable()
 export class OHLCManagerService {

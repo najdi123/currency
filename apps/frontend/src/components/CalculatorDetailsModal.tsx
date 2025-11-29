@@ -148,7 +148,7 @@ export const CalculatorDetailsModal: React.FC<CalculatorDetailsModalProps> = ({
           </div>
 
           {/* Footer with Total and Actions */}
-          <div className="border-t border-border-light px-6 py-4 bg-bg-elevated">
+          <div className="border-t border-border-light px-6 py-4 bg-bg-elevated pb-14">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-sm text-text-secondary">{t('total')}</p>

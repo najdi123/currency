@@ -10,7 +10,7 @@ import {
 import {
   OHLCPermanent,
   OHLCPermanentSchema,
-} from '../navasan/schemas/ohlc-permanent.schema';
+} from '../market-data/schemas/ohlc-permanent.schema';
 
 /**
  * AdminModule

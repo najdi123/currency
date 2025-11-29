@@ -11,16 +11,13 @@ export interface DataItem {
 }
 
 // Currency items to display with brand-specific colors
-// Only includes items that exist in the API response
+// Only includes MAIN items - variants (buy, regional) are shown in dropdown
 export const currencyItems: DataItem[] = [
-  { key: 'usd_sell', icon: FaDollarSign, color: 'text-green-600' }, // USD Sell
-  { key: 'usd_buy', icon: FaDollarSign, color: 'text-green-500' }, // USD Buy
-  { key: 'eur', icon: FaEuroSign, color: 'text-blue-600' }, // EUR
-  { key: 'eur_buy', icon: FaEuroSign, color: 'text-blue-500' }, // EUR Buy
-  { key: 'gbp', icon: FaPoundSign, color: 'text-purple-600' }, // GBP
-  { key: 'gbp_buy', icon: FaPoundSign, color: 'text-purple-500' }, // GBP Buy
-  { key: 'aed', icon: FaDollarSign, color: 'text-emerald-600' }, // AED
-  { key: 'aed_buy', icon: FaDollarSign, color: 'text-emerald-500' }, // AED Buy
+  { key: 'usd_sell', icon: FaDollarSign, color: 'text-green-600' }, // USD Sell (main)
+  { key: 'eur', icon: FaEuroSign, color: 'text-blue-600' }, // EUR (main)
+  { key: 'gbp', icon: FaPoundSign, color: 'text-purple-600' }, // GBP (main)
+  { key: 'aed', icon: FaDollarSign, color: 'text-emerald-600' }, // AED (main)
+  { key: 'try', icon: FaDollarSign, color: 'text-red-600' }, // TRY (Turkish Lira)
   { key: 'rub', icon: FaDollarSign, color: 'text-blue-500' }, // RUB (Russia)
 ]
 
@@ -52,50 +49,157 @@ export const goldItems: DataItem[] = [
 
 /**
  * Currency Variant Structure
- * Defines additional variants for currencies (buy/sell, harat, hawala, etc.)
+ * Defines additional variants for currencies (buy/sell, regional, etc.)
  */
+export type VariantType = 'sell' | 'buy' | 'sell_dubai' | 'buy_dubai' | 'sell_turkey' | 'buy_turkey' | 'sell_herat' | 'buy_herat'
+export type RegionType = 'iran' | 'dubai' | 'turkey' | 'herat'
+
 export interface CurrencyVariant {
   code: string
   apiCode: string
   parentCode: string
-  variantType: 'buy' | 'sell' | 'harat' | 'tomorrow' | 'special' | 'hawala'
+  variantType: VariantType
+  region?: RegionType
   displayOrder: number
 }
 
-// Currency variants - only for currencies that exist in the API
-// Note: Buy variants are now in the main currencyItems list
+// Currency variants - shown in the 3-dot dropdown menu
+// Includes buy/sell variants and regional variants (Dubai, Turkey, Herat)
 export const currencyVariants: CurrencyVariant[] = [
-  // USD variants (parentCode must match the key in currencyItems: 'usd_sell')
+  // ==================== USD Variants ====================
+  // Iran (default)
+  {
+    code: 'usd_sell',
+    apiCode: 'usd_sell',
+    parentCode: 'usd_sell',
+    variantType: 'sell',
+    region: 'iran',
+    displayOrder: 0,
+  },
   {
     code: 'usd_buy',
     apiCode: 'usd_buy',
     parentCode: 'usd_sell',
     variantType: 'buy',
+    region: 'iran',
     displayOrder: 1,
   },
-  // EUR variants
+  // Dubai
+  {
+    code: 'usd_sell_dubai',
+    apiCode: 'dirham_dubai',
+    parentCode: 'usd_sell',
+    variantType: 'sell_dubai',
+    region: 'dubai',
+    displayOrder: 2,
+  },
+  // Turkey (Istanbul)
+  {
+    code: 'usd_sell_turkey',
+    apiCode: 'dolar_istanbul_sell',
+    parentCode: 'usd_sell',
+    variantType: 'sell_turkey',
+    region: 'turkey',
+    displayOrder: 3,
+  },
+  // Herat
+  {
+    code: 'usd_sell_herat',
+    apiCode: 'dolar_harat_sell',
+    parentCode: 'usd_sell',
+    variantType: 'sell_herat',
+    region: 'herat',
+    displayOrder: 4,
+  },
+
+  // ==================== EUR Variants ====================
+  {
+    code: 'eur_sell',
+    apiCode: 'eur',
+    parentCode: 'eur',
+    variantType: 'sell',
+    region: 'iran',
+    displayOrder: 0,
+  },
   {
     code: 'eur_buy',
     apiCode: 'eur_buy',
     parentCode: 'eur',
     variantType: 'buy',
+    region: 'iran',
     displayOrder: 1,
   },
-  // GBP variants
+
+  // ==================== GBP Variants ====================
+  {
+    code: 'gbp_sell',
+    apiCode: 'gbp',
+    parentCode: 'gbp',
+    variantType: 'sell',
+    region: 'iran',
+    displayOrder: 0,
+  },
   {
     code: 'gbp_buy',
     apiCode: 'gbp_buy',
     parentCode: 'gbp',
     variantType: 'buy',
+    region: 'iran',
     displayOrder: 1,
   },
-  // AED variants
+
+  // ==================== AED Variants ====================
+  {
+    code: 'aed_sell',
+    apiCode: 'aed',
+    parentCode: 'aed',
+    variantType: 'sell',
+    region: 'iran',
+    displayOrder: 0,
+  },
   {
     code: 'aed_buy',
     apiCode: 'aed_buy',
     parentCode: 'aed',
     variantType: 'buy',
+    region: 'iran',
     displayOrder: 1,
+  },
+  // Dubai
+  {
+    code: 'aed_sell_dubai',
+    apiCode: 'dirham_dubai',
+    parentCode: 'aed',
+    variantType: 'sell_dubai',
+    region: 'dubai',
+    displayOrder: 2,
+  },
+
+  // ==================== TRY (Turkish Lira) Variants ====================
+  {
+    code: 'try_sell',
+    apiCode: 'try',
+    parentCode: 'try',
+    variantType: 'sell',
+    region: 'iran',
+    displayOrder: 0,
+  },
+  {
+    code: 'try_buy',
+    apiCode: 'try_buy',
+    parentCode: 'try',
+    variantType: 'buy',
+    region: 'iran',
+    displayOrder: 1,
+  },
+  // Turkey (Istanbul)
+  {
+    code: 'try_sell_turkey',
+    apiCode: 'lira_istanbul_sell',
+    parentCode: 'try',
+    variantType: 'sell_turkey',
+    region: 'turkey',
+    displayOrder: 2,
   },
 ]
 
@@ -133,6 +237,7 @@ export function getVariantData(
     code: variant.code,
     apiCode: variant.apiCode,
     variantType: variant.variantType,
+    region: variant.region,
     value: data.value,
     change: data.change,
   }
@@ -144,14 +249,14 @@ export function getVariantData(
  */
 
 // Main currencies shown by default (most important ones)
+// Variants (buy, regional) are shown in dropdown, not as separate cards
 export const mainCurrencies = [
-  'usd_sell', 'eur', 'gbp', 'aed', 'rub'
+  'usd_sell', 'eur', 'gbp', 'aed', 'try', 'rub'
 ]
 
 // Additional currencies shown when "show more" is clicked
-export const additionalCurrencies = [
-  'usd_buy', 'eur_buy', 'gbp_buy', 'aed_buy'
-]
+// Note: Buy variants are now in the dropdown, not as separate cards
+export const additionalCurrencies: string[] = []
 
 // Main crypto shown by default
 export const mainCrypto = ['btc', 'eth', 'usdt']

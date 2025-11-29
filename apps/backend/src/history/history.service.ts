@@ -7,7 +7,7 @@ import { TimeRange, ItemType } from "../chart/dto/chart-query.dto";
 import {
   OHLCPermanent,
   OHLCPermanentDocument,
-} from "../navasan/schemas/ohlc-permanent.schema";
+} from "../market-data/schemas/ohlc-permanent.schema";
 
 export interface HistoryDataPoint {
   date: string; // ISO 8601 date (YYYY-MM-DD)
