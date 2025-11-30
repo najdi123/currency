@@ -1,17 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { ManagedItem, ManagedItemDocument } from '../schemas/managed-item.schema';
+import { ManagedItem, ManagedItemDocument, ItemSource } from '../schemas/managed-item.schema';
+
+/**
+ * ManualItemData - Data structure for manual items to inject
+ */
+interface ManualItemData {
+  code: string;
+  price: number;
+  change?: number;
+  parentCode?: string;
+  region?: string;
+  variant?: string;
+  name: string;
+  nameFa?: string;
+  nameAr?: string;
+}
 
 /**
  * AdminOverrideService
  *
- * Lightweight service for fetching admin overrides.
+ * Lightweight service for fetching admin overrides and manual items.
  * Designed to be injected into MarketDataOrchestratorService
  * without circular dependency issues.
  *
  * This service is separate from AdminService to avoid
  * importing the full admin module into market-data.
+ *
+ * Responsibilities:
+ * 1. Apply price overrides to existing API items
+ * 2. Inject manual items (source='manual') into API response
  */
 @Injectable()
 export class AdminOverrideService {
@@ -21,6 +40,10 @@ export class AdminOverrideService {
   private overrideCache: Map<string, { price: number; change?: number }> | null = null;
   private overrideCacheTimestamp: number = 0;
   private readonly OVERRIDE_CACHE_TTL = 60000; // 1 minute
+
+  // In-memory cache for manual items
+  private manualItemsCache: ManualItemData[] | null = null;
+  private manualItemsCacheTimestamp: number = 0;
 
   constructor(
     @InjectModel(ManagedItem.name)
@@ -84,25 +107,90 @@ export class AdminOverrideService {
   clearCache(): void {
     this.overrideCache = null;
     this.overrideCacheTimestamp = 0;
-    this.logger.debug('Override cache cleared');
+    this.manualItemsCache = null;
+    this.manualItemsCacheTimestamp = 0;
+    this.logger.debug('Override and manual items cache cleared');
   }
 
   /**
-   * Apply overrides to market data response
-   * Returns the data with any overridden prices replaced
+   * Get all manual items (source='manual') with a price set
+   * These are admin-created items like regional variants (usd_dubai_sell, etc.)
+   */
+  async getManualItems(): Promise<ManualItemData[]> {
+    const now = Date.now();
+
+    // Return cached if still valid
+    if (this.manualItemsCache && (now - this.manualItemsCacheTimestamp) < this.OVERRIDE_CACHE_TTL) {
+      return this.manualItemsCache;
+    }
+
+    try {
+      // Fetch manual items that have a price set (either via override or initial price)
+      const items = await this.managedItemModel
+        .find({
+          source: ItemSource.MANUAL,
+          isActive: true,
+          $or: [
+            { overridePrice: { $exists: true, $ne: null } },
+            { isOverridden: true },
+          ],
+        })
+        .select('code parentCode region variant overridePrice overrideChange name nameFa nameAr')
+        .lean()
+        .exec();
+
+      const manualItems: ManualItemData[] = items
+        .filter(item => item.overridePrice !== undefined && item.overridePrice !== null)
+        .map(item => ({
+          code: item.code,
+          price: item.overridePrice!,
+          change: item.overrideChange,
+          parentCode: item.parentCode,
+          region: item.region,
+          variant: item.variant,
+          name: item.name,
+          nameFa: item.nameFa,
+          nameAr: item.nameAr,
+        }));
+
+      // Update cache
+      this.manualItemsCache = manualItems;
+      this.manualItemsCacheTimestamp = now;
+
+      this.logger.debug(`Loaded ${manualItems.length} manual item(s) from database`);
+
+      return manualItems;
+    } catch (error) {
+      this.logger.warn(`Failed to fetch manual items: ${error instanceof Error ? error.message : String(error)}`);
+
+      // Return cached or empty array on error
+      return this.manualItemsCache || [];
+    }
+  }
+
+  /**
+   * Apply overrides and inject manual items into market data response
+   *
+   * This method does two things:
+   * 1. Replaces prices for existing items that have overrides
+   * 2. Injects new manual items (regional variants) that don't exist in API data
+   *
+   * Returns the data with overridden prices and injected manual items
    */
   async applyOverrides<T extends Record<string, unknown>>(data: T): Promise<T> {
     try {
-      const overrides = await this.getOverriddenItems();
-
-      if (overrides.size === 0) {
-        return data;
-      }
+      // Fetch both overrides and manual items in parallel
+      const [overrides, manualItems] = await Promise.all([
+        this.getOverriddenItems(),
+        this.getManualItems(),
+      ]);
 
       // Create a shallow copy
       const result: Record<string, unknown> = { ...data };
       let overrideCount = 0;
+      let injectedCount = 0;
 
+      // Step 1: Apply overrides to existing items
       for (const [code, itemData] of Object.entries(result)) {
         if (!itemData || typeof itemData !== 'object' || code.startsWith('_')) continue;
 
@@ -120,8 +208,33 @@ export class AdminOverrideService {
         }
       }
 
-      if (overrideCount > 0) {
-        this.logger.debug(`Applied ${overrideCount} price override(s)`);
+      // Step 2: Inject manual items that don't exist in API data
+      for (const manualItem of manualItems) {
+        const code = manualItem.code.toLowerCase();
+
+        // Only inject if it doesn't already exist in the response
+        if (!result[code]) {
+          result[code] = {
+            value: String(manualItem.price),
+            change: manualItem.change ?? 0,
+            timestamp: Date.now(),
+            date: new Date().toISOString().split('T')[0],
+            _manual: true, // Debug marker for manual items
+            _parentCode: manualItem.parentCode,
+            _region: manualItem.region,
+            _variant: manualItem.variant,
+            _name: manualItem.name,
+            _nameFa: manualItem.nameFa,
+            _nameAr: manualItem.nameAr,
+          };
+          injectedCount++;
+        }
+      }
+
+      if (overrideCount > 0 || injectedCount > 0) {
+        this.logger.debug(
+          `Applied ${overrideCount} override(s), injected ${injectedCount} manual item(s)`
+        );
       }
 
       return result as T;
@@ -130,5 +243,14 @@ export class AdminOverrideService {
       this.logger.warn(`Failed to apply overrides: ${error instanceof Error ? error.message : String(error)}`);
       return data;
     }
+  }
+
+  /**
+   * Get all manual items grouped by parent code
+   * Useful for frontend to fetch regional variants for a specific currency
+   */
+  async getManualItemsByParent(parentCode: string): Promise<ManualItemData[]> {
+    const allManualItems = await this.getManualItems();
+    return allManualItems.filter(item => item.parentCode === parentCode.toLowerCase());
   }
 }

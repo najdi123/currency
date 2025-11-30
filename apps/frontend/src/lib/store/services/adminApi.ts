@@ -30,6 +30,8 @@ export interface ManagedItem {
   overrideChange?: number
   overrideBy?: string
   overrideAt?: string
+  overrideDuration?: number
+  overrideExpiresAt?: string
   lastApiUpdate?: string
   createdAt: string
   updatedAt: string
@@ -74,6 +76,8 @@ export interface UpdateManagedItemRequest {
 export interface SetOverrideRequest {
   price: number
   change?: number
+  duration?: number
+  isIndefinite?: boolean
 }
 
 export interface GroupedItem {

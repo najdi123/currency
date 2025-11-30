@@ -59,3 +59,10 @@ UpdateLogSchema.index({ itemCode: 1, timestamp: -1 });
 UpdateLogSchema.index({ updateType: 1, status: 1 });
 UpdateLogSchema.index({ timestamp: -1 });
 UpdateLogSchema.index({ itemCode: 1, timeframe: 1, timestamp: -1 });
+
+// TTL index for automatic cleanup - delete logs older than 90 days
+// This prevents unbounded growth of the update_logs collection
+UpdateLogSchema.index(
+  { timestamp: 1 },
+  { expireAfterSeconds: 90 * 24 * 60 * 60, name: 'ttl_90_days' }
+);

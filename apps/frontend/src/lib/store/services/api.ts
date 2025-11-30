@@ -83,6 +83,24 @@ export interface AllOhlcResponse {
   data: OhlcResponse[]
 }
 
+// Regional variant response types
+export interface RegionalVariant {
+  code: string
+  price: number
+  change: number
+  region?: string
+  variant?: string
+  name: string
+  nameFa?: string
+  nameAr?: string
+}
+
+export interface RegionalVariantsResponse {
+  parentCode: string
+  count: number
+  variants: RegionalVariant[]
+}
+
 export interface LatestRatesResponse {
   [key: string]: RateItem
 }
@@ -247,12 +265,12 @@ export const api = createApi({
   keepUnusedDataFor: 1200, // 20 minutes
   endpoints: (builder) => ({
     getLatestRates: builder.query<LatestRatesResponse, void>({
-      query: () => '/navasan/latest',
+      query: () => '/market-data/latest',
       providesTags: ['Rates'],
       keepUnusedDataFor: 1200,
     }),
     getCurrencies: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/currencies',
+      query: () => '/market-data/currencies',
       providesTags: ['Rates', 'Currencies'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -266,7 +284,7 @@ export const api = createApi({
       },
     }),
     getCrypto: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/crypto',
+      query: () => '/market-data/crypto',
       providesTags: ['Rates', 'DigitalCurrencies'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -280,7 +298,7 @@ export const api = createApi({
       },
     }),
     getGold: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/gold',
+      query: () => '/market-data/gold',
       providesTags: ['Rates', 'Gold'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -294,7 +312,7 @@ export const api = createApi({
       },
     }),
     getCoins: builder.query<CoinsResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/coins',
+      query: () => '/market-data/coins',
       providesTags: ['Rates', 'Coins'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -309,7 +327,7 @@ export const api = createApi({
     }),
     // Yesterday's data endpoints
     getCurrenciesYesterday: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/currencies/yesterday',
+      query: () => '/market-data/currencies/yesterday',
       providesTags: ['Rates', 'Currencies'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -323,7 +341,7 @@ export const api = createApi({
       },
     }),
     getCryptoYesterday: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/crypto/yesterday',
+      query: () => '/market-data/crypto/yesterday',
       providesTags: ['Rates', 'DigitalCurrencies'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -337,7 +355,7 @@ export const api = createApi({
       },
     }),
     getGoldYesterday: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/gold/yesterday',
+      query: () => '/market-data/gold/yesterday',
       providesTags: ['Rates', 'Gold'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -351,7 +369,7 @@ export const api = createApi({
       },
     }),
     getCoinsYesterday: builder.query<CoinsResponse & { _metadata?: ApiResponseMetadata }, void>({
-      query: () => '/navasan/coins/yesterday',
+      query: () => '/market-data/coins/yesterday',
       providesTags: ['Rates', 'Coins'],
       keepUnusedDataFor: 1200,
       transformResponse: (response: ApiRawResponse) => {
@@ -367,7 +385,7 @@ export const api = createApi({
     // Historical data endpoints with date parameter (90 days back)
     // Historical data doesn't change, so cache for much longer (24 hours = 86400s)
     getCurrenciesHistorical: builder.query<CurrenciesResponse & { _metadata?: ApiResponseMetadata }, string>({
-      query: (date) => `/navasan/currencies/historical?date=${date}`,
+      query: (date) => `/market-data/currencies/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
         { type: 'Currencies' as const, id: `historical-${date}` }
       ],
@@ -383,7 +401,7 @@ export const api = createApi({
       },
     }),
     getCryptoHistorical: builder.query<CryptoResponse & { _metadata?: ApiResponseMetadata }, string>({
-      query: (date) => `/navasan/crypto/historical?date=${date}`,
+      query: (date) => `/market-data/crypto/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
         { type: 'DigitalCurrencies' as const, id: `historical-${date}` }
       ],
@@ -399,7 +417,7 @@ export const api = createApi({
       },
     }),
     getGoldHistorical: builder.query<GoldResponse & { _metadata?: ApiResponseMetadata }, string>({
-      query: (date) => `/navasan/gold/historical?date=${date}`,
+      query: (date) => `/market-data/gold/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
         { type: 'Gold' as const, id: `historical-${date}` }
       ],
@@ -415,7 +433,7 @@ export const api = createApi({
       },
     }),
     getCoinsHistorical: builder.query<CoinsResponse & { _metadata?: ApiResponseMetadata }, string>({
-      query: (date) => `/navasan/coins/historical?date=${date}`,
+      query: (date) => `/market-data/coins/historical?date=${date}`,
       providesTags: (_result, _error, date) => [
         { type: 'Coins' as const, id: `historical-${date}` }
       ],
@@ -459,7 +477,7 @@ export const api = createApi({
     // Manual refresh mutations - force fresh data fetch
     refreshCurrencyData: builder.mutation<void, void>({
       query: () => ({
-        url: '/navasan/currencies',
+        url: '/market-data/currencies',
         method: 'GET',
         // Force bypass cache by adding timestamp
         params: { _t: Date.now() }
@@ -468,7 +486,7 @@ export const api = createApi({
     }),
     refreshCryptoData: builder.mutation<void, void>({
       query: () => ({
-        url: '/navasan/crypto',
+        url: '/market-data/crypto',
         method: 'GET',
         params: { _t: Date.now() }
       }),
@@ -476,7 +494,7 @@ export const api = createApi({
     }),
     refreshGoldData: builder.mutation<void, void>({
       query: () => ({
-        url: '/navasan/gold',
+        url: '/market-data/gold',
         method: 'GET',
         params: { _t: Date.now() }
       }),
@@ -484,7 +502,7 @@ export const api = createApi({
     }),
     refreshCoinsData: builder.mutation<void, void>({
       query: () => ({
-        url: '/navasan/coins',
+        url: '/market-data/coins',
         method: 'GET',
         params: { _t: Date.now() }
       }),
@@ -492,15 +510,20 @@ export const api = createApi({
     }),
     // Get today's OHLC for specific item
     getTodayOhlc: builder.query<OhlcResponse, string>({
-      query: (itemCode) => `/navasan/ohlc/today/${itemCode}`,
+      query: (itemCode) => `/market-data/ohlc/today/${itemCode}`,
       providesTags: (result, error, itemCode) => [{ type: 'Ohlc', id: itemCode }],
       keepUnusedDataFor: 600, // 10 minutes - intraday data changes frequently
     }),
     // Get today's OHLC for all items
     getAllTodayOhlc: builder.query<AllOhlcResponse, void>({
-      query: () => '/navasan/ohlc/all',
+      query: () => '/market-data/ohlc/all',
       providesTags: ['Ohlc'],
       keepUnusedDataFor: 600, // 10 minutes - intraday data changes frequently
+    }),
+    // Get regional variants for a parent currency (e.g., usd -> usd_dubai, usd_turkey)
+    getRegionalVariants: builder.query<RegionalVariantsResponse, string>({
+      query: (parentCode) => `/market-data/variants/${parentCode}`,
+      keepUnusedDataFor: 300, // 5 minutes - admin may add new variants
     }),
   }),
 })
@@ -530,6 +553,7 @@ export const {
   useRefreshCoinsDataMutation,
   useGetTodayOhlcQuery,
   useGetAllTodayOhlcQuery,
+  useGetRegionalVariantsQuery,
 } = api
 
 // Re-export typed error utilities for component use

@@ -46,6 +46,12 @@ export class HistoricalOhlc {
 export const HistoricalOhlcSchema =
   SchemaFactory.createForClass(HistoricalOhlc);
 
+// Unique constraint to prevent duplicate OHLC records for same item/timeframe/period
+HistoricalOhlcSchema.index(
+  { itemCode: 1, timeframe: 1, periodStart: 1 },
+  { unique: true, name: 'unique_ohlc_record' }
+);
+
 // Compound indexes for efficient queries
 HistoricalOhlcSchema.index({ itemCode: 1, timeframe: 1, periodStart: -1 });
 HistoricalOhlcSchema.index({ itemCode: 1, periodStart: -1 });

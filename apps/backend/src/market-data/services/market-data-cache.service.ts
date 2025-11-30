@@ -31,6 +31,10 @@ export class MarketDataCacheService {
   private readonly freshCacheMinutes = 5;
   private readonly staleCacheHours = 168; // 7 days
 
+  // Size limits to prevent 16MB MongoDB document limit issues
+  private readonly MAX_CACHE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB warning threshold
+  private readonly CRITICAL_CACHE_SIZE_BYTES = 14 * 1024 * 1024; // 14MB hard limit
+
   constructor(
     private readonly cacheService: CacheService,
     private readonly metricsService: MetricsService,
@@ -139,6 +143,35 @@ export class MarketDataCacheService {
   // ==================== MONGODB CACHE OPERATIONS ====================
 
   /**
+   * Validate cache data size to prevent MongoDB 16MB document limit issues
+   * Returns true if size is acceptable, false if too large
+   */
+  private validateCacheSize(data: unknown, category: string): boolean {
+    try {
+      const sizeEstimate = JSON.stringify(data).length;
+
+      if (sizeEstimate > this.CRITICAL_CACHE_SIZE_BYTES) {
+        this.logger.error(
+          `Cache data for ${category} exceeds critical size limit: ${(sizeEstimate / 1024 / 1024).toFixed(2)}MB (limit: 14MB)`,
+        );
+        return false;
+      }
+
+      if (sizeEstimate > this.MAX_CACHE_SIZE_BYTES) {
+        this.logger.warn(
+          `Cache data for ${category} approaching size limit: ${(sizeEstimate / 1024 / 1024).toFixed(2)}MB (warning threshold: 10MB)`,
+        );
+      }
+
+      return true;
+    } catch {
+      // If we can't stringify, assume it's too large or malformed
+      this.logger.error(`Failed to estimate cache size for ${category}`);
+      return false;
+    }
+  }
+
+  /**
    * Get fresh cached data from MongoDB (< 5 minutes old)
    * Returns null on DB failure instead of throwing
    */
@@ -197,6 +230,12 @@ export class MarketDataCacheService {
     data: MarketDataResponse,
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
+    // Validate cache size before saving
+    if (!this.validateCacheSize(data, category)) {
+      this.logger.error(`Skipping fresh cache save for ${category} due to size limit`);
+      return;
+    }
+
     const now = new Date();
     const expiresAt = new Date(
       now.getTime() + this.freshCacheMinutes * 60 * 1000,
@@ -241,6 +280,12 @@ export class MarketDataCacheService {
     data: MarketDataResponse,
     apiMetadata?: Record<string, unknown>,
   ): Promise<void> {
+    // Validate cache size before saving
+    if (!this.validateCacheSize(data, category)) {
+      this.logger.error(`Skipping stale cache save for ${category} due to size limit`);
+      return;
+    }
+
     const now = new Date();
     const expiresAt = new Date(
       now.getTime() + this.staleCacheHours * 60 * 60 * 1000,

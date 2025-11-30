@@ -8,7 +8,7 @@ import { HistoricalOhlc, HistoricalOhlcSchema } from "./historical-ohlc.schema";
  * Registers shared schemas with Mongoose.
  *
  * Notes:
- * - OHLCPermanent from navasan/schemas is the single source of truth for price data
+ * - OHLCPermanent from market-data/schemas is the single source of truth for price data
  * - HistoricalOhlc is used for weekly/monthly aggregation and chart fallbacks
  * - ManagedItem from schemas/managed-item.schema is the admin layer
  * - UserRateLimit is registered in RateLimitModule (encapsulated)

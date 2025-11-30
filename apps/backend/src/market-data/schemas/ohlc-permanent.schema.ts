@@ -63,3 +63,16 @@ OHLCPermanentSchema.index(
 OHLCPermanentSchema.index({ itemCode: 1, timestamp: 1 });
 OHLCPermanentSchema.index({ lastUpdated: 1 });
 OHLCPermanentSchema.index({ itemCode: 1, timeframe: 1, timestamp: -1 });
+
+// TTL index for automatic cleanup of fine-grained timeframes (1m, 5m)
+// Keeps minute data for 7 days, 5-minute data for 14 days
+// Note: MongoDB TTL indexes only work on date fields at the document level
+// For conditional TTL based on timeframe, we use a separate expiresAt field approach
+// or handle cleanup via scheduled task. Here we add a partial index for efficient cleanup queries.
+OHLCPermanentSchema.index(
+  { timeframe: 1, timestamp: 1 },
+  {
+    name: 'ttl_cleanup_helper',
+    partialFilterExpression: { timeframe: { $in: ['1m', '5m'] } }
+  }
+);

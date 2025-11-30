@@ -2,7 +2,7 @@
  * Schema Exports
  *
  * Notes:
- * - OHLCPermanent from navasan/schemas is the single source of truth for price data
+ * - OHLCPermanent from market-data/schemas is the single source of truth for price data
  * - ManagedItem provides admin layer for item management
  * - HistoricalOhlc is used for weekly/monthly aggregation
  * - UserRateLimit is exported from rate-limit module (encapsulated)

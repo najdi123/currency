@@ -184,6 +184,20 @@ export class ManagedItem {
   @Prop({ trim: true })
   overrideReason?: string;
 
+  /**
+   * Override duration in minutes (null = indefinite)
+   * Common values: 1, 15, 30, 60, 120, 300, 720, 1440
+   */
+  @Prop({ type: Number })
+  overrideDuration?: number;
+
+  /**
+   * Calculated expiration timestamp for the override
+   * null = indefinite override (never expires)
+   */
+  @Prop({ type: Date, index: true })
+  overrideExpiresAt?: Date;
+
   // ==================== METADATA ====================
 
   /**
@@ -214,6 +228,9 @@ ManagedItemSchema.index({ parentCode: 1, region: 1 });
 
 // Index for override tracking
 ManagedItemSchema.index({ isOverridden: 1, overrideAt: -1 });
+
+// Index for expired override cleanup (scheduler queries this frequently)
+ManagedItemSchema.index({ isOverridden: 1, overrideExpiresAt: 1 });
 
 // Text index for search
 ManagedItemSchema.index({ name: 'text', nameAr: 'text', nameFa: 'text' });

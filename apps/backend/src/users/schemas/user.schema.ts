@@ -32,10 +32,10 @@ export class User {
   @Prop({ default: UserRole.USER, enum: UserRole })
   role!: UserRole;
 
-  @Prop()
+  @Prop({ trim: true, maxlength: 100 })
   firstName?: string;
 
-  @Prop()
+  @Prop({ trim: true, maxlength: 100 })
   lastName?: string;
 
   @Prop()
@@ -72,3 +72,17 @@ UserSchema.index({ status: 1, createdAt: -1 });
 // Index for role-based queries
 // Useful for admin operations: "show me all admins"
 UserSchema.index({ role: 1 });
+
+// Compound index for login queries with soft-delete support
+// Useful for: "find user by email where not deleted"
+UserSchema.index({ email: 1, deletedAt: 1 });
+
+// Partial index for account lockout cleanup queries
+// Only indexes documents that have a lockout set (saves space)
+UserSchema.index(
+  { lockedUntil: 1 },
+  {
+    partialFilterExpression: { lockedUntil: { $exists: true, $ne: null } },
+    name: 'lockout_cleanup',
+  }
+);

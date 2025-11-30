@@ -70,6 +70,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   calculatorMode = false,
   quantity = 0,
   onQuantityChange,
+  selectedVariant,
+  onSelectVariant,
 }) => {
   const t = useTranslations('ItemCard')
 
@@ -126,7 +128,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           compact={compact}
           variantsDropdown={
             hasVariants && variants.length > 0 ? (
-              <CurrencyVariantsDropdown currencyCode={code} variants={variants} />
+              <CurrencyVariantsDropdown
+                currencyCode={code}
+                variants={variants}
+                selectable={!!onSelectVariant}
+                selectedVariant={selectedVariant}
+                onSelectVariant={onSelectVariant}
+              />
             ) : undefined
           }
         />
@@ -168,7 +176,13 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         compact={compact}
         variantsDropdown={
           hasVariants && variants.length > 0 ? (
-            <CurrencyVariantsDropdown currencyCode={code} variants={variants} />
+            <CurrencyVariantsDropdown
+              currencyCode={code}
+              variants={variants}
+              selectable={!!onSelectVariant}
+              selectedVariant={selectedVariant}
+              onSelectVariant={onSelectVariant}
+            />
           ) : undefined
         }
       />
@@ -250,7 +264,8 @@ export const ItemCard = React.memo<ItemCardProps>(
       prevProps.compact !== nextProps.compact ||
       prevProps.hasVariants !== nextProps.hasVariants ||
       prevProps.calculatorMode !== nextProps.calculatorMode ||
-      prevProps.quantity !== nextProps.quantity
+      prevProps.quantity !== nextProps.quantity ||
+      prevProps.selectedVariant !== nextProps.selectedVariant
     ) {
       return false
     }

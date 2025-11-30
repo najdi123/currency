@@ -30,7 +30,7 @@ export class DataRetentionScheduler {
   private readonly timezone = "Asia/Tehran";
 
   // Retention periods
-  private readonly HISTORICAL_RETENTION_YEARS = 2;
+  private readonly HISTORICAL_RETENTION_YEARS: number | null = null;
   private readonly SNAPSHOT_RETENTION_DAYS = 90;
 
   constructor(

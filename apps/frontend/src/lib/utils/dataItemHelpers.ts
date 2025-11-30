@@ -11,13 +11,13 @@ export interface DataItem {
 }
 
 // Currency items to display with brand-specific colors
-// Only includes MAIN items - variants (buy, regional) are shown in dropdown
+// Only includes MAIN items - variants (official, sana, nima) are shown in dropdown
+// Keys must match API response keys exactly (usd, eur, gbp, aed, rub)
 export const currencyItems: DataItem[] = [
-  { key: 'usd_sell', icon: FaDollarSign, color: 'text-green-600' }, // USD Sell (main)
-  { key: 'eur', icon: FaEuroSign, color: 'text-blue-600' }, // EUR (main)
-  { key: 'gbp', icon: FaPoundSign, color: 'text-purple-600' }, // GBP (main)
-  { key: 'aed', icon: FaDollarSign, color: 'text-emerald-600' }, // AED (main)
-  { key: 'try', icon: FaDollarSign, color: 'text-red-600' }, // TRY (Turkish Lira)
+  { key: 'usd', icon: FaDollarSign, color: 'text-green-600' }, // USD (free market)
+  { key: 'eur', icon: FaEuroSign, color: 'text-blue-600' }, // EUR (free market)
+  { key: 'gbp', icon: FaPoundSign, color: 'text-purple-600' }, // GBP (free market)
+  { key: 'aed', icon: FaDollarSign, color: 'text-emerald-600' }, // AED (free market)
   { key: 'rub', icon: FaDollarSign, color: 'text-blue-500' }, // RUB (Russia)
 ]
 
@@ -49,9 +49,10 @@ export const goldItems: DataItem[] = [
 
 /**
  * Currency Variant Structure
- * Defines additional variants for currencies (buy/sell, regional, etc.)
+ * Defines additional variants for currencies (official, sana, nima rates)
+ * These match the actual API response keys
  */
-export type VariantType = 'sell' | 'buy' | 'sell_dubai' | 'buy_dubai' | 'sell_turkey' | 'buy_turkey' | 'sell_herat' | 'buy_herat'
+export type VariantType = 'free_market' | 'official' | 'sana_buy' | 'sana_sell' | 'nima' | 'regional_buy' | 'regional_sell'
 export type RegionType = 'iran' | 'dubai' | 'turkey' | 'herat'
 
 export interface CurrencyVariant {
@@ -64,142 +65,174 @@ export interface CurrencyVariant {
 }
 
 // Currency variants - shown in the 3-dot dropdown menu
-// Includes buy/sell variants and regional variants (Dubai, Turkey, Herat)
+// Matches actual API response keys: usd, usd_official, usd_sana_buy, usd_sana_sell, usd_nima
 export const currencyVariants: CurrencyVariant[] = [
   // ==================== USD Variants ====================
-  // Iran (default)
   {
-    code: 'usd_sell',
-    apiCode: 'usd_sell',
-    parentCode: 'usd_sell',
-    variantType: 'sell',
+    code: 'usd',
+    apiCode: 'usd',
+    parentCode: 'usd',
+    variantType: 'free_market',
     region: 'iran',
     displayOrder: 0,
   },
   {
-    code: 'usd_buy',
-    apiCode: 'usd_buy',
-    parentCode: 'usd_sell',
-    variantType: 'buy',
+    code: 'usd_official',
+    apiCode: 'usd_official',
+    parentCode: 'usd',
+    variantType: 'official',
     region: 'iran',
     displayOrder: 1,
   },
-  // Dubai
   {
-    code: 'usd_sell_dubai',
-    apiCode: 'dirham_dubai',
-    parentCode: 'usd_sell',
-    variantType: 'sell_dubai',
-    region: 'dubai',
+    code: 'usd_sana_buy',
+    apiCode: 'usd_sana_buy',
+    parentCode: 'usd',
+    variantType: 'sana_buy',
+    region: 'iran',
     displayOrder: 2,
   },
-  // Turkey (Istanbul)
   {
-    code: 'usd_sell_turkey',
-    apiCode: 'dolar_istanbul_sell',
-    parentCode: 'usd_sell',
-    variantType: 'sell_turkey',
-    region: 'turkey',
+    code: 'usd_sana_sell',
+    apiCode: 'usd_sana_sell',
+    parentCode: 'usd',
+    variantType: 'sana_sell',
+    region: 'iran',
     displayOrder: 3,
   },
-  // Herat
   {
-    code: 'usd_sell_herat',
-    apiCode: 'dolar_harat_sell',
-    parentCode: 'usd_sell',
-    variantType: 'sell_herat',
-    region: 'herat',
+    code: 'usd_nima',
+    apiCode: 'usd_nima',
+    parentCode: 'usd',
+    variantType: 'nima',
+    region: 'iran',
     displayOrder: 4,
   },
 
   // ==================== EUR Variants ====================
   {
-    code: 'eur_sell',
+    code: 'eur',
     apiCode: 'eur',
     parentCode: 'eur',
-    variantType: 'sell',
+    variantType: 'free_market',
     region: 'iran',
     displayOrder: 0,
   },
   {
-    code: 'eur_buy',
-    apiCode: 'eur_buy',
+    code: 'eur_official',
+    apiCode: 'eur_official',
     parentCode: 'eur',
-    variantType: 'buy',
+    variantType: 'official',
     region: 'iran',
     displayOrder: 1,
+  },
+  {
+    code: 'eur_sana_buy',
+    apiCode: 'eur_sana_buy',
+    parentCode: 'eur',
+    variantType: 'sana_buy',
+    region: 'iran',
+    displayOrder: 2,
+  },
+  {
+    code: 'eur_sana_sell',
+    apiCode: 'eur_sana_sell',
+    parentCode: 'eur',
+    variantType: 'sana_sell',
+    region: 'iran',
+    displayOrder: 3,
+  },
+  {
+    code: 'eur_nima',
+    apiCode: 'eur_nima',
+    parentCode: 'eur',
+    variantType: 'nima',
+    region: 'iran',
+    displayOrder: 4,
   },
 
   // ==================== GBP Variants ====================
   {
-    code: 'gbp_sell',
+    code: 'gbp',
     apiCode: 'gbp',
     parentCode: 'gbp',
-    variantType: 'sell',
+    variantType: 'free_market',
     region: 'iran',
     displayOrder: 0,
   },
   {
-    code: 'gbp_buy',
-    apiCode: 'gbp_buy',
+    code: 'gbp_official',
+    apiCode: 'gbp_official',
     parentCode: 'gbp',
-    variantType: 'buy',
+    variantType: 'official',
     region: 'iran',
     displayOrder: 1,
+  },
+  {
+    code: 'gbp_sana_buy',
+    apiCode: 'gbp_sana_buy',
+    parentCode: 'gbp',
+    variantType: 'sana_buy',
+    region: 'iran',
+    displayOrder: 2,
+  },
+  {
+    code: 'gbp_sana_sell',
+    apiCode: 'gbp_sana_sell',
+    parentCode: 'gbp',
+    variantType: 'sana_sell',
+    region: 'iran',
+    displayOrder: 3,
+  },
+  {
+    code: 'gbp_nima',
+    apiCode: 'gbp_nima',
+    parentCode: 'gbp',
+    variantType: 'nima',
+    region: 'iran',
+    displayOrder: 4,
   },
 
   // ==================== AED Variants ====================
   {
-    code: 'aed_sell',
+    code: 'aed',
     apiCode: 'aed',
     parentCode: 'aed',
-    variantType: 'sell',
+    variantType: 'free_market',
     region: 'iran',
     displayOrder: 0,
   },
   {
-    code: 'aed_buy',
-    apiCode: 'aed_buy',
+    code: 'aed_official',
+    apiCode: 'aed_official',
     parentCode: 'aed',
-    variantType: 'buy',
+    variantType: 'official',
     region: 'iran',
     displayOrder: 1,
   },
-  // Dubai
   {
-    code: 'aed_sell_dubai',
-    apiCode: 'dirham_dubai',
+    code: 'aed_sana_buy',
+    apiCode: 'aed_sana_buy',
     parentCode: 'aed',
-    variantType: 'sell_dubai',
-    region: 'dubai',
+    variantType: 'sana_buy',
+    region: 'iran',
     displayOrder: 2,
   },
-
-  // ==================== TRY (Turkish Lira) Variants ====================
   {
-    code: 'try_sell',
-    apiCode: 'try',
-    parentCode: 'try',
-    variantType: 'sell',
+    code: 'aed_sana_sell',
+    apiCode: 'aed_sana_sell',
+    parentCode: 'aed',
+    variantType: 'sana_sell',
     region: 'iran',
-    displayOrder: 0,
+    displayOrder: 3,
   },
   {
-    code: 'try_buy',
-    apiCode: 'try_buy',
-    parentCode: 'try',
-    variantType: 'buy',
+    code: 'aed_nima',
+    apiCode: 'aed_nima',
+    parentCode: 'aed',
+    variantType: 'nima',
     region: 'iran',
-    displayOrder: 1,
-  },
-  // Turkey (Istanbul)
-  {
-    code: 'try_sell_turkey',
-    apiCode: 'lira_istanbul_sell',
-    parentCode: 'try',
-    variantType: 'sell_turkey',
-    region: 'turkey',
-    displayOrder: 2,
+    displayOrder: 4,
   },
 ]
 
@@ -249,9 +282,9 @@ export function getVariantData(
  */
 
 // Main currencies shown by default (most important ones)
-// Variants (buy, regional) are shown in dropdown, not as separate cards
+// Variants (official, sana, nima) are shown in dropdown, not as separate cards
 export const mainCurrencies = [
-  'usd_sell', 'eur', 'gbp', 'aed', 'try', 'rub'
+  'usd', 'eur', 'gbp', 'aed', 'rub'
 ]
 
 // Additional currencies shown when "show more" is clicked
@@ -330,4 +363,177 @@ export const getItemName = (
   }
   // Fallback to the key itself if no translation provided
   return itemKey
+}
+
+/**
+ * Regional Variant from API
+ * Structure returned by /market-data/variants/:parentCode endpoint
+ */
+export interface RegionalVariantFromApi {
+  code: string
+  price: number
+  change: number
+  region?: string
+  variant?: string // 'buy' | 'sell'
+  name: string
+  nameFa?: string
+  nameAr?: string
+}
+
+/**
+ * Convert a regional variant from API to CurrencyVariant format
+ * This allows dynamic variants to be used alongside static ones
+ */
+export function convertRegionalVariant(
+  apiVariant: RegionalVariantFromApi,
+  parentCode: string,
+  displayOrder: number
+): CurrencyVariant {
+  // Determine variant type based on variant field
+  let variantType: VariantType = 'regional_buy'
+  if (apiVariant.variant === 'sell') {
+    variantType = 'regional_sell'
+  } else if (apiVariant.variant === 'buy') {
+    variantType = 'regional_buy'
+  }
+
+  // Map region string to RegionType
+  let region: RegionType = 'iran'
+  if (apiVariant.region === 'dubai') {
+    region = 'dubai'
+  } else if (apiVariant.region === 'turkey') {
+    region = 'turkey'
+  } else if (apiVariant.region === 'herat') {
+    region = 'herat'
+  }
+
+  return {
+    code: apiVariant.code,
+    apiCode: apiVariant.code,
+    parentCode: parentCode.toLowerCase(),
+    variantType,
+    region,
+    displayOrder,
+  }
+}
+
+/**
+ * Get all variants for a currency - static + dynamic from API
+ * @param currencyCode - The parent currency code (e.g., 'usd')
+ * @param dynamicVariants - Optional array of regional variants from API
+ */
+export function getAllVariantsForCurrency(
+  currencyCode: string,
+  dynamicVariants?: RegionalVariantFromApi[]
+): CurrencyVariant[] {
+  // Get static variants
+  const staticVariants = getVariantsForCurrency(currencyCode)
+
+  // If no dynamic variants, just return static
+  if (!dynamicVariants || dynamicVariants.length === 0) {
+    return staticVariants
+  }
+
+  // Convert and merge dynamic variants
+  const startOrder = staticVariants.length > 0
+    ? Math.max(...staticVariants.map(v => v.displayOrder)) + 1
+    : 0
+
+  const convertedDynamic = dynamicVariants.map((v, index) =>
+    convertRegionalVariant(v, currencyCode, startOrder + index)
+  )
+
+  return [...staticVariants, ...convertedDynamic]
+}
+
+/**
+ * Get variant data for a dynamic variant from API
+ * Used when the variant price comes from the API response directly
+ */
+export function getDynamicVariantData(
+  variant: CurrencyVariant,
+  apiVariant: RegionalVariantFromApi
+) {
+  return {
+    code: variant.code,
+    apiCode: variant.apiCode,
+    variantType: variant.variantType,
+    region: variant.region,
+    value: String(apiVariant.price),
+    change: apiVariant.change,
+  }
+}
+
+/**
+ * Regional variant patterns for detecting admin-added variants in API data
+ * These patterns match keys like: usd_dubai_buy, usd_turkey_sell, eur_herat_buy
+ */
+const REGIONAL_PATTERNS = [
+  { pattern: /_dubai_buy$/, region: 'dubai' as RegionType, variant: 'regional_buy' as VariantType },
+  { pattern: /_dubai_sell$/, region: 'dubai' as RegionType, variant: 'regional_sell' as VariantType },
+  { pattern: /_turkey_buy$/, region: 'turkey' as RegionType, variant: 'regional_buy' as VariantType },
+  { pattern: /_turkey_sell$/, region: 'turkey' as RegionType, variant: 'regional_sell' as VariantType },
+  { pattern: /_herat_buy$/, region: 'herat' as RegionType, variant: 'regional_buy' as VariantType },
+  { pattern: /_herat_sell$/, region: 'herat' as RegionType, variant: 'regional_sell' as VariantType },
+]
+
+/**
+ * Scan API data for dynamic regional variants that belong to a parent currency
+ * This detects admin-added variants by pattern matching (e.g., usd_dubai_buy, usd_turkey_sell)
+ * @param parentCode - The parent currency code (e.g., 'usd')
+ * @param apiData - The API response data containing all currency values
+ */
+export function findDynamicVariantsInData(
+  parentCode: string,
+  apiData: Record<string, any>
+): CurrencyVariant[] {
+  const normalizedParent = parentCode.toLowerCase()
+  const dynamicVariants: CurrencyVariant[] = []
+  let displayOrder = 100 // Start after static variants
+
+  // Check each API data key for regional patterns
+  for (const key of Object.keys(apiData)) {
+    // Skip if not starting with parent code
+    if (!key.toLowerCase().startsWith(normalizedParent + '_')) continue
+
+    // Skip if it's a known static variant (official, sana, nima)
+    if (key.includes('_official') || key.includes('_sana') || key.includes('_nima')) continue
+
+    // Check against regional patterns
+    for (const { pattern, region, variant } of REGIONAL_PATTERNS) {
+      if (pattern.test(key)) {
+        dynamicVariants.push({
+          code: key,
+          apiCode: key,
+          parentCode: normalizedParent,
+          variantType: variant,
+          region: region,
+          displayOrder: displayOrder++,
+        })
+        break
+      }
+    }
+  }
+
+  return dynamicVariants
+}
+
+/**
+ * Get all variants for a currency including both static and dynamic (from API data)
+ * This combines hardcoded variants with admin-added regional variants found in data
+ * @param currencyCode - The parent currency code (e.g., 'usd')
+ * @param apiData - The API response data to scan for dynamic variants
+ */
+export function getCompleteVariantsForCurrency(
+  currencyCode: string,
+  apiData: Record<string, any>
+): CurrencyVariant[] {
+  // Get static variants (official, sana, nima)
+  const staticVariants = getVariantsForCurrency(currencyCode)
+
+  // Find dynamic regional variants in the API data
+  const dynamicVariants = findDynamicVariantsInData(currencyCode, apiData)
+
+  // Combine both
+  return [...staticVariants, ...dynamicVariants]
 }

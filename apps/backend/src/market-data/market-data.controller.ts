@@ -22,6 +22,7 @@ import {
 } from '../common/utils/date-utils';
 import { RateLimitGuard } from '../rate-limit/rate-limit.guard';
 import { CurrencyConversionService } from '../common/services/currency-conversion.service';
+import { AdminOverrideService } from '../admin/admin-override.service';
 
 /**
  * MarketDataController
@@ -43,6 +44,7 @@ export class MarketDataController {
     private readonly orchestratorService: MarketDataOrchestratorService,
     private readonly intradayOhlcService: IntradayOhlcService,
     private readonly currencyConversionService: CurrencyConversionService,
+    private readonly adminOverrideService: AdminOverrideService,
   ) {}
 
   /**
@@ -381,6 +383,66 @@ export class MarketDataController {
       });
     } catch (error) {
       throw error;
+    }
+  }
+
+  // ==================== REGIONAL VARIANTS ====================
+
+  /**
+   * GET /api/market-data/variants/:parentCode
+   * Returns all regional variants (manual items) for a given currency
+   *
+   * Example: GET /api/market-data/variants/usd
+   * Returns: [
+   *   { code: "usd_dubai_sell", price: 85000, region: "dubai", variant: "sell", ... },
+   *   { code: "usd_turkey_buy", price: 84500, region: "turkey", variant: "buy", ... }
+   * ]
+   */
+  @Get('variants/:parentCode')
+  async getRegionalVariants(
+    @Param('parentCode') parentCode: string,
+    @Res() res: Response,
+  ) {
+    try {
+      if (!parentCode || typeof parentCode !== 'string') {
+        throw new BadRequestException('Invalid parent code');
+      }
+
+      const safePattern = /^[a-zA-Z0-9_-]{1,50}$/;
+      if (!safePattern.test(parentCode)) {
+        throw new BadRequestException('Parent code contains invalid characters');
+      }
+
+      this.logger.log(
+        `GET /api/market-data/variants/${parentCode} - Fetching regional variants`,
+      );
+
+      const variants = await this.adminOverrideService.getManualItemsByParent(parentCode);
+
+      return res.json({
+        parentCode: parentCode.toLowerCase(),
+        count: variants.length,
+        variants: variants.map(v => ({
+          code: v.code,
+          price: v.price,
+          change: v.change ?? 0,
+          region: v.region,
+          variant: v.variant,
+          name: v.name,
+          nameFa: v.nameFa,
+          nameAr: v.nameAr,
+        })),
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      const err = error as Error;
+      this.logger.error(
+        `Error fetching variants for ${parentCode}: ${err.message}`,
+        err.stack,
+      );
+      throw new InternalServerErrorException('Failed to fetch regional variants');
     }
   }
 

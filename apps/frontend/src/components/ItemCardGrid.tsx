@@ -1,8 +1,8 @@
-import React, { useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { IconType } from 'react-icons'
 import { ItemCard, AccentColorVariant } from './ItemCard'
-import { hasVariants, getVariantsForCurrency, getVariantData } from '@/lib/utils/dataItemHelpers'
+import { hasVariants, getVariantData, getCompleteVariantsForCurrency } from '@/lib/utils/dataItemHelpers'
 import { useGetAllTodayOhlcQuery } from '@/lib/store/services/api'
 import type { OhlcResponse } from '@/lib/store/services/api'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
@@ -15,6 +15,7 @@ import {
   type ItemType as CalculatorItemType,
 } from '@/lib/store/slices/calculatorSlice'
 import type { ItemType } from '@/types/chart'
+import type { VariantData } from './ItemCard/itemCard.types'
 
 /**
  * Map display item types to calculator item types
@@ -150,6 +151,19 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
     }, {} as Record<string, typeof calculatorItems[0]>)
   }, [calculatorItems])
 
+  // Track selected variants for each currency item (e.g., { 'usd_sell': 'usd_sell_official' })
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
+
+  // Handler for variant selection
+  const handleSelectVariant = useCallback((itemKey: string, variant: VariantData) => {
+    setSelectedVariants(prev => ({
+      ...prev,
+      [itemKey]: variant.code
+    }))
+    // Log selection for debugging
+    console.log(`[ItemCardGrid] Selected variant for ${itemKey}:`, variant.code, variant)
+  }, [])
+
   // Handler for quantity changes in calculator mode
   const handleQuantityChange = useCallback((itemKey: string, itemName: string, unitPrice: number, quantity: number) => {
     const existingItem = calculatorItemsMap[itemKey]
@@ -206,8 +220,10 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
         if (!itemData) return null
 
         // Check if this currency has variants and extract variant data
+        // Use getCompleteVariantsForCurrency to include both static (official, sana, nima)
+        // and dynamic (admin-added regional) variants
         const itemHasVariants = itemType === 'currency' && hasVariants(item.key)
-        const variantDefinitions = itemHasVariants ? getVariantsForCurrency(item.key) : []
+        const variantDefinitions = itemHasVariants ? getCompleteVariantsForCurrency(item.key, data) : []
         const variants = itemHasVariants
           ? variantDefinitions
               .map((v) => getVariantData(v, data))
@@ -322,6 +338,8 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             calculatorMode={isCalculatorMode}
             quantity={quantity}
             onQuantityChange={(qty) => handleQuantityChange(item.key, t(`items.${item.key}`), itemData.value, qty)}
+            selectedVariant={selectedVariants[item.key]}
+            onSelectVariant={(variant) => handleSelectVariant(item.key, variant)}
           />
         )
       })}

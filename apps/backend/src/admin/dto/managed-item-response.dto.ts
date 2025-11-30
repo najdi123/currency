@@ -76,6 +76,18 @@ export class ManagedItemResponseDto {
   @ApiPropertyOptional({ description: 'Admin who set override' })
   overrideBy?: string;
 
+  @ApiPropertyOptional({
+    description: 'Override duration in minutes (null = indefinite)',
+    example: 60,
+  })
+  overrideDuration?: number;
+
+  @ApiPropertyOptional({
+    description: 'Override expiration timestamp (null = indefinite)',
+    example: '2025-01-15T14:30:00.000Z',
+  })
+  overrideExpiresAt?: Date;
+
   // Timestamps
   @ApiPropertyOptional({ description: 'Last API update' })
   lastApiUpdate?: Date;

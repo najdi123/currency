@@ -115,31 +115,71 @@ export const CurrencyVariantsDropdown: React.FC<CurrencyVariantsDropdownProps> =
     }
   }
 
-  // Get region badge styling
-  const getRegionBadge = (region?: RegionType) => {
+  // Get region badge styling for regional variants (Dubai, Turkey, Herat)
+  const getRegionBadge = (region?: RegionType): { label: string; bg: string; text: string } | null => {
     if (!region || region === 'iran') return null
 
-    const regionStyles: Record<string, { bg: string; text: string; label: string }> = {
-      dubai: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', label: t('regions.dubai') },
-      turkey: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: t('regions.turkey') },
-      herat: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', label: t('regions.herat') },
+    const regionStyles: Record<string, { label: string; bg: string; text: string }> = {
+      dubai: {
+        label: t('regions.dubai'),
+        bg: 'bg-orange-100 dark:bg-orange-900/30',
+        text: 'text-orange-700 dark:text-orange-400'
+      },
+      turkey: {
+        label: t('regions.turkey'),
+        bg: 'bg-red-100 dark:bg-red-900/30',
+        text: 'text-red-700 dark:text-red-400'
+      },
+      herat: {
+        label: t('regions.herat'),
+        bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+        text: 'text-cyan-700 dark:text-cyan-400'
+      },
     }
 
-    const style = regionStyles[region]
-    if (!style) return null
-
-    return (
-      <span className={`text-xs px-1.5 py-0.5 rounded ${style.bg} ${style.text}`}>
-        {style.label}
-      </span>
-    )
+    return regionStyles[region] || null
   }
 
-  // Get variant type label (buy/sell)
-  const getVariantTypeLabel = (variantType: VariantType) => {
-    if (variantType.includes('buy')) return t('variantTypes.buy')
-    if (variantType.includes('sell')) return t('variantTypes.sell')
-    return ''
+  // Get variant type label and styling
+  const getVariantTypeLabel = (variantType: VariantType): { label: string; bg: string; text: string } | null => {
+    const styles: Record<VariantType, { label: string; bg: string; text: string }> = {
+      free_market: {
+        label: t('variantTypes.freeMarket'),
+        bg: 'bg-green-100 dark:bg-green-900/30',
+        text: 'text-green-700 dark:text-green-400'
+      },
+      official: {
+        label: t('variantTypes.official'),
+        bg: 'bg-blue-100 dark:bg-blue-900/30',
+        text: 'text-blue-700 dark:text-blue-400'
+      },
+      sana_buy: {
+        label: t('variantTypes.sanaBuy'),
+        bg: 'bg-purple-100 dark:bg-purple-900/30',
+        text: 'text-purple-700 dark:text-purple-400'
+      },
+      sana_sell: {
+        label: t('variantTypes.sanaSell'),
+        bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+        text: 'text-indigo-700 dark:text-indigo-400'
+      },
+      nima: {
+        label: t('variantTypes.nima'),
+        bg: 'bg-amber-100 dark:bg-amber-900/30',
+        text: 'text-amber-700 dark:text-amber-400'
+      },
+      regional_buy: {
+        label: t('variantTypes.regionalBuy'),
+        bg: 'bg-teal-100 dark:bg-teal-900/30',
+        text: 'text-teal-700 dark:text-teal-400'
+      },
+      regional_sell: {
+        label: t('variantTypes.regionalSell'),
+        bg: 'bg-pink-100 dark:bg-pink-900/30',
+        text: 'text-pink-700 dark:text-pink-400'
+      },
+    }
+    return styles[variantType] || null
   }
 
   // Don't render if no variants
@@ -228,19 +268,19 @@ export const CurrencyVariantsDropdown: React.FC<CurrencyVariantsDropdownProps> =
                       {variantName}
                     </span>
 
-                    {/* Type badge (buy/sell) */}
+                    {/* Type badge (free_market, official, sana, nima) */}
                     {typeLabel && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        variant.variantType.includes('buy')
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                      }`}>
-                        {typeLabel}
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${typeLabel.bg} ${typeLabel.text}`}>
+                        {typeLabel.label}
                       </span>
                     )}
 
-                    {/* Region badge */}
-                    {regionBadge}
+                    {/* Region badge (Dubai, Turkey, Herat) */}
+                    {regionBadge && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${regionBadge.bg} ${regionBadge.text}`}>
+                        {regionBadge.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* Bottom row: Price and change */}

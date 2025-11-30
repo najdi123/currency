@@ -151,6 +151,7 @@ export class OhlcCleanupSchedulerService {
 
   /**
    * Get statistics about OHLC snapshots
+   * Optimized to use aggregation pipeline instead of N+1 queries
    */
   async getOhlcStats(): Promise<{
     total: number;
@@ -159,35 +160,54 @@ export class OhlcCleanupSchedulerService {
     newestSnapshot: Date | null;
   }> {
     try {
-      const total = await this.ohlcSnapshotModel.countDocuments();
+      // Use aggregation to get all counts in a single query instead of N+1
+      const [statsResult, boundaryResult] = await Promise.all([
+        // Get counts by timeRange in single aggregation
+        this.ohlcSnapshotModel.aggregate([
+          {
+            $group: {
+              _id: '$timeRange',
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+        // Get oldest and newest in single aggregation
+        this.ohlcSnapshotModel.aggregate([
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              oldestSnapshot: { $min: '$timestamp' },
+              newestSnapshot: { $max: '$timestamp' },
+            },
+          },
+        ]),
+      ]);
 
-      // Count by time range
+      // Convert aggregation result to byTimeRange object
       const byTimeRange: Record<string, number> = {};
+      // Initialize all known time ranges to 0
       for (const timeRange of Object.keys(this.retentionPolicies)) {
-        const count = await this.ohlcSnapshotModel.countDocuments({
-          timeRange,
-        });
-        byTimeRange[timeRange] = count;
+        byTimeRange[timeRange] = 0;
+      }
+      // Fill in actual counts from aggregation
+      for (const item of statsResult) {
+        if (item._id) {
+          byTimeRange[item._id] = item.count;
+        }
       }
 
-      // Get oldest and newest snapshots
-      const oldest = await this.ohlcSnapshotModel
-        .findOne()
-        .sort({ timestamp: 1 })
-        .select("timestamp")
-        .exec();
-
-      const newest = await this.ohlcSnapshotModel
-        .findOne()
-        .sort({ timestamp: -1 })
-        .select("timestamp")
-        .exec();
+      const boundary = boundaryResult[0] || {
+        total: 0,
+        oldestSnapshot: null,
+        newestSnapshot: null,
+      };
 
       return {
-        total,
+        total: boundary.total,
         byTimeRange,
-        oldestSnapshot: oldest?.timestamp || null,
-        newestSnapshot: newest?.timestamp || null,
+        oldestSnapshot: boundary.oldestSnapshot || null,
+        newestSnapshot: boundary.newestSnapshot || null,
       };
     } catch (error) {
       const errorMessage =

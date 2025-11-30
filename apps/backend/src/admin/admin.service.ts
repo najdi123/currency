@@ -27,7 +27,9 @@ import {
   DiagnosticDataResponseDto,
   ListManagedItemsQueryDto,
 } from './dto';
+import { DEFAULT_OVERRIDE_DURATION } from './dto/override-price.dto';
 import { AdminOverrideService } from './admin-override.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 /**
  * AdminService
@@ -252,25 +254,59 @@ export class AdminService {
 
   /**
    * Set price override for an item
+   *
+   * @param code - Item code
+   * @param dto - Override data including price, duration, and isIndefinite flag
+   * @param adminUserId - Admin user ID setting the override
+   *
+   * Duration behavior:
+   * - If isIndefinite=true: Override never expires (overrideExpiresAt=null)
+   * - If duration is provided: Override expires after that many minutes
+   * - If neither: Default duration of 60 minutes (1 hour)
    */
   async setOverride(
     code: string,
     dto: OverridePriceDto,
     adminUserId: string,
   ): Promise<ManagedItemResponseDto> {
+    const overrideAt = new Date();
+
+    // Determine duration and expiration
+    const isIndefinite = dto.isIndefinite === true;
+    const duration = isIndefinite ? undefined : (dto.duration ?? DEFAULT_OVERRIDE_DURATION);
+    const expiresAt = isIndefinite || duration === undefined
+      ? undefined
+      : new Date(overrideAt.getTime() + duration * 60 * 1000);
+
     const updateData: Partial<ManagedItem> = {
       isOverridden: true,
       overridePrice: dto.price,
       overrideChange: dto.change,
       overrideReason: dto.reason,
-      overrideAt: new Date(),
+      overrideAt,
       overrideBy: new Types.ObjectId(adminUserId),
+      overrideDuration: duration,
+      overrideExpiresAt: expiresAt,
     };
+
+    // Build the update operation
+    const updateOperation: Record<string, unknown> = { $set: updateData };
+
+    // If indefinite, unset the expiration fields
+    if (isIndefinite) {
+      updateOperation.$unset = {
+        overrideDuration: 1,
+        overrideExpiresAt: 1,
+      };
+      // Remove from $set since we're unsetting
+      delete (updateOperation.$set as Partial<ManagedItem>).overrideDuration;
+      delete (updateOperation.$set as Partial<ManagedItem>).overrideExpiresAt;
+    }
 
     const item = await this.managedItemModel
       .findOneAndUpdate(
         { code: code.toLowerCase() },
-        { $set: updateData },
+        updateOperation,
         { new: true, runValidators: true },
       )
       .lean()
@@ -283,8 +319,11 @@ export class AdminService {
     // Clear the override cache so new requests get updated data
     this.adminOverrideService.clearCache();
 
+    const durationStr = isIndefinite
+      ? 'indefinite'
+      : `${duration} minutes (expires at ${expiresAt?.toISOString()})`;
     this.logger.log(
-      `Set price override for ${code}: ${dto.price} by admin ${adminUserId}`,
+      `Set price override for ${code}: ${dto.price} by admin ${adminUserId}, duration: ${durationStr}`,
     );
 
     const responseDto = this.toResponseDto(item);
@@ -307,6 +346,8 @@ export class AdminService {
             overrideReason: 1,
             overrideAt: 1,
             overrideBy: 1,
+            overrideDuration: 1,
+            overrideExpiresAt: 1,
           },
         },
         { new: true },
@@ -415,6 +456,8 @@ export class AdminService {
       overrideReason: item.overrideReason,
       overrideAt: item.overrideAt,
       overrideBy: item.overrideBy?.toString(),
+      overrideDuration: item.overrideDuration,
+      overrideExpiresAt: item.overrideExpiresAt,
       lastApiUpdate: item.lastApiUpdate,
       createdAt: item.createdAt || new Date(),
       updatedAt: item.updatedAt || new Date(),
@@ -422,7 +465,24 @@ export class AdminService {
   }
 
   /**
+   * Check if an override has expired
+   */
+  private isOverrideExpired(item: ManagedItemResponseDto): boolean {
+    // If not overridden, not applicable
+    if (!item.isOverridden) return false;
+
+    // If no expiration set (indefinite), never expires
+    if (!item.overrideExpiresAt) return false;
+
+    // Check if expiration time has passed
+    return new Date() > new Date(item.overrideExpiresAt);
+  }
+
+  /**
    * Enrich items with current prices from ohlc_permanent
+   *
+   * Also checks for expired overrides - if an override has expired,
+   * it falls back to OHLC data instead of the override price.
    */
   private async enrichWithPrices(
     items: ManagedItemResponseDto[],
@@ -466,8 +526,13 @@ export class AdminService {
     return items.map((item) => {
       const priceData = priceMap.get(item.ohlcCode);
 
-      // If overridden, use override values
-      if (item.isOverridden && item.overridePrice !== undefined) {
+      // Check if override is active and not expired
+      const isOverrideActive = item.isOverridden &&
+        item.overridePrice !== undefined &&
+        !this.isOverrideExpired(item);
+
+      // If override is active, use override values
+      if (isOverrideActive) {
         return {
           ...item,
           currentPrice: item.overridePrice,
@@ -551,6 +616,8 @@ export class AdminService {
   /**
    * Initialize managed_items collection from ohlc_permanent data
    * This creates entries for all unique items found in ohlc_permanent
+   *
+   * Optimized to use batch operations instead of N+1 queries
    */
   async initializeFromOhlc(): Promise<{ created: number; skipped: number; items: string[] }> {
     this.logger.log('Initializing managed_items from ohlc_permanent...');
@@ -564,10 +631,6 @@ export class AdminService {
       .exec();
 
     this.logger.log(`Found ${uniqueItems.length} unique items in ohlc_permanent`);
-
-    let created = 0;
-    let skipped = 0;
-    const createdItems: string[] = [];
 
     // Item name mappings (can be expanded)
     const itemNames: Record<string, { name: string; nameFa: string; nameAr: string }> = {
@@ -603,52 +666,138 @@ export class AdminService {
     };
 
     // Category mappings
-    const getCategory = (itemType: string, code: string): string => {
+    const getCategory = (itemType: string): string => {
       if (itemType === 'crypto') return 'crypto';
       if (itemType === 'gold') return 'gold';
       return 'currencies';
     };
 
-    for (const item of uniqueItems) {
+    // BATCH CHECK: Get all existing codes in a single query instead of N queries
+    const allLowerCodes = uniqueItems.map((item) => (item._id as string).toLowerCase());
+    const existingItems = await this.managedItemModel
+      .find({ code: { $in: allLowerCodes } })
+      .select('code')
+      .lean()
+      .exec();
+    const existingCodesSet = new Set(existingItems.map((item) => item.code));
+
+    this.logger.log(`Found ${existingCodesSet.size} existing managed items`);
+
+    // Filter to only items that need to be created
+    const itemsToCreate = uniqueItems.filter(
+      (item) => !existingCodesSet.has((item._id as string).toLowerCase())
+    );
+
+    if (itemsToCreate.length === 0) {
+      this.logger.log('No new items to create - all items already exist');
+      return { created: 0, skipped: uniqueItems.length, items: [] };
+    }
+
+    // Prepare batch insert documents
+    const documentsToInsert = itemsToCreate.map((item) => {
       const code = item._id as string;
       const itemType = item.itemType as string;
       const lowerCode = code.toLowerCase();
 
-      // Check if already exists
-      const existing = await this.managedItemModel.findOne({ code: lowerCode }).exec();
-      if (existing) {
-        skipped++;
-        continue;
-      }
-
-      // Get name mappings or use default
       const names = itemNames[code] || {
         name: code.replace(/_/g, ' '),
         nameFa: code.replace(/_/g, ' '),
         nameAr: code.replace(/_/g, ' '),
       };
 
-      // Create managed item
-      const managedItem = new this.managedItemModel({
+      return {
         code: lowerCode,
         ohlcCode: code,
         name: names.name,
         nameFa: names.nameFa,
         nameAr: names.nameAr,
-        category: getCategory(itemType, code),
+        category: getCategory(itemType),
         source: ItemSource.API,
         hasApiData: true,
         isActive: true,
         displayOrder: 999,
-      });
+      };
+    });
 
-      await managedItem.save();
-      created++;
-      createdItems.push(lowerCode);
-    }
+    // BATCH INSERT: Insert all new items in a single operation
+    const insertResult = await this.managedItemModel.insertMany(documentsToInsert, {
+      ordered: false, // Continue inserting even if some fail (e.g., duplicate key)
+    });
+
+    const created = insertResult.length;
+    const skipped = uniqueItems.length - created;
+    const createdItems = documentsToInsert.map((doc) => doc.code);
 
     this.logger.log(`Initialization complete: ${created} created, ${skipped} skipped`);
 
     return { created, skipped, items: createdItems };
+  }
+
+  // ==================== SCHEDULED TASKS ====================
+
+  /**
+   * Clear expired price overrides
+   *
+   * This scheduled task runs every minute to find and clear overrides
+   * that have passed their expiration time. This ensures prices
+   * automatically revert to API values after the specified duration.
+   *
+   * Query uses the compound index: { isOverridden: 1, overrideExpiresAt: 1 }
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async clearExpiredOverrides(): Promise<void> {
+    const now = new Date();
+
+    // Find all expired overrides
+    // Query: isOverridden=true AND overrideExpiresAt exists AND overrideExpiresAt < now
+    const expiredItems = await this.managedItemModel
+      .find({
+        isOverridden: true,
+        overrideExpiresAt: { $exists: true, $ne: null, $lt: now },
+      })
+      .select('code overrideExpiresAt')
+      .lean()
+      .exec();
+
+    if (expiredItems.length === 0) {
+      return; // No expired overrides, nothing to do
+    }
+
+    const expiredCodes = expiredItems.map((item) => item.code);
+
+    this.logger.log(
+      `Found ${expiredItems.length} expired override(s): ${expiredCodes.join(', ')}`,
+    );
+
+    // Clear all expired overrides in a single operation
+    const result = await this.managedItemModel
+      .updateMany(
+        {
+          isOverridden: true,
+          overrideExpiresAt: { $exists: true, $ne: null, $lt: now },
+        },
+        {
+          $set: { isOverridden: false },
+          $unset: {
+            overridePrice: 1,
+            overrideChange: 1,
+            overrideReason: 1,
+            overrideAt: 1,
+            overrideBy: 1,
+            overrideDuration: 1,
+            overrideExpiresAt: 1,
+          },
+        },
+      )
+      .exec();
+
+    if (result.modifiedCount > 0) {
+      // Clear the override cache so new requests get updated data
+      this.adminOverrideService.clearCache();
+
+      this.logger.log(
+        `Cleared ${result.modifiedCount} expired override(s): ${expiredCodes.join(', ')}`,
+      );
+    }
   }
 }

@@ -130,4 +130,14 @@ export interface ItemCardProps {
    * Callback when quantity changes in calculator mode
    */
   onQuantityChange?: (quantity: number) => void
+
+  /**
+   * Currently selected variant code (for calculator/selection mode)
+   */
+  selectedVariant?: string
+
+  /**
+   * Callback when user selects a variant from the dropdown
+   */
+  onSelectVariant?: (variant: VariantData) => void
 }

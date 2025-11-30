@@ -27,6 +27,7 @@ import {
   type ManagedItem,
   type ItemCategory,
   type ItemRegion,
+  type ItemVariant,
   type CreateManagedItemRequest,
 } from '@/lib/store/services/adminApi'
 import { Alert } from '@/components/ui/Alert'
@@ -140,6 +141,56 @@ const cn = (...classes: (string | boolean | undefined | null)[]) => {
 const formatPrice = (price: number | undefined, locale: string): string => {
   if (price === undefined) return '-'
   return new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : locale === 'ar' ? 'ar-SA' : 'en-US').format(price)
+}
+
+// Format remaining time until override expires
+const formatRemainingTime = (expiresAt: string, locale: string): { text: string; isExpired: boolean; isExpiringSoon: boolean } | null => {
+  const now = new Date()
+  const expiresDate = new Date(expiresAt)
+  const diffMs = expiresDate.getTime() - now.getTime()
+
+  // If expired
+  if (diffMs <= 0) {
+    return { text: '', isExpired: true, isExpiringSoon: false }
+  }
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  // Is expiring soon (less than 15 minutes)
+  const isExpiringSoon = diffMinutes < 15
+
+  let text = ''
+  if (diffDays > 0) {
+    const remainingHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    if (locale === 'fa') {
+      text = `${diffDays}d ${remainingHours}h`
+    } else if (locale === 'ar') {
+      text = `${diffDays}d ${remainingHours}h`
+    } else {
+      text = `${diffDays}d ${remainingHours}h`
+    }
+  } else if (diffHours > 0) {
+    const remainingMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+    if (locale === 'fa') {
+      text = `${diffHours}h ${remainingMinutes}m`
+    } else if (locale === 'ar') {
+      text = `${diffHours}h ${remainingMinutes}m`
+    } else {
+      text = `${diffHours}h ${remainingMinutes}m`
+    }
+  } else {
+    if (locale === 'fa') {
+      text = `${diffMinutes}m`
+    } else if (locale === 'ar') {
+      text = `${diffMinutes}m`
+    } else {
+      text = `${diffMinutes}m`
+    }
+  }
+
+  return { text, isExpired: false, isExpiringSoon }
 }
 
 // Helper to get localized name from ManagedItem
@@ -326,11 +377,29 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   )
 }
 
+// Duration options for override
+interface DurationOption {
+  value: number | null
+  labelKey: string
+}
+
+const DURATION_OPTIONS: DurationOption[] = [
+  { value: 1, labelKey: 'duration_1' },
+  { value: 15, labelKey: 'duration_15' },
+  { value: 30, labelKey: 'duration_30' },
+  { value: 60, labelKey: 'duration_60' },
+  { value: 120, labelKey: 'duration_120' },
+  { value: 300, labelKey: 'duration_300' },
+  { value: 720, labelKey: 'duration_720' },
+  { value: 1440, labelKey: 'duration_1440' },
+  { value: null, labelKey: 'duration_indefinite' },
+]
+
 // Override modal component
 const OverrideModal: React.FC<{
   item: ManagedItem
   onClose: () => void
-  onSubmit: (price: number, change?: number) => void
+  onSubmit: (price: number, change?: number, duration?: number, isIndefinite?: boolean) => void
   isLoading: boolean
 }> = ({ item, onClose, onSubmit, isLoading }) => {
   const t = useTranslations('Admin')
@@ -342,13 +411,26 @@ const OverrideModal: React.FC<{
 
   const [price, setPrice] = useState(initialPrice?.toString() || '')
   const [change, setChange] = useState(initialChange?.toString() || '')
+  // Default to 1 hour (60 minutes)
+  const [selectedDuration, setSelectedDuration] = useState<string>('60')
+
+  const durationOptions = DURATION_OPTIONS.map((opt) => ({
+    value: opt.value === null ? 'indefinite' : opt.value.toString(),
+    label: t(opt.labelKey),
+  }))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const priceNum = parseFloat(price)
     const changeNum = change ? parseFloat(change) : undefined
+
     if (!isNaN(priceNum)) {
-      onSubmit(priceNum, changeNum)
+      if (selectedDuration === 'indefinite') {
+        onSubmit(priceNum, changeNum, undefined, true)
+      } else {
+        const durationNum = parseInt(selectedDuration, 10)
+        onSubmit(priceNum, changeNum, durationNum, false)
+      }
     }
   }
 
@@ -405,6 +487,15 @@ const OverrideModal: React.FC<{
             onChange={(e) => setChange(e.target.value)}
             placeholder="0.00"
             dir="ltr"
+          />
+
+          <SearchableSelect
+            label={t('overrideDuration')}
+            value={selectedDuration}
+            onChange={(value) => setSelectedDuration(value)}
+            options={durationOptions}
+            placeholder={t('selectDuration')}
+            noResultsText={t('noResultsFound')}
           />
 
           <div className="flex gap-3 pt-2">
@@ -597,14 +688,17 @@ const AddRegionalVariantModal: React.FC<{
   const t = useTranslations('Admin')
   const locale = useLocale()
   const [region, setRegion] = useState<ItemRegion>('turkey')
+  const [variant, setVariant] = useState<ItemVariant>('sell')
   const [price, setPrice] = useState('')
 
   const regions: ItemRegion[] = ['turkey', 'dubai', 'herat']
+  const variants: ItemVariant[] = ['sell', 'buy']
 
-  // Generate code based on parent + region
-  const generatedCode = `${parentItem.code}_${region}`
+  // Generate code based on parent + region + variant
+  // e.g., usd_turkey_sell, aed_dubai_buy, try_turkey_sell
+  const generatedCode = `${parentItem.code}_${region}_${variant}`
 
-  // Generate names based on parent + region
+  // Generate names based on parent + region + variant
   const getRegionName = (reg: ItemRegion, lang: 'en' | 'fa' | 'ar') => {
     const regionNames = {
       turkey: { en: 'Turkey', fa: 'ترکیه', ar: 'تركيا' },
@@ -612,6 +706,14 @@ const AddRegionalVariantModal: React.FC<{
       herat: { en: 'Herat', fa: 'هرات', ar: 'هرات' },
     }
     return regionNames[reg][lang]
+  }
+
+  const getVariantName = (v: ItemVariant, lang: 'en' | 'fa' | 'ar') => {
+    const variantNames = {
+      sell: { en: 'Sell', fa: 'فروش', ar: 'بيع' },
+      buy: { en: 'Buy', fa: 'خرید', ar: 'شراء' },
+    }
+    return variantNames[v][lang]
   }
 
   const parentName = getLocalizedName(parentItem, locale)
@@ -623,9 +725,10 @@ const AddRegionalVariantModal: React.FC<{
     const data: CreateManagedItemRequest = {
       code: generatedCode,
       parentCode: parentItem.code,
-      name: `${parentItem.name} (${getRegionName(region, 'en')})`,
-      nameFa: `${parentItem.nameFa || parentItem.name} (${getRegionName(region, 'fa')})`,
-      nameAr: parentItem.nameAr ? `${parentItem.nameAr} (${getRegionName(region, 'ar')})` : undefined,
+      name: `${parentItem.name} ${getRegionName(region, 'en')} (${getVariantName(variant, 'en')})`,
+      nameFa: `${parentItem.nameFa || parentItem.name} ${getRegionName(region, 'fa')} (${getVariantName(variant, 'fa')})`,
+      nameAr: parentItem.nameAr ? `${parentItem.nameAr} ${getRegionName(region, 'ar')} (${getVariantName(variant, 'ar')})` : undefined,
+      variant,
       region,
       category: parentItem.category,
       source: 'manual',
@@ -669,6 +772,19 @@ const AddRegionalVariantModal: React.FC<{
               label: t(`region_${reg}`),
             }))}
             placeholder={t('selectRegion')}
+            noResultsText={t('noResultsFound')}
+          />
+
+          {/* Variant (Buy/Sell) */}
+          <SearchableSelect
+            label={t('variantType')}
+            value={variant}
+            onChange={(value) => setVariant(value as ItemVariant)}
+            options={variants.map((v) => ({
+              value: v,
+              label: t(`variant_${v}`),
+            }))}
+            placeholder={t('selectVariant')}
             noResultsText={t('noResultsFound')}
           />
 
@@ -871,7 +987,7 @@ export function CurrencyManagement() {
   }, [])
 
   // Handle override
-  const handleSetOverride = async (price: number, change?: number) => {
+  const handleSetOverride = async (price: number, change?: number, duration?: number, isIndefinite?: boolean) => {
     if (!overrideItem) return
     const itemName = getLocalizedName(overrideItem, locale)
     try {
@@ -879,6 +995,8 @@ export function CurrencyManagement() {
         code: overrideItem.code,
         price,
         change,
+        duration,
+        isIndefinite,
       }).unwrap()
       setOverrideItem(null)
       addToast('success', t('toastOverrideSuccess'), `${itemName}: ${formatPrice(price, locale)}`)
@@ -954,9 +1072,17 @@ export function CurrencyManagement() {
     }
   }
 
-  // Check if item can have regional variants (USD, AED, TRY only for now)
+  // Check if item can have regional variants (USD, AED, TRY/Lira)
+  // These are currencies that have regional pricing (Turkey, Dubai, Herat)
   const canAddRegionalVariant = (item: ManagedItem) => {
-    const allowedCodes = ['usd', 'aed', 'try', 'usd_sell', 'usd_buy']
+    const allowedCodes = [
+      // USD variants
+      'usd', 'usd_official', 'usd_sana_buy', 'usd_sana_sell', 'usd_nima',
+      // AED/Dirham variants
+      'aed', 'aed_official', 'aed_sana_buy', 'aed_sana_sell', 'aed_nima',
+      // Turkish Lira
+      'try',
+    ]
     return item.source === 'api' && allowedCodes.includes(item.code.toLowerCase())
   }
 
@@ -998,6 +1124,34 @@ export function CurrencyManagement() {
             )}
             {item.isOverridden && (
               <Badge variant="override">{t('overridden')}</Badge>
+            )}
+            {item.isOverridden && item.overrideExpiresAt && (() => {
+              const timeInfo = formatRemainingTime(item.overrideExpiresAt, locale)
+              if (timeInfo) {
+                if (timeInfo.isExpired) {
+                  return (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                      {t('expired')}
+                    </span>
+                  )
+                }
+                return (
+                  <span className={cn(
+                    'px-2 py-0.5 rounded-full text-xs font-medium',
+                    timeInfo.isExpiringSoon
+                      ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  )}>
+                    {t('expiresIn', { time: timeInfo.text })}
+                  </span>
+                )
+              }
+              return null
+            })()}
+            {item.isOverridden && !item.overrideExpiresAt && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                {t('indefinite')}
+              </span>
             )}
             {!item.isActive && (
               <Badge variant="inactive">{t('inactive')}</Badge>
