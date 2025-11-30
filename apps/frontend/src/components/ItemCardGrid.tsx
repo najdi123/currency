@@ -11,6 +11,7 @@ import {
   selectCalculatorItems,
   addItem,
   updateItemQuantity,
+  updateItemVariant,
   removeItem,
   type ItemType as CalculatorItemType,
 } from '@/lib/store/slices/calculatorSlice'
@@ -266,10 +267,29 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
         value: variantValue,
       }
     }))
-  }, [])
+
+    // Update calculator item if already added
+    const existingItem = calculatorItemsMap[itemKey]
+    if (existingItem) {
+      const variantName = t(`currencyVariants.${variant.code}`)
+      dispatch(updateItemVariant({
+        id: existingItem.id,
+        unitPrice: variantValue,
+        variantCode: variant.code,
+        variantName,
+      }))
+    }
+  }, [calculatorItemsMap, dispatch, t])
 
   // Handler for quantity changes in calculator mode
-  const handleQuantityChange = useCallback((itemKey: string, itemName: string, unitPrice: number, quantity: number) => {
+  const handleQuantityChange = useCallback((
+    itemKey: string,
+    itemName: string,
+    unitPrice: number,
+    quantity: number,
+    variantCode?: string,
+    variantName?: string
+  ) => {
     const existingItem = calculatorItemsMap[itemKey]
 
     if (existingItem) {
@@ -285,6 +305,8 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
         name: itemName,
         quantity,
         unitPrice,
+        variantCode,
+        variantName,
       }))
     }
   }, [calculatorItemsMap, dispatch, itemType])
@@ -306,11 +328,30 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
     return items.reduce((acc, item) => {
       const itemData = data[item.key]
       if (itemData) {
-        const selectedVariantInfo = selectedVariants[item.key]
-        const displayValue = selectedVariantInfo?.value ?? itemData.value
-        const itemName = t(`items.${item.key}`)
+        // ✅ Handler reads current value at invocation time (fixes stale closure bug)
+        acc[item.key] = (qty: number) => {
+          const currentSelectedVariant = selectedVariants[item.key]
+          const currentDisplayValue = currentSelectedVariant?.value ?? itemData.value
+          const itemName = t(`items.${item.key}`)
 
-        acc[item.key] = (qty: number) => handleQuantityChange(item.key, itemName, displayValue, qty)
+          // Get variant metadata
+          const variantCode = currentSelectedVariant?.code
+          const variantName = variantCode ? t(`currencyVariants.${variantCode}`) : undefined
+
+          // Validation
+          if (isNaN(currentDisplayValue) || currentDisplayValue <= 0) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn(
+                `[ItemCardGrid] Invalid display value for ${item.key}:`,
+                currentDisplayValue,
+                'selectedVariant:', currentSelectedVariant
+              )
+            }
+            return
+          }
+
+          handleQuantityChange(item.key, itemName, currentDisplayValue, qty, variantCode, variantName)
+        }
       }
       return acc
     }, {} as Record<string, (qty: number) => void>)

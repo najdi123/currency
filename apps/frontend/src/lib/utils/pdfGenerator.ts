@@ -230,7 +230,8 @@ export const generateCalculatorPDF = async ({
       currentY = marginTop
     }
 
-    const itemName = item.name.length > 30 ? item.name.substring(0, 27) + '...' : item.name
+    const displayName = item.variantName || item.name
+    const itemName = displayName.length > 30 ? displayName.substring(0, 27) + '...' : displayName
     const qtyText = `${item.quantity} ${item.type === 'gold' ? translations.grams : translations.piece}`
     const unitPriceText = formatToman(item.unitPrice)
     const totalText = formatToman(item.totalValue)

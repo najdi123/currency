@@ -15,6 +15,8 @@ export interface CalculatorItem {
   unitPrice: number // Price in Toman
   totalValue: number // quantity * unitPrice
   date?: string // For historical calculations
+  variantCode?: string // e.g., "usd_turkey_sell"
+  variantName?: string // e.g., "US Dollar Turkey (Sell)"
 }
 
 export interface CalculationHistory {
@@ -91,6 +93,22 @@ const calculatorSlice = createSlice({
       const item = state.items.find(i => i.id === action.payload.id)
       if (item) {
         item.quantity = action.payload.quantity
+        item.totalValue = item.quantity * item.unitPrice
+        state.totalValue = state.items.reduce((sum, item) => sum + item.totalValue, 0)
+      }
+    },
+
+    updateItemVariant: (state, action: PayloadAction<{
+      id: string
+      unitPrice: number
+      variantCode?: string
+      variantName?: string
+    }>) => {
+      const item = state.items.find(i => i.id === action.payload.id)
+      if (item) {
+        item.unitPrice = action.payload.unitPrice
+        item.variantCode = action.payload.variantCode
+        item.variantName = action.payload.variantName
         item.totalValue = item.quantity * item.unitPrice
         state.totalValue = state.items.reduce((sum, item) => sum + item.totalValue, 0)
       }
@@ -175,6 +193,7 @@ const calculatorSlice = createSlice({
 export const {
   addItem,
   updateItemQuantity,
+  updateItemVariant,
   removeItem,
   clearAllItems,
   setCurrentDate,

@@ -120,9 +120,16 @@ export const CalculatorDetailsModal: React.FC<CalculatorDetailsModalProps> = ({
                     className="flex items-center justify-between p-4 bg-bg-elevated rounded-lg border border-border-light"
                   >
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-text-primary truncate">
-                        {item.name}
-                      </h3>
+                      <div>
+                        <h3 className="font-medium text-text-primary truncate">
+                          {item.variantName || item.name}
+                        </h3>
+                        {item.variantName && (
+                          <p className="text-xs text-text-tertiary mt-0.5 truncate">
+                            {item.name}
+                          </p>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-1 text-sm text-text-secondary">
                         <span>
                           {item.quantity} {item.type === 'gold' ? t('grams') : t('piece')}
