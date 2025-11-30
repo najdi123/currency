@@ -12,10 +12,6 @@ import { TimeRange, ItemType } from "./dto/chart-query.dto";
 import { ChartDataPoint, ChartResponse } from "./interfaces/chart.interface";
 import { Cache, CacheDocument } from "../market-data/schemas/cache.schema";
 import {
-  OhlcSnapshot,
-  OhlcSnapshotDocument,
-} from "../market-data/schemas/ohlc-snapshot.schema";
-import {
   PriceSnapshot,
   PriceSnapshotDocument,
 } from "../market-data/schemas/price-snapshot.schema";
@@ -44,8 +40,6 @@ export class ChartService {
 
   constructor(
     @InjectModel(Cache.name) private cacheModel: Model<CacheDocument>,
-    @InjectModel(OhlcSnapshot.name)
-    private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     @InjectModel(PriceSnapshot.name)
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
     @InjectModel(HistoricalOhlc.name)
@@ -1110,168 +1104,6 @@ export class ChartService {
   }
 
   /**
-   * Save OHLC snapshot to database with TTL and metrics tracking
-   * ISSUE 4 FIX: Records auto-deleted after 90 days via TTL index
-   * METRICS: Tracks snapshot save failures
-   * DB ERROR HANDLING: Uses safeDbWrite
-   */
-  private async saveOhlcSnapshot(
-    itemCode: string,
-    timeRange: TimeRange,
-    data: NavasanOHLCDataPoint[],
-    apiMetadata?: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      const snapshot = new this.ohlcSnapshotModel({
-        itemCode,
-        timeRange,
-        data,
-        timestamp: new Date(),
-        source: "api",
-        metadata: apiMetadata,
-      });
-
-      const saveResult = await safeDbWrite(
-        () => snapshot.save(),
-        "saveOhlcSnapshot",
-        this.logger,
-        { itemCode, timeRange },
-        true, // Critical - track failures
-      );
-
-      if (saveResult) {
-        this.logger.log(
-          `📸 Saved OHLC snapshot for ${itemCode} (${timeRange})`,
-        );
-        // Reset failure counter on success
-        this.metricsService.resetSnapshotFailureCounter(
-          "ohlc",
-          `${itemCode}_${timeRange}`,
-        );
-      } else {
-        // Track failure
-        this.metricsService.trackSnapshotFailure(
-          "ohlc",
-          `${itemCode}_${timeRange}`,
-          "Database write failed during OHLC snapshot save",
-        );
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Failed to save OHLC snapshot for ${itemCode}: ${errorMessage}`,
-      );
-      // Track failure
-      this.metricsService.trackSnapshotFailure(
-        "ohlc",
-        `${itemCode}_${timeRange}`,
-        errorMessage,
-      );
-      // Don't fail the request if snapshot saving fails
-    }
-  }
-
-  /**
-   * Get OHLC snapshot from database with smart TTL based on time range
-   * Returns data if found and not expired according to retention policy
-   */
-  private async getOhlcSnapshotData(
-    itemCode: string,
-    timeRange: TimeRange,
-  ): Promise<{
-    data: NavasanOHLCDataPoint[];
-    timestamp: Date;
-    metadata?: Record<string, unknown>;
-  } | null> {
-    try {
-      // Get expiry date based on time range retention policy
-      const expiryDate = this.getSnapshotExpiryDate(timeRange);
-
-      const snapshot = await safeDbRead(
-        () =>
-          this.ohlcSnapshotModel
-            .findOne({
-              itemCode,
-              timeRange,
-              timestamp: { $gte: expiryDate },
-            })
-            .sort({ timestamp: -1 }) // Get most recent
-            .exec(),
-        "getOhlcSnapshot",
-        this.logger,
-      );
-
-      if (!snapshot) {
-        this.metricsService.trackCacheMiss("ohlc", "snapshot_db");
-        return null;
-      }
-
-      // Validate data structure
-      if (
-        !snapshot.data ||
-        !Array.isArray(snapshot.data) ||
-        snapshot.data.length === 0
-      ) {
-        this.logger.warn(
-          `Invalid OHLC snapshot data for ${itemCode} (${timeRange})`,
-        );
-        return null;
-      }
-
-      return {
-        data: snapshot.data as NavasanOHLCDataPoint[],
-        timestamp: snapshot.timestamp,
-        metadata: snapshot.metadata,
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Failed to get OHLC snapshot for ${itemCode}: ${errorMessage}`,
-      );
-      return null;
-    }
-  }
-
-  /**
-   * Get expiry date for OHLC snapshots based on time range
-   * Different time ranges have different retention policies:
-   * - 1d: Keep for 1 hour (same as fresh cache)
-   * - 1w: Keep for 6 hours
-   * - 1m: Keep for 1 day
-   * - 3m: Keep for 7 days
-   * - 1y/all: Keep for 30 days
-   */
-  private getSnapshotExpiryDate(timeRange: TimeRange): Date {
-    const now = new Date();
-    const expiryDate = new Date(now);
-
-    switch (timeRange) {
-      case TimeRange.ONE_DAY:
-        expiryDate.setHours(now.getHours() - 1); // 1 hour
-        break;
-      case TimeRange.ONE_WEEK:
-        expiryDate.setHours(now.getHours() - 6); // 6 hours
-        break;
-      case TimeRange.ONE_MONTH:
-        expiryDate.setDate(now.getDate() - 1); // 1 day
-        break;
-      case TimeRange.THREE_MONTHS:
-        expiryDate.setDate(now.getDate() - 7); // 7 days
-        break;
-      case TimeRange.ONE_YEAR:
-      case TimeRange.ALL:
-        expiryDate.setDate(now.getDate() - 30); // 30 days
-        break;
-      default:
-        expiryDate.setHours(now.getHours() - 1); // Default: 1 hour
-    }
-
-    return expiryDate;
-  }
-
-  /**
    * Get human-readable data age string
    */
   private getDataAge(timestamp: Date): string {
@@ -1569,15 +1401,12 @@ export class ChartService {
       const endDate = new Date(endTimestamp * 1000);
 
       // Determine which timeframe to use based on time range
-      // For shorter ranges, use daily data; for longer ranges, use weekly/monthly
+      // historical_ohlc only has WEEKLY and MONTHLY data
+      // For shorter ranges (< 365 days), use WEEKLY; for longer use MONTHLY
       let timeframe: OhlcTimeframe;
       const daysDiff = Math.floor((endTimestamp - startTimestamp) / 86400);
 
-      if (daysDiff <= 7) {
-        timeframe = OhlcTimeframe.DAILY;
-      } else if (daysDiff <= 90) {
-        timeframe = OhlcTimeframe.DAILY;
-      } else if (daysDiff <= 365) {
+      if (daysDiff <= 365) {
         timeframe = OhlcTimeframe.WEEKLY;
       } else {
         timeframe = OhlcTimeframe.MONTHLY;

@@ -3,16 +3,21 @@ import { Document } from "mongoose";
 
 export type HistoricalOhlcDocument = HistoricalOhlc & Document;
 
+/**
+ * OHLC Timeframe enum for aggregated historical data
+ * Note: HOURLY and DAILY timeframes are not used - ohlc_permanent is the source for granular data
+ * historical_ohlc only stores WEEKLY and MONTHLY aggregations
+ */
 export enum OhlcTimeframe {
-  HOURLY = "hourly",
-  DAILY = "daily",
   WEEKLY = "weekly",
   MONTHLY = "monthly",
 }
 
 @Schema({ collection: "historical_ohlc", timestamps: true })
 export class HistoricalOhlc {
-  @Prop({ required: true })
+  // itemCode is stored in UPPERCASE for consistency across all collections
+  // Use uppercase: true to automatically normalize on save
+  @Prop({ required: true, uppercase: true })
   itemCode: string; // References TrackedItem.code
 
   @Prop({ required: true, enum: Object.values(OhlcTimeframe) })

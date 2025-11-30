@@ -32,7 +32,7 @@ import type { ItemCardProps } from './itemCard.types'
  * - Larger border radius (16px) for modern look
  * - Soft shadows for depth without visual noise
  * - No colored borders - clean, minimal aesthetic
- * - Subtle scale on active state (0.98)
+ * - No movement on hover/click (stable card position)
  * - Uses ONLY Tailwind CSS classes (no inline styles)
  *
  * Accessibility Features:
@@ -74,6 +74,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   onSelectVariant,
 }) => {
   const t = useTranslations('ItemCard')
+  const tHome = useTranslations('Home')
 
   // Process data using custom hook
   const { sparklineData, isPositive, sparklineColor } = useItemCardData({
@@ -86,15 +87,20 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   // Track if we've logged an invalid icon error to prevent spam
   const hasLoggedInvalidIcon = useRef(false)
 
+  // Get selected variant name from translations if a variant is selected
+  const selectedVariantName = selectedVariant
+    ? tHome(`currencyVariants.${selectedVariant}`)
+    : undefined
+
   /**
    * Generates the card button className based on compact mode
    */
   const getCardClassName = (isCompact: boolean) =>
-    `card-apple cursor-pointer active:scale-[0.98] group flex flex-col ${
+    `card-apple cursor-pointer group flex flex-col ${
       isCompact
         ? 'min-h-[90px] sm:min-h-[100px] lg:min-h-[140px] p-3'
         : 'min-h-[110px] sm:min-h-[130px] lg:min-h-[150px] p-4'
-    } w-full text-left focus:outline-none focus:ring-[3px] focus:ring-[rgba(var(--accent-primary),0.4)] focus:ring-offset-2 touch-manipulation [-webkit-tap-highlight-color:transparent] motion-reduce:transition-none motion-reduce:active:scale-100`
+    } w-full text-left focus:outline-none focus:ring-[3px] focus:ring-[rgba(var(--accent-primary),0.4)] focus:ring-offset-2 touch-manipulation [-webkit-tap-highlight-color:transparent]`
 
   // Runtime validation for icon
   if (!isValidIconComponent(icon)) {
@@ -126,6 +132,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           id={id}
           iconColor={iconColor}
           compact={compact}
+          selectedVariantName={selectedVariantName}
           variantsDropdown={
             hasVariants && variants.length > 0 ? (
               <CurrencyVariantsDropdown
@@ -174,6 +181,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         id={id}
         iconColor={iconColor}
         compact={compact}
+        selectedVariantName={selectedVariantName}
         variantsDropdown={
           hasVariants && variants.length > 0 ? (
             <CurrencyVariantsDropdown

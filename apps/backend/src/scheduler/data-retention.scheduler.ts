@@ -11,18 +11,13 @@ import {
   PriceSnapshot,
   PriceSnapshotDocument,
 } from "../market-data/schemas/price-snapshot.schema";
-import {
-  OhlcSnapshot,
-  OhlcSnapshotDocument,
-} from "../market-data/schemas/ohlc-snapshot.schema";
 
 /**
  * Data Retention Scheduler
  *
  * Manages data retention policies to prevent database growth:
- * - Delete historical_ohlc older than 2 years
+ * - Delete historical_ohlc older than configured years (null = never delete)
  * - Delete price_snapshots older than 90 days
- * - Delete ohlc_snapshots older than 90 days
  */
 @Injectable()
 export class DataRetentionScheduler {
@@ -38,19 +33,22 @@ export class DataRetentionScheduler {
     private historicalModel: Model<HistoricalOhlcDocument>,
     @InjectModel(PriceSnapshot.name)
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
-    @InjectModel(OhlcSnapshot.name)
-    private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
   ) {}
 
   /**
    * Clean up old historical OHLC data
    * Runs daily at 03:00 Tehran time
-   * Deletes records older than 2 years
+   * Deletes records older than configured years (disabled if null)
    */
   @Cron("0 3 * * *", { timeZone: "Asia/Tehran" })
   async cleanupOldHistoricalOhlc(): Promise<void> {
+    if (this.HISTORICAL_RETENTION_YEARS === null) {
+      this.logger.debug("Historical OHLC cleanup disabled (retention = null)");
+      return;
+    }
+
     const startTime = Date.now();
-    this.logger.log(">� Starting historical OHLC cleanup...");
+    this.logger.log("🧹 Starting historical OHLC cleanup...");
 
     try {
       const cutoffDate = moment()
@@ -59,7 +57,7 @@ export class DataRetentionScheduler {
         .toDate();
 
       this.logger.log(
-        `=�  Deleting historical OHLC records older than ${cutoffDate.toISOString()}`,
+        `📅 Deleting historical OHLC records older than ${cutoffDate.toISOString()}`,
       );
 
       const result = await this.historicalModel.deleteMany({
@@ -70,7 +68,7 @@ export class DataRetentionScheduler {
 
       if (result.deletedCount > 0) {
         this.logger.log(
-          ` Deleted ${result.deletedCount} historical OHLC records (older than ${this.HISTORICAL_RETENTION_YEARS} years) in ${duration}ms`,
+          `✅ Deleted ${result.deletedCount} historical OHLC records (older than ${this.HISTORICAL_RETENTION_YEARS} years) in ${duration}ms`,
         );
       } else {
         this.logger.debug(
@@ -80,7 +78,7 @@ export class DataRetentionScheduler {
     } catch (error) {
       const err = error as Error;
       this.logger.error(
-        `L Failed to cleanup historical OHLC: ${err.message}`,
+        `❌ Failed to cleanup historical OHLC: ${err.message}`,
         err.stack,
       );
     }
@@ -94,7 +92,7 @@ export class DataRetentionScheduler {
   @Cron("0 4 * * *", { timeZone: "Asia/Tehran" })
   async cleanupOldPriceSnapshots(): Promise<void> {
     const startTime = Date.now();
-    this.logger.log(">� Starting price snapshot cleanup...");
+    this.logger.log("🧹 Starting price snapshot cleanup...");
 
     try {
       const cutoffDate = moment()
@@ -103,7 +101,7 @@ export class DataRetentionScheduler {
         .toDate();
 
       this.logger.log(
-        `=�  Deleting price snapshots older than ${cutoffDate.toISOString()}`,
+        `📅 Deleting price snapshots older than ${cutoffDate.toISOString()}`,
       );
 
       const result = await this.priceSnapshotModel.deleteMany({
@@ -114,7 +112,7 @@ export class DataRetentionScheduler {
 
       if (result.deletedCount > 0) {
         this.logger.log(
-          ` Deleted ${result.deletedCount} price snapshots (older than ${this.SNAPSHOT_RETENTION_DAYS} days) in ${duration}ms`,
+          `✅ Deleted ${result.deletedCount} price snapshots (older than ${this.SNAPSHOT_RETENTION_DAYS} days) in ${duration}ms`,
         );
       } else {
         this.logger.debug(
@@ -124,51 +122,7 @@ export class DataRetentionScheduler {
     } catch (error) {
       const err = error as Error;
       this.logger.error(
-        `L Failed to cleanup price snapshots: ${err.message}`,
-        err.stack,
-      );
-    }
-  }
-
-  /**
-   * Clean up old OHLC snapshots
-   * Runs daily at 04:30 Tehran time
-   * Deletes snapshots older than 90 days
-   */
-  @Cron("30 4 * * *", { timeZone: "Asia/Tehran" })
-  async cleanupOldOhlcSnapshots(): Promise<void> {
-    const startTime = Date.now();
-    this.logger.log(">� Starting OHLC snapshot cleanup...");
-
-    try {
-      const cutoffDate = moment()
-        .tz(this.timezone)
-        .subtract(this.SNAPSHOT_RETENTION_DAYS, "days")
-        .toDate();
-
-      this.logger.log(
-        `=�  Deleting OHLC snapshots older than ${cutoffDate.toISOString()}`,
-      );
-
-      const result = await this.ohlcSnapshotModel.deleteMany({
-        timestamp: { $lt: cutoffDate },
-      });
-
-      const duration = Date.now() - startTime;
-
-      if (result.deletedCount > 0) {
-        this.logger.log(
-          ` Deleted ${result.deletedCount} OHLC snapshots (older than ${this.SNAPSHOT_RETENTION_DAYS} days) in ${duration}ms`,
-        );
-      } else {
-        this.logger.debug(
-          `No OHLC snapshots to delete (checked in ${duration}ms)`,
-        );
-      }
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error(
-        `L Failed to cleanup OHLC snapshots: ${err.message}`,
+        `❌ Failed to cleanup price snapshots: ${err.message}`,
         err.stack,
       );
     }
@@ -190,18 +144,14 @@ export class DataRetentionScheduler {
       newestRecord: Date | null;
       willBeDeleted: number;
     };
-    ohlcSnapshots: {
-      total: number;
-      oldestRecord: Date | null;
-      newestRecord: Date | null;
-      willBeDeleted: number;
-    };
   }> {
     try {
-      const historicalCutoff = moment()
-        .tz(this.timezone)
-        .subtract(this.HISTORICAL_RETENTION_YEARS, "years")
-        .toDate();
+      const historicalCutoff = this.HISTORICAL_RETENTION_YEARS
+        ? moment()
+            .tz(this.timezone)
+            .subtract(this.HISTORICAL_RETENTION_YEARS, "years")
+            .toDate()
+        : new Date(0); // No cutoff if null
 
       const snapshotCutoff = moment()
         .tz(this.timezone)
@@ -217,10 +167,6 @@ export class DataRetentionScheduler {
         priceSnapshotOldest,
         priceSnapshotNewest,
         priceSnapshotToDelete,
-        ohlcSnapshotTotal,
-        ohlcSnapshotOldest,
-        ohlcSnapshotNewest,
-        ohlcSnapshotToDelete,
       ] = await Promise.all([
         // Historical OHLC
         this.historicalModel.countDocuments(),
@@ -234,9 +180,11 @@ export class DataRetentionScheduler {
           .sort({ periodStart: -1 })
           .select("periodStart")
           .lean(),
-        this.historicalModel.countDocuments({
-          periodStart: { $lt: historicalCutoff },
-        }),
+        this.HISTORICAL_RETENTION_YEARS
+          ? this.historicalModel.countDocuments({
+              periodStart: { $lt: historicalCutoff },
+            })
+          : 0,
         // Price Snapshots
         this.priceSnapshotModel.countDocuments(),
         this.priceSnapshotModel
@@ -250,21 +198,6 @@ export class DataRetentionScheduler {
           .select("timestamp")
           .lean(),
         this.priceSnapshotModel.countDocuments({
-          timestamp: { $lt: snapshotCutoff },
-        }),
-        // OHLC Snapshots
-        this.ohlcSnapshotModel.countDocuments(),
-        this.ohlcSnapshotModel
-          .findOne()
-          .sort({ timestamp: 1 })
-          .select("timestamp")
-          .lean(),
-        this.ohlcSnapshotModel
-          .findOne()
-          .sort({ timestamp: -1 })
-          .select("timestamp")
-          .lean(),
-        this.ohlcSnapshotModel.countDocuments({
           timestamp: { $lt: snapshotCutoff },
         }),
       ]);
@@ -281,12 +214,6 @@ export class DataRetentionScheduler {
           oldestRecord: priceSnapshotOldest?.timestamp || null,
           newestRecord: priceSnapshotNewest?.timestamp || null,
           willBeDeleted: priceSnapshotToDelete,
-        },
-        ohlcSnapshots: {
-          total: ohlcSnapshotTotal,
-          oldestRecord: ohlcSnapshotOldest?.timestamp || null,
-          newestRecord: ohlcSnapshotNewest?.timestamp || null,
-          willBeDeleted: ohlcSnapshotToDelete,
         },
       };
     } catch (error) {
@@ -308,12 +235,6 @@ export class DataRetentionScheduler {
           newestRecord: null,
           willBeDeleted: 0,
         },
-        ohlcSnapshots: {
-          total: 0,
-          oldestRecord: null,
-          newestRecord: null,
-          willBeDeleted: 0,
-        },
       };
     }
   }
@@ -324,32 +245,26 @@ export class DataRetentionScheduler {
   async manualCleanupAll(): Promise<{
     historicalDeleted: number;
     priceSnapshotsDeleted: number;
-    ohlcSnapshotsDeleted: number;
   }> {
     this.logger.log("Manual cleanup triggered for all data types");
 
     const results = {
       historicalDeleted: 0,
       priceSnapshotsDeleted: 0,
-      ohlcSnapshotsDeleted: 0,
     };
 
     try {
       await this.cleanupOldHistoricalOhlc();
       await this.cleanupOldPriceSnapshots();
-      await this.cleanupOldOhlcSnapshots();
 
       // Get actual counts after cleanup
       const stats = await this.getRetentionStats();
-      this.logger.log(" Manual cleanup complete");
+      this.logger.log("✅ Manual cleanup complete");
       this.logger.log(
         `Historical OHLC: ${stats.historicalOhlc.total} records remain`,
       );
       this.logger.log(
         `Price Snapshots: ${stats.priceSnapshots.total} records remain`,
-      );
-      this.logger.log(
-        `OHLC Snapshots: ${stats.ohlcSnapshots.total} records remain`,
       );
 
       return results;

@@ -114,6 +114,29 @@ export class OHLCManagerService {
   }
 
   /**
+   * Batch get OHLC data for multiple items (prevents N+1 queries)
+   * Used by collectMinuteData to fetch all existing records in one query
+   */
+  async getBatchOHLCData(
+    itemCodes: string[],
+    timeframe: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<OHLCPermanent[]> {
+    return this.ohlcPermanentModel
+      .find({
+        itemCode: { $in: itemCodes },
+        timeframe,
+        timestamp: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+      })
+      .lean()
+      .exec();
+  }
+
+  /**
    * Aggregate lower timeframe data to higher timeframes
    */
   async aggregateTimeframes(

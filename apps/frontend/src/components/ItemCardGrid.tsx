@@ -17,12 +17,43 @@ import {
 import type { ItemType } from '@/types/chart'
 import type { VariantData } from './ItemCard/itemCard.types'
 
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+/** Threshold to determine if API change is percentage vs absolute value */
+const PERCENTAGE_THRESHOLD = 1
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface ItemData {
+  value: number
+  change: number
+}
+
+interface ChangeData {
+  dailyChangePercent: number
+  absoluteChange: number
+}
+
+interface GridItemConfig {
+  key: string
+  icon: IconType
+  color: string
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS (extracted for testability)
+// =============================================================================
+
 /**
  * Map display item types to calculator item types
  * - 'crypto' and 'coins' both map to 'coin' in calculator
  * - 'currency' and 'gold' stay the same
  */
-const mapToCalculatorItemType = (displayType: string): CalculatorItemType => {
+export const mapToCalculatorItemType = (displayType: string): CalculatorItemType => {
   if (displayType === 'crypto' || displayType === 'coins') {
     return 'coin'
   }
@@ -32,25 +63,71 @@ const mapToCalculatorItemType = (displayType: string): CalculatorItemType => {
   return 'custom'
 }
 
+/**
+ * Calculate change data from OHLC or API data
+ * Extracted for testability and reuse
+ */
+export const calculateChangeData = (
+  ohlcItem: OhlcResponse | undefined,
+  itemData: ItemData
+): ChangeData => {
+  // Priority: Use OHLC if available and non-zero
+  if (ohlcItem && (ohlcItem.change !== 0 || ohlcItem.absoluteChange !== 0)) {
+    return {
+      dailyChangePercent: typeof ohlcItem.change === 'string'
+        ? parseFloat(ohlcItem.change)
+        : ohlcItem.change,
+      absoluteChange: ohlcItem.absoluteChange || 0,
+    }
+  }
+
+  // Fallback: compute from API change data
+  const apiChange = itemData.change
+
+  // Values < PERCENTAGE_THRESHOLD are percentages (e.g., 0.035 for 3.5%)
+  // Values >= PERCENTAGE_THRESHOLD are absolute Toman (e.g., 26 for gold)
+  if (Math.abs(apiChange) < PERCENTAGE_THRESHOLD) {
+    return {
+      dailyChangePercent: apiChange,
+      absoluteChange: itemData.value * apiChange,
+    }
+  }
+
+  return {
+    absoluteChange: apiChange,
+    dailyChangePercent: itemData.value !== 0 ? apiChange / itemData.value : 0,
+  }
+}
+
+/**
+ * Get grid CSS classes based on view mode
+ */
+const getGridClasses = (viewMode: 'single' | 'dual'): string => {
+  const colClasses = viewMode === 'dual'
+    ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+
+  const gapClasses = viewMode === 'dual'
+    ? 'gap-2 sm:gap-4 lg:gap-6 xl:gap-8'
+    : 'gap-4 sm:gap-6 lg:gap-8'
+
+  return `grid ${colClasses} ${gapClasses} w-full`
+}
+
+// =============================================================================
+// PROPS INTERFACE
+// =============================================================================
+
 export interface ItemCardGridProps {
   /**
    * Array of items to display
    */
-  items: Array<{
-    key: string
-    icon: IconType
-    color: string
-  }>
+  items: Array<GridItemConfig>
 
   /**
    * Data object containing values for each item
    */
-  data: {
-    [key: string]: {
-      value: number
-      change: number
-    }
-  } | null
+  data: Record<string, ItemData> | null
 
   /**
    * Item type for fetching historical data (can be chart type or calculator type)
@@ -75,44 +152,20 @@ export interface ItemCardGridProps {
   onItemClick?: (itemKey: string) => void
 }
 
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
 /**
  * ItemCardGrid - A responsive grid layout for displaying currency/gold cards
- *
- * Responsive breakpoints:
- * - Extra Small (< 640px): 1 card per row
- * - Small (640px - 768px): 2 cards per row
- * - Medium (768px - 1024px): 2 cards per row
- * - Large (1024px - 1280px): 3 cards per row
- * - Extra Large (1280px - 1536px): 4 cards per row
- * - 2XL (1536px+): 5 cards per row
  *
  * Features:
  * - Automatic grid layout with consistent spacing
  * - Filters out items with no data
- * - Passes through all ItemCard features
+ * - Calculator mode with variant selection
+ * - OHLC data integration
  * - Fully accessible with ARIA list/listitem relationships
- * - Optimized with useCallback to prevent unnecessary re-renders
- * - Memoized component to prevent re-renders when props haven't changed
- * - Responsive gap spacing that scales with screen size
- * - Mobile-first design with 1 column on mobile, expanding to more columns on larger screens
- *
- * Performance Optimizations:
- * - Wrapped with React.memo for shallow prop comparison
- * - Custom comparison function checks all props for changes
- * - Prevents unnecessary re-renders of child ItemCard components
- * - Particularly beneficial during polling updates (every 5 minutes)
- * - Uses reference equality for objects and arrays
- *
- * Memoization Strategy:
- * - items: Array reference comparison (stable module-level constants)
- * - data: Object reference comparison (RTK Query provides stable refs)
- * - accentColor: Primitive string comparison
- * - onItemClick: Function reference comparison (typically stable or undefined)
- *
- * Performance Impact:
- * - Skips re-rendering when parent updates but ItemCardGrid props are unchanged
- * - Reduces React reconciliation work during unrelated state updates
- * - Improves overall application performance, especially with multiple grid instances
+ * - Performance optimized with memoization
  */
 const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   items,
@@ -132,6 +185,13 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   // Fetch OHLC data for all items
   const { data: ohlcData } = useGetAllTodayOhlcQuery()
 
+  // Track selected variants for each currency item
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, { code: string; value: number }>>({})
+
+  // ==========================================================================
+  // MEMOIZED LOOKUPS
+  // ==========================================================================
+
   // Create a lookup map for OHLC data by itemCode
   const ohlcMap = useMemo(() => {
     if (!ohlcData?.data) return {}
@@ -144,24 +204,68 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   // Create a lookup map for calculator items by item key
   const calculatorItemsMap = useMemo(() => {
     return calculatorItems.reduce((acc, item) => {
-      // Map calculator item to the item key (e.g., subType 'USD' -> 'usd_sell')
       const itemKey = item.subType?.toLowerCase() || item.id
       acc[itemKey] = item
       return acc
     }, {} as Record<string, typeof calculatorItems[0]>)
   }, [calculatorItems])
 
-  // Track selected variants for each currency item (e.g., { 'usd_sell': 'usd_sell_official' })
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
+  // Pre-compute variants for all items (moved out of render loop)
+  const variantsMap = useMemo(() => {
+    if (!data || itemType !== 'currency') return {}
+
+    return items.reduce((acc, item) => {
+      if (hasVariants(item.key)) {
+        const variantDefinitions = getCompleteVariantsForCurrency(item.key, data)
+        acc[item.key] = variantDefinitions
+          .map((v) => getVariantData(v, data))
+          .filter((v): v is NonNullable<typeof v> => v !== null)
+      }
+      return acc
+    }, {} as Record<string, VariantData[]>)
+  }, [items, data, itemType])
+
+  // Pre-compute OHLC data for all items (moved out of render loop)
+  const ohlcDataMap = useMemo(() => {
+    if (!data) return {}
+
+    return items.reduce((acc, item) => {
+      const itemData = data[item.key]
+      if (itemData) {
+        const ohlcItem = ohlcMap[item.key]
+        const changeData = calculateChangeData(ohlcItem, itemData)
+        acc[item.key] = {
+          ...changeData,
+          dataPoints: ohlcItem?.dataPoints || []
+        }
+      }
+      return acc
+    }, {} as Record<string, ChangeData & { dataPoints: Array<{ time: string; price: number }> }>)
+  }, [items, data, ohlcMap])
+
+  // ==========================================================================
+  // MEMOIZED HANDLERS (fixes inline arrow functions)
+  // ==========================================================================
 
   // Handler for variant selection
   const handleSelectVariant = useCallback((itemKey: string, variant: VariantData) => {
+    const variantValue = Number(variant.value)
+
+    // Validate variant value
+    if (isNaN(variantValue)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[ItemCardGrid] Invalid variant value for ${variant.code}:`, variant.value)
+      }
+      return
+    }
+
     setSelectedVariants(prev => ({
       ...prev,
-      [itemKey]: variant.code
+      [itemKey]: {
+        code: variant.code,
+        value: variantValue,
+      }
     }))
-    // Log selection for debugging
-    console.log(`[ItemCardGrid] Selected variant for ${itemKey}:`, variant.code, variant)
   }, [])
 
   // Handler for quantity changes in calculator mode
@@ -170,14 +274,11 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
 
     if (existingItem) {
       if (quantity === 0) {
-        // Remove item if quantity is 0
         dispatch(removeItem(existingItem.id))
       } else {
-        // Update existing item quantity
         dispatch(updateItemQuantity({ id: existingItem.id, quantity }))
       }
     } else if (quantity > 0) {
-      // Add new item to calculator
       dispatch(addItem({
         type: mapToCalculatorItemType(itemType),
         subType: itemKey.toUpperCase() as any,
@@ -188,8 +289,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
     }
   }, [calculatorItemsMap, dispatch, itemType])
 
-  // Memoize click handlers to prevent creating new functions on every render
-  // Creates a stable object mapping item keys to their click handlers
+  // Memoize click handlers
   const clickHandlers = useMemo(() => {
     if (!onItemClick) return {}
 
@@ -199,123 +299,60 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
     }, {} as Record<string, () => void>)
   }, [items, onItemClick])
 
+  // Memoize quantity change handlers (fixes inline arrow function in render)
+  const quantityHandlers = useMemo(() => {
+    if (!data) return {}
+
+    return items.reduce((acc, item) => {
+      const itemData = data[item.key]
+      if (itemData) {
+        const selectedVariantInfo = selectedVariants[item.key]
+        const displayValue = selectedVariantInfo?.value ?? itemData.value
+        const itemName = t(`items.${item.key}`)
+
+        acc[item.key] = (qty: number) => handleQuantityChange(item.key, itemName, displayValue, qty)
+      }
+      return acc
+    }, {} as Record<string, (qty: number) => void>)
+  }, [items, data, selectedVariants, handleQuantityChange, t])
+
+  // Memoize variant select handlers (fixes inline arrow function in render)
+  const variantSelectHandlers = useMemo(() => {
+    return items.reduce((acc, item) => {
+      acc[item.key] = (variant: VariantData) => handleSelectVariant(item.key, variant)
+      return acc
+    }, {} as Record<string, (variant: VariantData) => void>)
+  }, [items, handleSelectVariant])
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  // Handle missing data with explicit empty state
   if (!data) {
     return null
   }
 
   return (
     <div
-      className={`grid ${
-        viewMode === 'dual'
-          ? 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-      } ${
-        viewMode === 'dual' ? 'gap-2 sm:gap-4 lg:gap-6 xl:gap-8' : 'gap-4 sm:gap-6 lg:gap-8'
-      } w-full`}
+      className={getGridClasses(viewMode)}
       role="list"
-      aria-label="لیست آیتم‌های قیمت"
+      aria-label={t('accessibility.priceItemsList') || 'Price items list'}
     >
       {items.map((item) => {
         const itemData = data[item.key]
         if (!itemData) return null
 
-        // Check if this currency has variants and extract variant data
-        // Use getCompleteVariantsForCurrency to include both static (official, sana, nima)
-        // and dynamic (admin-added regional) variants
         const itemHasVariants = itemType === 'currency' && hasVariants(item.key)
-        const variantDefinitions = itemHasVariants ? getCompleteVariantsForCurrency(item.key, data) : []
-        const variants = itemHasVariants
-          ? variantDefinitions
-              .map((v) => getVariantData(v, data))
-              .filter((v): v is NonNullable<typeof v> => v !== null)
-          : []
+        const variants = variantsMap[item.key] || []
+        const ohlcItemData = ohlcDataMap[item.key]
 
-        // Debug logging for variants
-        if (itemHasVariants) {
-          if (item.key === 'usd_sell') {
-            const allUSDVariants = variantDefinitions.map(v => ({
-              code: v.code,
-              apiCode: v.apiCode,
-              hasData: !!data[v.apiCode],
-              type: v.variantType,
-            }))
-            const foundVariantCodes = variants.map(v => v.apiCode)
-            console.log(`[ItemCardGrid] USD Variants Summary:`, {
-              total: variantDefinitions.length,
-              found: variants.length,
-              missing: variantDefinitions.filter(v => !data[v.apiCode]).map(v => v.apiCode),
-              specificVariants: {
-                soleimanie: !!data['dolar_soleimanie_sell'],
-                kordestan: !!data['dolar_kordestan_sell'],
-                mashad: !!data['dolar_mashad_sell'],
-                harat: !!data['dolar_harat_sell'],
-                haratCash: !!data['harat_naghdi_sell'],
-              },
-              allVariants: allUSDVariants,
-            })
-          }
-          if (item.key === 'aed') {
-            const allAEDVariants = variantDefinitions.map(v => ({
-              code: v.code,
-              apiCode: v.apiCode,
-              hasData: !!data[v.apiCode],
-              type: v.variantType,
-            }))
-            console.log(`[ItemCardGrid] AED Variants Summary:`, {
-              total: variantDefinitions.length,
-              found: variants.length,
-              missing: variantDefinitions.filter(v => !data[v.apiCode]).map(v => v.apiCode),
-              specificVariants: {
-                dubai: !!data['dirham_dubai'],
-                tehran: !!data['aed_sell'],
-              },
-              allVariants: allAEDVariants,
-            })
-          }
-        }
-
-        // Get OHLC data for this item if available
-        const ohlcItem = ohlcMap[item.key]
-
-        // Calculate absolute change and percentage for consistent display
-        // Priority: Use OHLC if available and non-zero, otherwise compute from API data
-        let dailyChangePercent: number
-        let absoluteChange: number
-
-        if (ohlcItem && (ohlcItem.change !== 0 || ohlcItem.absoluteChange !== 0)) {
-          // OHLC has meaningful data
-          dailyChangePercent = typeof ohlcItem.change === 'string'
-            ? parseFloat(ohlcItem.change)
-            : ohlcItem.change
-          absoluteChange = ohlcItem.absoluteChange || 0
-        } else {
-          // No OHLC or OHLC is zero - compute from API change data
-          const apiChange = itemData.change
-
-          // Detect if API change is percentage (< 1 means percentage like 0.035)
-          // or absolute Toman (>= 1 means absolute like 26 for gold)
-          if (Math.abs(apiChange) < 1) {
-            // API returns percentage (e.g., 0.035 for 3.5%)
-            dailyChangePercent = apiChange
-            // Calculate absolute Toman change: value * percentage
-            absoluteChange = itemData.value * apiChange
-          } else {
-            // API returns absolute Toman (e.g., 26 for gold items)
-            absoluteChange = apiChange
-            // Calculate percentage: (change / value)
-            dailyChangePercent = itemData.value !== 0 ? apiChange / itemData.value : 0
-          }
-        }
-
-        const ohlcData = {
-          dailyChangePercent,
-          absoluteChange,
-          dataPoints: ohlcItem?.dataPoints || []
-        }
-
-        // Get calculator data for this item
         const calculatorItem = calculatorItemsMap[item.key]
         const quantity = calculatorItem?.quantity || 0
+
+        const selectedVariantInfo = selectedVariants[item.key]
+        const displayValue = selectedVariantInfo?.value ?? itemData.value
+        const selectedVariantCode = selectedVariantInfo?.code
 
         return (
           <ItemCard
@@ -325,7 +362,7 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             name={t(`items.${item.key}`)}
             icon={item.icon}
             iconColor={item.color}
-            value={itemData.value}
+            value={displayValue}
             change={itemData.change}
             type={itemType as ItemType}
             compact={viewMode === 'dual'}
@@ -334,12 +371,12 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
             role="listitem"
             hasVariants={itemHasVariants}
             variants={variants}
-            ohlc={ohlcData}
+            ohlc={ohlcItemData}
             calculatorMode={isCalculatorMode}
             quantity={quantity}
-            onQuantityChange={(qty) => handleQuantityChange(item.key, t(`items.${item.key}`), itemData.value, qty)}
-            selectedVariant={selectedVariants[item.key]}
-            onSelectVariant={(variant) => handleSelectVariant(item.key, variant)}
+            onQuantityChange={quantityHandlers[item.key]}
+            selectedVariant={selectedVariantCode}
+            onSelectVariant={variantSelectHandlers[item.key]}
           />
         )
       })}
@@ -347,42 +384,16 @@ const ItemCardGridComponent: React.FC<ItemCardGridProps> = ({
   )
 }
 
+// =============================================================================
+// MEMOIZED EXPORT
+// =============================================================================
+
 /**
  * Memoized ItemCardGrid component with custom comparison function
- *
- * The custom comparison function returns true if props are equal (skip re-render)
- * and false if props are different (perform re-render).
- *
- * Comparison logic:
- * - All props must be equal for the component to skip re-rendering
- * - Uses reference equality (===) for all props
- * - This is sufficient because:
- *   1. items arrays are stable module-level constants
- *   2. data objects have stable references from RTK Query
- *   3. accentColor is a primitive string
- *   4. onItemClick is either undefined or a stable callback
  */
 export const ItemCardGrid = React.memo<ItemCardGridProps>(
   ItemCardGridComponent,
   (prevProps, nextProps) => {
-    // Development-only logging to track re-render behavior
-    if (process.env.NODE_ENV === 'development') {
-      const changedProps: string[] = []
-      if (prevProps.accentColor !== nextProps.accentColor) changedProps.push('accentColor')
-      if (prevProps.data !== nextProps.data) changedProps.push('data')
-      if (prevProps.items !== nextProps.items) changedProps.push('items')
-      if (prevProps.itemType !== nextProps.itemType) changedProps.push('itemType')
-      if (prevProps.onItemClick !== nextProps.onItemClick) changedProps.push('onItemClick')
-      if (prevProps.viewMode !== nextProps.viewMode) changedProps.push('viewMode')
-
-      if (changedProps.length > 0) {
-        console.log('[ItemCardGrid] Re-rendering due to changed props:', changedProps)
-      }
-
-      return changedProps.length === 0 // true if no changes, false if changes
-    }
-
-    // Production: optimized comparison with early returns
     // Return false immediately if any prop changed (perform re-render)
     if (prevProps.accentColor !== nextProps.accentColor) return false
     if (prevProps.data !== nextProps.data) return false

@@ -484,26 +484,40 @@ export const LastUpdatedDisplay = ({
     <div className="flex flex-col items-center gap-3" role="region" aria-label={t('lastUpdated')}>
       {/* Desktop: Horizontal layout with buttons on sides, Mobile: Vertical with buttons below */}
       <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-        {/* Left Navigation Button - Desktop only (hidden on mobile) */}
+        {/* Left Navigation Buttons - Desktop only (hidden on mobile) */}
         {historicalNav && (
-          <button
-            onClick={historicalNav.goToPreviousDay}
-            disabled={!historicalNav.canGoBack || isFetching}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            aria-label={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
-            title={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
-            aria-disabled={!historicalNav.canGoBack || isFetching}
-          >
-            {/* Conditional Arrow: Flip in Farsi */}
-            {locale === 'fa' || locale === 'ar' ? (
-              <FiChevronRight className="text-base" aria-hidden="true" />
-            ) : (
-              <FiChevronLeft className="text-base" aria-hidden="true" />
-            )}
-            <span>
-              {historicalNav.isToday ? t('goToYesterday') || 'Yesterday' : t('previousDay')}
-            </span>
-          </button>
+          <div className="hidden sm:flex items-center gap-2">
+            <button
+              onClick={historicalNav.goToPreviousDay}
+              disabled={!historicalNav.canGoBack || isFetching}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              aria-label={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
+              title={historicalNav.isToday ? t('goToYesterday') || 'Go to Yesterday' : t('previousDay')}
+              aria-disabled={!historicalNav.canGoBack || isFetching}
+            >
+              {/* Conditional Arrow: Flip in Farsi */}
+              {locale === 'fa' || locale === 'ar' ? (
+                <FiChevronRight className="text-base" aria-hidden="true" />
+              ) : (
+                <FiChevronLeft className="text-base" aria-hidden="true" />
+              )}
+              <span>
+                {historicalNav.isToday ? t('goToYesterday') || 'Yesterday' : t('previousDay')}
+              </span>
+            </button>
+            {/* Today Button - Always visible on desktop */}
+            <button
+              onClick={historicalNav.goToToday}
+              disabled={historicalNav.isToday || isFetching}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              aria-label={t('today')}
+              title={t('today')}
+              aria-disabled={historicalNav.isToday || isFetching}
+            >
+              <HiCalendar className="text-base" aria-hidden="true" />
+              <span>{t('today')}</span>
+            </button>
+          </div>
         )}
 
         {/* Last Updated Time Display */}
@@ -702,26 +716,19 @@ export const LastUpdatedDisplay = ({
         {/* Right Navigation Button - Desktop only (hidden on mobile) */}
         {historicalNav && (
           <button
-            onClick={historicalNav.canGoForward ? historicalNav.goToNextDay : historicalNav.goToToday}
-            disabled={historicalNav.isToday || isFetching}
+            onClick={historicalNav.goToNextDay}
+            disabled={!historicalNav.canGoForward || isFetching}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            aria-label={historicalNav.canGoForward ? t('nextDay') : t('today')}
-            title={historicalNav.canGoForward ? t('nextDay') : t('today')}
-            aria-disabled={historicalNav.isToday || isFetching}
+            aria-label={t('nextDay')}
+            title={t('nextDay')}
+            aria-disabled={!historicalNav.canGoForward || isFetching}
           >
-            <span>
-              {historicalNav.canGoForward ? t('nextDay') : t('today')}
-            </span>
-
+            <span>{t('nextDay')}</span>
             {/* Arrow flips in Farsi: Next Day = left arrow in RTL */}
-            {historicalNav.canGoForward ? (
-              locale === 'fa' || locale === 'ar' ? (
-                <FiChevronLeft className="text-base" aria-hidden="true" />
-              ) : (
-                <FiChevronRight className="text-base" aria-hidden="true" />
-              )
+            {locale === 'fa' || locale === 'ar' ? (
+              <FiChevronLeft className="text-base" aria-hidden="true" />
             ) : (
-              <HiCalendar className="text-base" aria-hidden="true" />
+              <FiChevronRight className="text-base" aria-hidden="true" />
             )}
           </button>
         )}
@@ -729,7 +736,7 @@ export const LastUpdatedDisplay = ({
 
       {/* Navigation Buttons Row - Mobile only (shown below the time/date) */}
       {historicalNav && (
-        <div className="flex sm:hidden items-center gap-5">
+        <div className="flex sm:hidden items-center gap-2">
           {/* Left Navigation Button - Previous Day / Yesterday */}
           <button
             onClick={historicalNav.goToPreviousDay}
@@ -752,29 +759,34 @@ export const LastUpdatedDisplay = ({
             </span>
           </button>
 
-          {/* Right Navigation Button - Today / Next Day */}
+          {/* Today Button - Always visible on mobile */}
           <button
-            onClick={historicalNav.canGoForward ? historicalNav.goToNextDay : historicalNav.goToToday}
+            onClick={historicalNav.goToToday}
             disabled={historicalNav.isToday || isFetching}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            aria-label={historicalNav.canGoForward ? t('nextDay') : t('today')}
-            title={historicalNav.canGoForward ? t('nextDay') : t('today')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            aria-label={t('today')}
+            title={t('today')}
             aria-disabled={historicalNav.isToday || isFetching}
           >
-            {/* Show full text on mobile */}
-            <span>
-              {historicalNav.canGoForward ? t('nextDay') : t('today')}
-            </span>
+            <HiCalendar className="text-base" aria-hidden="true" />
+            <span>{t('today')}</span>
+          </button>
 
+          {/* Right Navigation Button - Next Day */}
+          <button
+            onClick={historicalNav.goToNextDay}
+            disabled={!historicalNav.canGoForward || isFetching}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            aria-label={t('nextDay')}
+            title={t('nextDay')}
+            aria-disabled={!historicalNav.canGoForward || isFetching}
+          >
+            <span>{t('nextDay')}</span>
             {/* Arrow flips in Farsi: Next Day = left arrow in RTL */}
-            {historicalNav.canGoForward ? (
-              locale === 'fa' || locale === 'ar' ? (
-                <FiChevronLeft className="text-base" aria-hidden="true" />
-              ) : (
-                <FiChevronRight className="text-base" aria-hidden="true" />
-              )
+            {locale === 'fa' || locale === 'ar' ? (
+              <FiChevronLeft className="text-base" aria-hidden="true" />
             ) : (
-              <HiCalendar className="text-base" aria-hidden="true" />
+              <FiChevronRight className="text-base" aria-hidden="true" />
             )}
           </button>
         </div>

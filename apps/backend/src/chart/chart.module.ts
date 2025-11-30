@@ -5,10 +5,6 @@ import { ChartController } from "./chart.controller";
 import { ChartService } from "./chart.service";
 import { Cache, CacheSchema } from "../market-data/schemas/cache.schema";
 import {
-  OhlcSnapshot,
-  OhlcSnapshotSchema,
-} from "../market-data/schemas/ohlc-snapshot.schema";
-import {
   PriceSnapshot,
   PriceSnapshotSchema,
 } from "../market-data/schemas/price-snapshot.schema";
@@ -27,7 +23,6 @@ import { MetricsModule } from "../metrics/metrics.module";
     ConfigModule,
     MongooseModule.forFeature([
       { name: Cache.name, schema: CacheSchema },
-      { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
       { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
       { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
       { name: OHLCPermanent.name, schema: OHLCPermanentSchema },

@@ -3,7 +3,6 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { MongooseModule } from "@nestjs/mongoose";
 import { OhlcAggregationScheduler } from "./ohlc-aggregation.scheduler";
 import { DataRetentionScheduler } from "./data-retention.scheduler";
-import { OhlcCleanupSchedulerService } from "./ohlc-cleanup-scheduler.service";
 import { OhlcPermanentCleanupScheduler } from "./ohlc-permanent-cleanup.scheduler";
 import { NavasanSchedulerService } from "./navasan-scheduler.service";
 import { ScheduleConfigService } from "./schedule-config.service";
@@ -17,10 +16,6 @@ import {
   PriceSnapshotSchema,
 } from "../market-data/schemas/price-snapshot.schema";
 import {
-  OhlcSnapshot,
-  OhlcSnapshotSchema,
-} from "../market-data/schemas/ohlc-snapshot.schema";
-import {
   OHLCPermanent,
   OHLCPermanentSchema,
 } from "../market-data/schemas/ohlc-permanent.schema";
@@ -32,8 +27,7 @@ import { AuthModule } from "../auth/auth.module";
  *
  * Manages all scheduled tasks for the application:
  * - OHLC data aggregation (weekly, monthly) - daily is disabled
- * - Data retention and cleanup for historical_ohlc, price_snapshots, ohlc_snapshots
- * - OHLC snapshot cleanup (removes old snapshots based on retention policies)
+ * - Data retention and cleanup for historical_ohlc, price_snapshots
  * - OHLC permanent cleanup (removes old 1m/5m/15m/1h data to control RAM usage)
  *
  * Note: OHLCPermanent is the primary data source.
@@ -45,7 +39,6 @@ import { AuthModule } from "../auth/auth.module";
     MongooseModule.forFeature([
       { name: HistoricalOhlc.name, schema: HistoricalOhlcSchema },
       { name: PriceSnapshot.name, schema: PriceSnapshotSchema },
-      { name: OhlcSnapshot.name, schema: OhlcSnapshotSchema },
       { name: OHLCPermanent.name, schema: OHLCPermanentSchema },
     ]),
     MarketDataModule, // For MarketDataOrchestratorService
@@ -55,7 +48,6 @@ import { AuthModule } from "../auth/auth.module";
   providers: [
     OhlcAggregationScheduler,
     DataRetentionScheduler,
-    OhlcCleanupSchedulerService,
     OhlcPermanentCleanupScheduler,
     NavasanSchedulerService,
     ScheduleConfigService,
@@ -63,7 +55,6 @@ import { AuthModule } from "../auth/auth.module";
   exports: [
     OhlcAggregationScheduler,
     DataRetentionScheduler,
-    OhlcCleanupSchedulerService,
     OhlcPermanentCleanupScheduler,
     NavasanSchedulerService,
   ],

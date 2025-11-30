@@ -4,14 +4,16 @@ import { Document } from "mongoose";
 export type PriceSnapshotDocument = PriceSnapshot & Document;
 
 /**
- * Price Snapshot Schema - PERMANENT STORAGE
+ * Price Snapshot Schema - FALLBACK DATA SOURCE
  *
- * This schema stores historical records of price data permanently.
- * Records are NEVER automatically deleted - they remain forever for historical analysis.
+ * This schema stores hourly price snapshots as a fallback when OHLC data is unavailable.
+ * Records are automatically deleted after 90 days via the DataRetentionScheduler.
  *
  * Each snapshot represents the state of all items at a specific timestamp.
  * One snapshot is saved per hour per category (currencies, crypto, gold).
  *
+ * Primary use: Emergency fallback when ohlc_permanent has data gaps.
+ * Retention: 90 days
  * Storage estimate: ~10-20 MB per month
  */
 @Schema({
@@ -54,9 +56,14 @@ export class PriceSnapshot {
 
 export const PriceSnapshotSchema = SchemaFactory.createForClass(PriceSnapshot);
 
-// PERMANENT STORAGE: No TTL index - records are kept forever
-// If you want to enable automatic deletion after X days, uncomment the line below:
-// PriceSnapshotSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
+// Retention: Records deleted after 90 days by DataRetentionScheduler
+// No TTL index - cleanup is handled by scheduled cron job for better control
+
+// UNIQUE constraint: Prevent duplicate snapshots for same category+timestamp
+PriceSnapshotSchema.index(
+  { category: 1, timestamp: 1 },
+  { unique: true, name: "unique_category_timestamp" },
+);
 
 // Add compound indexes for efficient querying
 PriceSnapshotSchema.index({ category: 1, timestamp: -1 });

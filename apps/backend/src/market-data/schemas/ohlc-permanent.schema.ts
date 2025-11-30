@@ -8,7 +8,9 @@ export type OHLCPermanentDocument = OHLCPermanent & Document;
   collection: "ohlc_permanent",
 })
 export class OHLCPermanent {
-  @Prop({ required: true, index: true })
+  // itemCode is stored in UPPERCASE for consistency across all collections
+  // Use uppercase: true to automatically normalize on save
+  @Prop({ required: true, index: true, uppercase: true })
   itemCode!: string;
 
   @Prop({ required: true, enum: ["currency", "crypto", "gold"] })

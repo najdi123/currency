@@ -145,6 +145,7 @@ export class OHLCCollectorService implements OnModuleInit {
 
   /**
    * Collect real-time data every minute
+   * Optimized: Uses batch query instead of N+1 individual queries
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async collectMinuteData(): Promise<void> {
@@ -169,32 +170,39 @@ export class OHLCCollectorService implements OnModuleInit {
       const timestamp = new Date();
       timestamp.setSeconds(0, 0); // Round to minute
 
+      // OPTIMIZATION: Batch query for all existing records instead of N+1
+      const itemCodes = this.ITEMS_TO_TRACK.map((item) => item.code);
+      const existingRecords = await this.ohlcManager.getBatchOHLCData(
+        itemCodes,
+        "1m",
+        timestamp,
+        new Date(timestamp.getTime() + 59999),
+      );
+
+      // Create a map for O(1) lookup
+      const existingMap = new Map(
+        existingRecords.map((r) => [r.itemCode, r]),
+      );
+
       const ohlcData = [];
 
-      // Process each tracked item
+      // Process each tracked item using the pre-fetched data
       for (const item of this.ITEMS_TO_TRACK) {
         const price = this.extractPrice(latestRates, item);
 
         if (price !== null && price > 0) {
-          // Check if we have an existing record for this minute
-          const existing = await this.ohlcManager.getOHLCData(
-            item.code,
-            item.type,
-            "1m",
-            timestamp,
-            new Date(timestamp.getTime() + 59999), // End of the same minute
-          );
+          const existing = existingMap.get(item.code);
 
-          if (existing.length > 0) {
+          if (existing) {
             // Update existing record
             ohlcData.push({
               itemCode: item.code,
               itemType: item.type,
               timeframe: "1m",
               timestamp,
-              open: existing[0].open, // Keep original open
-              high: Math.max(existing[0].high, price),
-              low: Math.min(existing[0].low, price),
+              open: existing.open, // Keep original open
+              high: Math.max(existing.high, price),
+              low: Math.min(existing.low, price),
               close: price, // Update close
               volume: 0,
               source: "api",

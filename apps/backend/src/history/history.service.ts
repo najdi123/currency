@@ -65,15 +65,18 @@ export class HistoryService {
   /**
    * Get history from ohlc_permanent collection
    * Uses 1d timeframe data for daily prices
+   * For today (incomplete day), aggregates from 1h data
    */
   private async getHistoryFromOhlcPermanent(
     itemCode: string,
     days: number,
   ): Promise<HistoryDataPoint[]> {
     try {
-      const endDate = moment().tz(this.timezone).endOf("day").toDate();
-      const startDate = moment()
-        .tz(this.timezone)
+      const now = moment().tz(this.timezone);
+      const todayStart = now.clone().startOf("day").toDate();
+      const endDate = now.clone().endOf("day").toDate();
+      const startDate = now
+        .clone()
         .subtract(days, "days")
         .startOf("day")
         .toDate();
@@ -82,18 +85,59 @@ export class HistoryService {
         `Querying ohlc_permanent for ${itemCode.toUpperCase()} from ${startDate.toISOString()} to ${endDate.toISOString()}`,
       );
 
-      // Query ohlc_permanent for 1d timeframe data
-      const records = await this.ohlcPermanentModel
+      // Query ohlc_permanent for 1d timeframe data (completed days)
+      const dailyRecords = await this.ohlcPermanentModel
         .find({
           itemCode: itemCode.toUpperCase(),
           timeframe: "1d",
-          timestamp: { $gte: startDate, $lte: endDate },
+          timestamp: { $gte: startDate, $lt: todayStart },
         })
         .sort({ timestamp: 1 })
         .lean()
         .exec();
 
-      if (!records || records.length === 0) {
+      // For today, aggregate from 1h data since 1d isn't complete yet
+      const todayHourlyRecords = await this.ohlcPermanentModel
+        .find({
+          itemCode: itemCode.toUpperCase(),
+          timeframe: "1h",
+          timestamp: { $gte: todayStart, $lte: endDate },
+        })
+        .sort({ timestamp: 1 })
+        .lean()
+        .exec();
+
+      const historyData: HistoryDataPoint[] = [];
+
+      // Add completed daily records
+      for (const record of dailyRecords) {
+        historyData.push({
+          date: moment(record.timestamp).tz(this.timezone).format("YYYY-MM-DD"),
+          price: record.close,
+          timestamp: Math.floor(record.timestamp.getTime() / 1000),
+        });
+      }
+
+      // Add today's data if we have hourly records
+      if (todayHourlyRecords.length > 0) {
+        const todayOpen = todayHourlyRecords[0].open;
+        const todayHigh = Math.max(...todayHourlyRecords.map((r) => r.high));
+        const todayLow = Math.min(...todayHourlyRecords.map((r) => r.low));
+        const todayClose =
+          todayHourlyRecords[todayHourlyRecords.length - 1].close;
+
+        historyData.push({
+          date: now.format("YYYY-MM-DD"),
+          price: todayClose, // Use latest close as today's price
+          timestamp: Math.floor(todayStart.getTime() / 1000),
+        });
+
+        this.logger.log(
+          `Added today's data for ${itemCode}: open=${todayOpen}, high=${todayHigh}, low=${todayLow}, close=${todayClose}`,
+        );
+      }
+
+      if (historyData.length === 0) {
         this.logger.warn(
           `No ohlc_permanent data found for ${itemCode} in the last ${days} days`,
         );
@@ -101,15 +145,10 @@ export class HistoryService {
       }
 
       this.logger.log(
-        `Found ${records.length} ohlc_permanent records for ${itemCode}`,
+        `Found ${historyData.length} data points for ${itemCode} (${dailyRecords.length} daily + ${todayHourlyRecords.length > 0 ? "today" : "no today"})`,
       );
 
-      // Transform to HistoryDataPoint format
-      return records.map((record) => ({
-        date: moment(record.timestamp).format("YYYY-MM-DD"),
-        price: record.close, // Use closing price
-        timestamp: Math.floor(record.timestamp.getTime() / 1000),
-      }));
+      return historyData;
     } catch (error) {
       const err = error as Error;
       this.logger.error(

@@ -427,14 +427,6 @@ button, a, [role="button"] {
   .card-apple:hover {
     box-shadow: var(--shadow-md);
     background: var(--background-secondary);
-    transform: translateY(-2px);
-  }
-
-  /* Respect accessibility preference */
-  @media (prefers-reduced-motion: reduce) {
-    .card-apple:hover {
-      transform: none;
-    }
   }
 
   /* Button Utilities - Apple-style button variants */

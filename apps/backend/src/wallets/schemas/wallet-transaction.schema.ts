@@ -53,6 +53,18 @@ WalletTransactionSchema.index(
   { unique: true, sparse: true },
 );
 
+// Admin reporting index - for queries across all users by date
+WalletTransactionSchema.index({ createdAt: -1 });
+
+// Retention policy: Auto-delete transactions older than 5 years
+// 5 years = 5 * 365 * 24 * 60 * 60 = 157,680,000 seconds
+// Note: Financial records often have regulatory retention requirements
+// Adjust this value based on your jurisdiction's requirements
+WalletTransactionSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 157680000, name: "ttl_5_years_retention" },
+);
+
 WalletTransactionSchema.set("toJSON", {
   transform: (_doc: any, ret: any) => {
     if (ret.amount?.toString) ret.amount = ret.amount.toString();

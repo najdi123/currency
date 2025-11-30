@@ -85,6 +85,25 @@ export const formatYAxisLabel = (value: number): string => {
 }
 
 /**
+ * Format tooltip values with at least 2 decimal places
+ * Shows full precision for small numbers, K/M/B for large numbers
+ */
+export const formatTooltipValue = (value: number): string => {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(2)}B`
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(2)}M`
+  }
+  if (value >= 1_000) {
+    // For thousands, show with commas and 2 decimal places
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+  // For smaller numbers, always show at least 2 decimal places
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/**
  * Get ECharts option configuration
  */
 export const getEChartsOption = (
@@ -255,11 +274,11 @@ export const getEChartsOption = (
         return `
           <div style="font-size: 12px; line-height: 1.6;">
             <div style="margin-bottom: 6px; font-weight: 600; color: ${isDark ? '#FFFFFF' : '#000000'};">${formatChartDate(point.timestamp, timeRange)}</div>
-            <div>Open: ${formatYAxisLabel(point.open)} T</div>
-            <div>High: ${formatYAxisLabel(point.high)} T</div>
-            <div>Low: ${formatYAxisLabel(point.low)} T</div>
-            <div style="font-weight: 600;">Close: ${formatYAxisLabel(point.close)} T</div>
-            ${point.volume ? `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid ${colors.grid};">Volume: ${formatYAxisLabel(point.volume)}</div>` : ''}
+            <div>Open: ${formatTooltipValue(point.open)} T</div>
+            <div>High: ${formatTooltipValue(point.high)} T</div>
+            <div>Low: ${formatTooltipValue(point.low)} T</div>
+            <div style="font-weight: 600;">Close: ${formatTooltipValue(point.close)} T</div>
+            ${point.volume ? `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid ${colors.grid};">Volume: ${formatTooltipValue(point.volume)}</div>` : ''}
           </div>
         `
       },

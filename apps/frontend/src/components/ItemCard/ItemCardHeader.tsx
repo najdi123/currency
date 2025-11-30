@@ -32,6 +32,12 @@ interface ItemCardHeaderProps {
    * Optional variants dropdown to display (shown at the end)
    */
   variantsDropdown?: React.ReactNode
+
+  /**
+   * Selected variant name to display instead of the base name
+   * e.g., "دلار سنا (خرید)" for "Turkey Dollar (Buy)"
+   */
+  selectedVariantName?: string
 }
 
 /**
@@ -55,7 +61,10 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
   iconColor = 'text-accent',
   compact = false,
   variantsDropdown,
+  selectedVariantName,
 }) => {
+  // Use selected variant name if provided, otherwise fall back to base name
+  const displayName = selectedVariantName || name
   // If icon is invalid, render a placeholder circle
   if (!isValidIconComponent(Icon)) {
     return (
@@ -70,7 +79,7 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
             compact ? 'text-xs sm:text-xs md:text-sm' : 'text-sm sm:text-base'
           } font-semibold text-text-secondary truncate text-right [dir=ltr]:text-left flex-1`}
         >
-          {name}
+          {displayName}
         </h3>
         {variantsDropdown && <div className="flex-shrink-0">{variantsDropdown}</div>}
       </div>
@@ -97,7 +106,7 @@ export const ItemCardHeader: React.FC<ItemCardHeaderProps> = ({
           compact ? 'text-xs sm:text-xs md:text-sm' : 'text-sm sm:text-base'
         } font-semibold text-text-secondary truncate flex-1 min-w-0 text-right [dir=ltr]:text-left`}
       >
-        {name}
+        {displayName}
       </h3>
 
       {variantsDropdown && <div className="flex-shrink-0">{variantsDropdown}</div>}

@@ -63,5 +63,12 @@ export const CacheSchema = SchemaFactory.createForClass(Cache);
 // MongoDB will automatically delete documents when expiresAt is reached
 CacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+// UNIQUE constraint: Only one cache entry per category+cacheType
+// Prevents multiple "fresh" or "stale" entries for the same category
+CacheSchema.index(
+  { category: 1, cacheType: 1 },
+  { unique: true, name: "unique_category_cachetype" },
+);
+
 // Index for efficient queries by cache type
 CacheSchema.index({ category: 1, cacheType: 1, timestamp: -1 });

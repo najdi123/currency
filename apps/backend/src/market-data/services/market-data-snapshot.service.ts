@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PriceSnapshot, PriceSnapshotDocument } from '../schemas/price-snapshot.schema';
-import { OhlcSnapshot, OhlcSnapshotDocument } from '../schemas/ohlc-snapshot.schema';
 import { OHLCPermanent, OHLCPermanentDocument } from '../schemas/ohlc-permanent.schema';
 import { SNAPSHOT } from '../constants/market-data.constants';
 import { MarketDataResponse, AggregatedOhlcData } from '../types/market-data.types';
@@ -12,10 +11,10 @@ import { safeDbRead, safeDbWrite } from '../../common/utils/db-error-handler';
 /**
  * MarketDataSnapshotService
  *
- * Responsible for managing price and OHLC snapshots
- * - Saves hourly price snapshots
+ * Responsible for managing price snapshots and OHLC queries
+ * - Saves hourly price snapshots (fallback data source)
  * - Finds closest snapshots for historical queries
- * - Manages OHLC snapshots
+ * - Queries ohlc_permanent for OHLC data
  * - Handles retention policies
  */
 @Injectable()
@@ -25,8 +24,6 @@ export class MarketDataSnapshotService {
   constructor(
     @InjectModel(PriceSnapshot.name)
     private priceSnapshotModel: Model<PriceSnapshotDocument>,
-    @InjectModel(OhlcSnapshot.name)
-    private ohlcSnapshotModel: Model<OhlcSnapshotDocument>,
     @InjectModel(OHLCPermanent.name)
     private ohlcPermanentModel: Model<OHLCPermanentDocument>,
     private metricsService: MetricsService,
@@ -222,63 +219,6 @@ export class MarketDataSnapshotService {
     );
 
     return result || [];
-  }
-
-  /**
-   * Save OHLC snapshot
-   */
-  async saveOhlcSnapshot(
-    itemCode: string,
-    timeframe: string,
-    data: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      const now = new Date();
-
-      const snapshot = new this.ohlcSnapshotModel({
-        itemCode,
-        timeframe,
-        data,
-        timestamp: now,
-      });
-
-      await safeDbWrite(
-        () => snapshot.save(),
-        'saveOhlcSnapshot',
-        this.logger,
-        { itemCode, timeframe },
-        false, // Not critical
-      );
-
-      this.logger.debug(
-        `Saved OHLC snapshot for ${itemCode} (${timeframe})`,
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Failed to save OHLC snapshot for ${itemCode}: ${errorMessage}`,
-      );
-    }
-  }
-
-  /**
-   * Get OHLC snapshot
-   */
-  async getOhlcSnapshot(
-    itemCode: string,
-    timeframe: string,
-  ): Promise<OhlcSnapshotDocument | null> {
-    return safeDbRead(
-      () =>
-        this.ohlcSnapshotModel
-          .findOne({ itemCode, timeframe })
-          .sort({ timestamp: -1 })
-          .exec(),
-      'getOhlcSnapshot',
-      this.logger,
-      { itemCode, timeframe },
-    );
   }
 
   /**
